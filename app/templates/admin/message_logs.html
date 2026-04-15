@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0"><i class="fa-solid fa-satellite-dish text-success"></i> {{ title }}</h3>
+</div>
+
+<div class="header-glass max-w-full flex-col align-start m-0">
+    <div class="table-responsive w-100">
+        <table class="table-glass">
+            <thead>
+                <tr>
+                    <th>Data/Hora</th>
+                    <th>Recebedor</th>
+                    <th>Envio por</th>
+                    <th>Mensagem</th>
+                    <th>Canal</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="nowrap text-sm text-muted">{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="font-semibold">{{ log.client.name if log.client else 'Deletado' }}</td>
+                    <td class="text-sm">{{ log.user.username if log.user else 'API/Bot' }}</td>
+                    <td class="text-sm">
+                        <div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ log.content }}">
+                            {{ log.content }}
+                        </div>
+                    </td>
+                    <td>
+                        {% if log.channel == 'evolution_api' %}
+                        <span class="badge badge-primary"><i class="fa-solid fa-robot"></i> API</span>
+                        {% else %}
+                        <span class="badge badge-success"><i class="fa-brands fa-whatsapp"></i> ZAP Link</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.status == 'sent' %}
+                        <span class="badge badge-primary">Enviado</span>
+                        {% elif log.status == 'error' %}
+                        <span class="badge badge-danger">Erro</span>
+                        {% else %}
+                        <span class="badge badge-secondary">{{ log.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted p-4">Nenhum registro de disparo encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

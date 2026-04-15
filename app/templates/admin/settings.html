@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0">Configurações do Sistema</h3>
+</div>
+
+<div class="header-glass max-w-lg">
+    <form action="" method="post" class="w-100">
+        <h4 class="card-title mb-4">
+            <i class="fa-brands fa-whatsapp text-success"></i> Templates de Mensagens WhatsApp
+        </h4>
+        
+        <div class="form-group">
+            <label for="msg_boas_vindas">Mensagem de Boas-Vindas (Novo Lead)</label>
+            <textarea name="msg_boas_vindas" id="msg_boas_vindas" class="input-glass" rows="4" 
+                      placeholder="Olá! Vi que você se cadastrou...">{{ settings.get('msg_boas_vindas', '') }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="msg_proposta">Envio de Proposta</label>
+            <textarea name="msg_proposta" id="msg_proposta" class="input-glass" rows="4" 
+                      placeholder="Segue a nossa proposta comercial...">{{ settings.get('msg_proposta', '') }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="msg_fechamento">Agradecimento de Fechamento</label>
+            <textarea name="msg_fechamento" id="msg_fechamento" class="input-glass" rows="4" 
+                      placeholder="Muito obrigado por fechar conosco!">{{ settings.get('msg_fechamento', '') }}</textarea>
+        </div>
+
+        <button type="submit" class="btn-primary mt-3">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações
+        </button>
+    </form>
+</div>
+
+<div class="header-glass max-w-lg flex-col align-start m-0 mb-4 mt-4">
+    <h4 class="card-title w-100 text-primary mb-3">
+        <i class="fa-solid fa-store"></i> Lojas & Filiais
+    </h4>
+    <div class="w-100 mb-4">
+        {% for store in stores %}
+        <div class="d-flex align-center justify-between p-3 border-bottom bg-glass mt-2 rounded-md" style="border: 1px solid var(--glass-border);">
+            <div class="font-semibold">{{ store.name }}</div>
+            <form action="{{ url_for('admin.delete_store', id=store.id) }}" method="post" onsubmit="return confirm('Excluir loja {{ store.name }}?')">
+                <button class="icon-btn text-danger p-1 m-0">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <p class="text-sm text-muted">Nenhuma loja cadastrada.</p>
+        {% endfor %}
+    </div>
+
+    <form action="{{ url_for('admin.new_store') }}" method="post" class="w-100 d-flex gap-2">
+        <input type="text" name="name" class="input-glass flex-1" placeholder="Nome da nova loja..." required>
+        <button type="submit" class="btn-primary w-auto">Adicionar</button>
+    </form>
+</div>
+{% endblock %}

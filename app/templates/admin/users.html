@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0">Gestão de Usuários</h3>
+    <a href="{{ url_for('admin.new_user') }}" class="btn-primary w-auto">
+        <i class="fa-solid fa-user-plus"></i> Novo Usuário
+    </a>
+</div>
+
+<div class="header-glass p-0 mb-4" style="overflow:hidden;display:block;">
+    <div class="table-responsive">
+        <table class="table-glass">
+            <thead>
+                <tr>
+                    <th>Usuário</th>
+                    <th>E-mail</th>
+                    <th>Perfil</th>
+                    <th>Pontos XP</th>
+                    <th>Criado em</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-center gap-2">
+                            <div class="avatar avatar-md"
+                                 style="background:{% if user.role == 'admin' %}var(--primary-color){% elif user.role == 'gerente' %}#f59e0b{% else %}#475569{% endif %};">
+                                {{ user.username[0] | upper }}
+                            </div>
+                            <span class="font-semibold">{{ user.username }}</span>
+                        </div>
+                    </td>
+                    <td class="text-sm text-muted">{{ user.email }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if user.role == 'admin' %} badge-primary
+                            {% elif user.role == 'gerente' %} badge-warning
+                            {% else %} badge-secondary {% endif %}">
+                            {{ user.role | capitalize }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="text-warning font-semibold">{{ user.performance_points }} XP</span>
+                    </td>
+                    <td class="text-sm text-muted">
+                        {{ user.created_at.strftime('%d/%m/%Y') }}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('admin.edit_user', id=user.id) }}" class="icon-btn-solid primary">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            {% if user.id != current_user.id %}
+                            <form action="{{ url_for('admin.delete_user', id=user.id) }}" method="post"
+                                  class="d-inline" onsubmit="return confirm('Excluir usuário {{ user.username }}?')">
+                                <button class="icon-btn-solid danger">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

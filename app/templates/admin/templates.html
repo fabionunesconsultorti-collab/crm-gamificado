@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0"><i class="fa-solid fa-file-code text-primary"></i> {{ title }}</h3>
+</div>
+
+<div class="grid grid-main-layout gap-4">
+    <div>
+        <div class="header-glass flex-col align-start m-0">
+            <h4 class="card-title w-100 flex justify-between">
+                <span>Lista de Templates</span>
+            </h4>
+            <div class="table-responsive w-100 mt-3">
+                <table class="table-glass">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Conteúdo (Início)</th>
+                            <th class="text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in templates %}
+                        <tr>
+                            <td class="font-semibold">{{ t.name }}</td>
+                            <td><span class="text-xs text-muted">{{ t.text_content[:80] }}...</span></td>
+                            <td class="text-right">
+                                <form action="{{ url_for('admin.delete_template', id=t.id) }}" method="post" class="d-inline" onsubmit="return confirm('Excluir este template?');">
+                                    <button type="submit" class="icon-btn text-danger">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted p-4">Nenhum template cadastrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="header-glass flex-col align-start m-0">
+            <h4 class="card-title w-100 text-success">
+                <i class="fa-solid fa-plus"></i> Novo Template
+            </h4>
+            <div class="text-xs text-muted w-100 mb-3">
+                Variáveis Mágicas Suportadas:<br>
+                <span class="badge badge-primary mt-1">[NOME]</span>
+                <span class="badge badge-primary mt-1">[DATA]</span>
+                <span class="badge badge-primary mt-1">[HORA]</span><br>
+                <span class="badge badge-primary mt-1">[VENDEDOR]</span>
+                <span class="badge badge-primary mt-1">[STATUS]</span>
+            </div>
+            <form action="" method="post" class="w-100">
+                <div class="form-group mb-2">
+                    <input type="text" name="name" class="input-glass" placeholder="Nome do Template (ex: Cobrança Tier 1)" required>
+                </div>
+                <div class="form-group mb-3">
+                    <textarea name="text_content" class="input-glass" rows="6" placeholder="Olá [NOME]! Notamos que hoje, [DATA], o seu pedido..." required></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Registrar Template</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

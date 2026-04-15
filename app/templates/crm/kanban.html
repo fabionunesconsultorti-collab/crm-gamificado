@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+.kanban-wrap {
+    display: flex;
+    gap: 1.25rem;
+    overflow-x: auto;
+    padding-bottom: 1.5rem;
+    align-items: flex-start;
+}
+
+.kanban-column {
+    flex: 0 0 270px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 220px);
+}
+
+.kanban-col-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 14px 14px 0 0;
+}
+
+.kanban-cards {
+    padding: 0.75rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 80px;
+    transition: background 0.2s;
+}
+
+.kanban-cards.drag-over {
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+}
+
+.kanban-card {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.2s;
+    user-select: none;
+}
+
+.kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: var(--primary-color);
+}
+
+.kanban-card.dragging {
+    opacity: 0.3;
+    cursor: grabbing;
+}
+
+.kanban-card-name   { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; }
+.kanban-card-phone  { font-size: 0.78rem; color: var(--text-muted); }
+.kanban-card-email  { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+.kanban-card-notes  {
+    margin-top: 0.5rem; font-size: 0.78rem; color: var(--text-muted);
+    font-style: italic; overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+.kanban-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.col-badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+/* Specific component icon colors to avoid inline style duplication */
+.kanban-icon-phone { font-size:0.7rem; width:14px; }
+.kanban-icon-email { font-size:0.7rem; width:14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <div>
+        <h3 class="m-0">Funil de Vendas</h3>
+        <div class="text-xs text-muted mt-1">
+            {{ total_clients }} clientes no funil &mdash; Arraste para mover entre etapas
+        </div>
+    </div>
+    <a href="{{ url_for('crm.new_client') }}" class="btn-primary w-auto">
+        <i class="fa-solid fa-plus"></i> Novo Cliente
+    </a>
+</div>
+
+<div class="kanban-wrap" id="kanbanBoard">
+
+    {% set columns = [
+        ('lead',     'Novos Leads',       '#6366f1', 'fa-user-plus'),
+        ('contato',  'Em Contato',        '#f59e0b', 'fa-phone'),
+        ('proposta', 'Proposta Enviada',  '#3b82f6', 'fa-file-alt'),
+        ('fechado',  'Fechado (Venda!)',  '#10b981', 'fa-trophy'),
+        ('perdido',  'Perdido',           '#ef4444', 'fa-circle-xmark')
+    ] %}
+
+    {% for status, label, color, icon in columns %}
+    <div class="kanban-column" data-status="{{ status }}">
+        <div class="kanban-col-header" style="background: {{ color }}18;">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid {{ icon }}" style="color: {{ color }};"></i>
+                <span class="font-semibold text-sm" style="color: {{ color }};">{{ label }}</span>
+            </div>
+            <span class="col-badge" style="background: {{ color }}44;" id="count-{{ status }}">
+                {{ clients_by_status[status] | length }}
+            </span>
+        </div>
+        <div class="kanban-cards" data-status="{{ status }}" id="col-{{ status }}">
+            {% for client in clients_by_status[status] %}
+            <div class="kanban-card" draggable="true" data-id="{{ client.id }}">
+                <div class="d-flex justify-between align-start mb-1">
+                    <div class="kanban-card-name">{{ client.name }}</div>
+                    {% if client.tier == 'vip' %}
+                    <span class="badge" style="background:#f59e0b;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">VIP</span>
+                    {% elif client.tier == 'ouro' %}
+                    <span class="badge" style="background:#eab308;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">Ouro</span>
+                    {% endif %}
+                </div>
+                <div class="kanban-card-phone"><i class="fa-solid fa-phone kanban-icon-phone"></i> {{ client.phone }}</div>
+                {% if client.email %}
+                <div class="kanban-card-email"><i class="fa-solid fa-envelope kanban-icon-email"></i> {{ client.email }}</div>
+                {% endif %}
+                {% if client.notes %}
+                <div class="kanban-card-notes">"{{ client.notes }}"</div>
+                {% endif %}
+                <div class="kanban-card-actions">
+                    <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn-solid primary flex-1 text-center">
+                        <i class="fa-solid fa-pen"></i> Editar
+                    </a>
+                    <a href="{{ url_for('crm.message_client', id=client.id) }}"
+                       class="icon-btn-solid success flex-1 text-center" title="Enviar Mensagem / WA">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                    <form action="{{ url_for('crm.delete_client', id=client.id) }}" method="post" class="flex-1 d-flex" onsubmit="return confirm('Excluir {{ client.name }}?')">
+                        <button class="icon-btn-solid danger w-100 justify-center">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center text-muted p-4 text-sm">
+                <i class="fa-solid fa-inbox text-muted opacity-50 mb-2" style="font-size:1.5rem; display:block;"></i>
+                Vazio
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+let draggedCard = null;
+let sourceCol   = null;
+
+document.querySelectorAll('.kanban-card').forEach(attachDrag);
+
+function attachDrag(card) {
+    card.addEventListener('dragstart', () => {
+        draggedCard = card;
+        sourceCol   = card.closest('.kanban-cards');
+        setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        draggedCard = null;
+    });
+}
+
+document.querySelectorAll('.kanban-cards').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', e => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        if (!draggedCard || col === sourceCol) return;
+
+        const newStatus = col.dataset.status;
+        const clientId  = draggedCard.dataset.id;
+
+        col.appendChild(draggedCard);
+        updateCounts();
+
+        fetch(`/crm/client/${clientId}/move`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: newStatus})
+        }).catch(() => {
+            // Revert on failure
+            if (sourceCol) sourceCol.appendChild(draggedCard);
+            updateCounts();
+        });
+    });
+});
+
+function updateCounts() {
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        const status = col.dataset.status;
+        const count  = col.querySelectorAll('.kanban-card').length;
+        const badge  = document.getElementById('count-' + status);
+        if (badge) badge.textContent = count;
+    });
+}
+</script>
+{% endblock %}

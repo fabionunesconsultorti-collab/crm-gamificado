@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0">{{ title }}</h3>
+    <a href="{{ url_for('crm.list_clients') }}" class="nav-link p-0 m-0 w-auto">
+        <i class="fa-solid fa-arrow-left nav-icon"></i> Voltar listagem
+    </a>
+</div>
+
+<div class="grid grid-main-layout gap-4">
+    <!-- Regras e Instruções -->
+    <div class="header-glass flex-col align-start m-0">
+        <h4 class="card-title w-100">
+            <i class="fa-solid fa-circle-info text-primary"></i> Instruções
+        </h4>
+        <p class="text-sm text-muted mb-3 line-height-relaxed">
+            Faça o upload de um arquivo <strong>.csv</strong> contendo a sua base de contatos. 
+            O sistema tentará identificar automaticamente informações através dos cabeçalhos.
+        </p>
+        <div class="w-100 p-3 bg-glass rounded-md border-bottom" style="border: 1px solid var(--glass-border);">
+            <div class="font-semibold text-sm mb-2">Colunas Aceitas:</div>
+            <ul class="text-xs text-muted" style="list-style-position: inside; display: flex; flex-direction: column; gap: 0.3rem;">
+                <li><code>Nome</code>, <code>nome</code> ou <code>Name</code></li>
+                <li><code>Telefone</code>, <code>telefone</code> ou <code>Phone</code></li>
+                <li><code>Email</code>, <code>email</code> ou <code>E-mail</code></li>
+            </ul>
+        </div>
+        <div class="mt-3 text-xs text-muted w-100">
+            <i class="fa-solid fa-star text-warning"></i> Você ganha <strong>+5 XP</strong> por cada cliente importado com sucesso!
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="header-glass m-0">
+        <form action="" method="post" enctype="multipart/form-data" class="w-100 d-flex flex-col gap-4">
+            <div class="form-group mb-0">
+                <label for="file">Arquivo CSV</label>
+                <div class="input-glass d-flex align-center justify-center p-4 border-bottom rounded-md" style="border: 2px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
+                    <input type="file" name="file" id="file" accept=".csv" required class="w-100" style="color:var(--text-main);">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary w-100 py-3">
+                <i class="fa-solid fa-upload"></i> Processar Arquivo
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

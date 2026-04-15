@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - CRM Pro</title>
+    <meta name="description" content="CRM Pro — Sistema de Gestão de Clientes e Funil de Vendas">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+
+    <!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2 class="sidebar-brand">
+                <span class="text-primary">CRM</span>
+                <span class="text-main"> PRO</span>
+            </h2>
+            <div class="sidebar-tagline">
+                GESTÃO DE VENDAS
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-title m-0 mb-1">
+                PRINCIPAL
+            </div>
+            <ul>
+                <li>
+                    <a href="{{ url_for('main.index') }}" class="nav-link {{ 'active' if request.endpoint == 'main.index' }}">
+                        <i class="fa-solid fa-chart-line nav-icon"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('crm.list_clients') }}" class="nav-link {{ 'active' if request.endpoint in ['crm.list_clients','crm.new_client','crm.edit_client', 'crm.import_csv'] }}">
+                        <i class="fa-solid fa-users nav-icon"></i> Clientes
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('crm.kanban') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.kanban' }}">
+                        <i class="fa-solid fa-filter nav-icon"></i> Funil Kanban
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('main.ranking') }}" class="nav-link {{ 'active' if request.endpoint == 'main.ranking' }}">
+                        <i class="fa-solid fa-trophy nav-icon"></i> Ranking XP
+                    </a>
+                </li>
+            </ul>
+
+            {% if current_user.role in ['admin', 'gerente'] %}
+            <div class="nav-section-title">
+                ADMINISTRAÇÃO
+            </div>
+            <ul>
+                <li>
+                    <a href="{{ url_for('admin.list_users') }}" class="nav-link {{ 'active' if 'admin.list_users' == request.endpoint or 'admin.new_user' == request.endpoint or 'admin.edit_user' == request.endpoint }}">
+                        <i class="fa-solid fa-user-gear nav-icon"></i> Usuários
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.templates_list') }}" class="nav-link {{ 'active' if 'admin.templates_list' in request.endpoint }}">
+                        <i class="fa-solid fa-file-code nav-icon"></i> Templates 
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.message_logs') }}" class="nav-link {{ 'active' if 'admin.message_logs' in request.endpoint }}">
+                        <i class="fa-solid fa-satellite-dish nav-icon"></i> Disparos (WA)
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.logs' }}">
+                        <i class="fa-solid fa-scroll nav-icon"></i> Logs do Sistema
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}">
+                        <i class="fa-solid fa-gear nav-icon"></i> Configurações
+                    </a>
+                </li>
+            </ul>
+            {% endif %}
+        </nav>
+
+        <!-- User footer -->
+        <div class="sidebar-footer">
+            <div class="d-flex align-center gap-2 mb-2">
+                <div class="avatar avatar-md">
+                    {{ current_user.username[0] | upper }}
+                </div>
+                <div>
+                    <div class="font-semibold text-sm">{{ current_user.username }}</div>
+                    <div class="text-xs text-muted">
+                        {{ current_user.role | capitalize }} &middot;
+                        <span class="text-warning font-bold">{{ current_user.performance_points }} XP</span>
+                    </div>
+                </div>
+            </div>
+            <a href="{{ url_for('auth.logout') }}" class="nav-link logout-link">
+                <i class="fa-solid fa-right-from-bracket nav-icon"></i> Sair
+            </a>
+        </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────────── -->
+    <div class="main-content">
+        <!-- Top bar -->
+        <div class="header-glass mb-4">
+            <div class="d-flex align-center gap-2">
+                <button id="sidebarToggle" class="sidebar-toggle">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <h3 class="m-0 font-semibold text-main">{{ title }}</h3>
+            </div>
+            <div class="d-flex align-center gap-2 header-glass-action">
+                <a href="{{ url_for('crm.new_client') }}" class="btn-primary btn-sm pt-2 w-100">
+                    <i class="fa-solid fa-plus"></i> Novo Cliente
+                </a>
+            </div>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+            <div class="flash-msg">
+                {{ message }}
+                <button onclick="this.parentElement.remove()" class="icon-btn text-muted p-0 m-0" style="margin-left:auto;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Overlay for mobile sidebar -->
+    <div id="overlay" class="d-none" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;" onclick="closeSidebar()"></div>
+
+    {% else %}
+    {% block auth_content %}{% endblock %}
+    {% endif %}
+
+    <script>
+        const toggleBtn = document.getElementById('sidebarToggle');
+        const sidebar   = document.getElementById('sidebar');
+        const overlay   = document.getElementById('overlay');
+
+        function openSidebar()  { sidebar.classList.add('active');    overlay.classList.remove('d-none'); }
+        function closeSidebar() { sidebar.classList.remove('active'); overlay.classList.add('d-none'); }
+
+        if (toggleBtn) toggleBtn.onclick = () => sidebar.classList.contains('active') ? closeSidebar() : openSidebar();
+
+        // Auto-dismiss flash after 4 s
+        document.querySelectorAll('.flash-msg').forEach(el => {
+            setTimeout(() => el.style.opacity = '0', 3500);
+            setTimeout(() => el.remove(), 4000);
+        });
+    </script>
+</body>
+</html>

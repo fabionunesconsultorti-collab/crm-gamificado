@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0">{{ title }}</h3>
+    <a href="{{ url_for('crm.list_clients') }}" class="nav-link p-0 m-0 w-auto">
+        <i class="fa-solid fa-arrow-left nav-icon"></i> Voltar listagem
+    </a>
+</div>
+
+<form action="" method="post" class="w-100">
+    <!-- 1. Dados Essenciais -->
+    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
+        <h4 class="card-title w-100 text-primary">
+            <i class="fa-solid fa-address-card"></i> 1. Dados Essenciais (Operação/Fiscal)
+        </h4>
+        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+            <div class="form-group mb-0">
+                <label for="name">Nome Completo *</label>
+                <input type="text" name="name" id="name" class="input-glass" value="{{ client.name if client else '' }}" required placeholder="Ex: João Silva">
+            </div>
+            <div class="form-group mb-0">
+                <label for="cpf">CPF</label>
+                <input type="text" name="cpf" id="cpf" class="input-glass" value="{{ client.cpf if client else '' }}" placeholder="000.000.000-00">
+            </div>
+            <div class="form-group mb-0">
+                <label for="email">E-mail</label>
+                <input type="email" name="email" id="email" class="input-glass" value="{{ client.email if client else '' }}" placeholder="exemplo@email.com">
+            </div>
+            <div class="form-group mb-0">
+                <label for="phone">Celular / WhatsApp *</label>
+                <input type="text" name="phone" id="phone" class="input-glass" value="{{ client.phone if client else '' }}" required placeholder="Ex: (11) 99999-9999">
+            </div>
+            <div class="form-group mb-0">
+                <label for="birth_date">Data de Nascimento</label>
+                <input type="date" name="birth_date" id="birth_date" class="input-glass" value="{{ client.birth_date.strftime('%Y-%m-%d') if client and client.birth_date else '' }}">
+            </div>
+            <div class="form-group mb-0">
+                <label for="cep">CEP</label>
+                <input type="text" name="cep" id="cep" class="input-glass" value="{{ client.cep if client else '' }}" placeholder="00000-000">
+            </div>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="address">Endereço Completo</label>
+                <input type="text" name="address" id="address" class="input-glass" value="{{ client.address if client else '' }}" placeholder="Rua, Número, Bairro, Cidade, UF">
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Estratégicos -->
+    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
+        <h4 class="card-title w-100 text-warning">
+            <i class="fa-solid fa-bullseye"></i> 2. Estratégicos e Comportamentais
+        </h4>
+        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+            <div class="form-group mb-0">
+                <label for="status">Status no Funil CRM</label>
+                <select name="status" id="status" class="input-glass">
+                    <option value="lead" {{ 'selected' if client and client.status == 'lead' }}>Novo Lead</option>
+                    <option value="contato" {{ 'selected' if client and client.status == 'contato' }}>Em Contato</option>
+                    <option value="proposta" {{ 'selected' if client and client.status == 'proposta' }}>Proposta Enviada</option>
+                    <option value="fechado" {{ 'selected' if client and client.status == 'fechado' }}>Fechado (Venda!)</option>
+                    <option value="perdido" {{ 'selected' if client and client.status == 'perdido' }}>Perdido</option>
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="gender">Gênero</label>
+                <select name="gender" id="gender" class="input-glass">
+                    <option value="" {{ 'selected' if not client or not client.gender }}>Não Informado</option>
+                    <option value="M" {{ 'selected' if client and client.gender == 'M' }}>Masculino</option>
+                    <option value="F" {{ 'selected' if client and client.gender == 'F' }}>Feminino</option>
+                    <option value="O" {{ 'selected' if client and client.gender == 'O' }}>Outro</option>
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="preferred_store_id">Loja de Preferência</label>
+                <select name="preferred_store_id" id="preferred_store_id" class="input-glass">
+                    <option value="">Nenhuma / Matriz</option>
+                    {% for store in stores %}
+                    <option value="{{ store.id }}" {{ 'selected' if client and client.preferred_store_id == store.id }}>{{ store.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="referred_by_id">Vendedor Referência</label>
+                <select name="referred_by_id" id="referred_by_id" class="input-glass">
+                    <option value="">Nenhum</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {{ 'selected' if client and client.referred_by_id == user.id }}>{{ user.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="preferred_channel">Canal Preferencial</label>
+                <select name="preferred_channel" id="preferred_channel" class="input-glass">
+                    <option value="whatsapp" {{ 'selected' if client and client.preferred_channel == 'whatsapp' }}>WhatsApp</option>
+                    <option value="email" {{ 'selected' if client and client.preferred_channel == 'email' }}>E-mail</option>
+                    <option value="telefone" {{ 'selected' if client and client.preferred_channel == 'telefone' }}>Ligação Telefônica</option>
+                    <option value="presencial" {{ 'selected' if client and client.preferred_channel == 'presencial' }}>Presencialmente</option>
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="lead_source">Origem do Cadastro</label>
+                <select name="lead_source" id="lead_source" class="input-glass">
+                    <option value="loja_fisica" {{ 'selected' if client and client.lead_source == 'loja_fisica' }}>Loja Física</option>
+                    <option value="ecommerce" {{ 'selected' if client and client.lead_source == 'ecommerce' }}>E-commerce</option>
+                    <option value="instagram" {{ 'selected' if client and client.lead_source == 'instagram' }}>Instagram</option>
+                    <option value="indicacao" {{ 'selected' if client and client.lead_source == 'indicacao' }}>Indicação</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group mt-4 mb-0 w-100">
+            <label for="notes">Anotações / Histórico Geral</label>
+            <textarea name="notes" id="notes" class="input-glass" rows="4" placeholder="Detalhes de venda, comportamento, etc">{{ client.notes if client else '' }}</textarea>
+        </div>
+    </div>
+
+    <!-- 3. Fidelidade -->
+    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
+        <h4 class="card-title w-100 text-success">
+            <i class="fa-solid fa-medal"></i> 3. Fidelidade e Engajamento
+        </h4>
+        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+            <div class="form-group mb-0">
+                <label for="tier">Nível (Tier)</label>
+                <select name="tier" id="tier" class="input-glass">
+                    <option value="bronze" {{ 'selected' if client and client.tier == 'bronze' }}>🥉 Bronze</option>
+                    <option value="prata" {{ 'selected' if client and client.tier == 'prata' }}>🥈 Prata</option>
+                    <option value="ouro" {{ 'selected' if client and client.tier == 'ouro' }}>🥇 Ouro</option>
+                    <option value="vip" {{ 'selected' if client and client.tier == 'vip' }}>💎 VIP</option>
+                </select>
+            </div>
+            <div class="form-group mb-0">
+                <label for="loyalty_points">Saldo de Pontos</label>
+                <input type="number" step="0.01" name="loyalty_points" id="loyalty_points" class="input-glass" value="{{ client.loyalty_points if client else '0' }}">
+            </div>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="badges">Selos / Badges (separados por vírgula)</label>
+                <input type="text" name="badges" id="badges" class="input-glass" value="{{ client.badges if client else '' }}" placeholder="Eco-friendly, Early Adopter, etc">
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. LGPD -->
+    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0" style="border-color: rgba(244, 63, 94, 0.4);">
+        <h4 class="card-title w-100 text-danger">
+            <i class="fa-solid fa-scale-balanced"></i> 4. Conformidade (LGPD)
+        </h4>
+        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label class="d-flex align-center gap-2" style="cursor: pointer; text-transform: none; letter-spacing: normal;">
+                    <input type="checkbox" name="opt_in" value="1" {{ 'checked' if client and client.opt_in }}>
+                    <span class="text-main">Status de Consentimento (Opt-in)</span>
+                </label>
+                <div class="text-xs text-muted mt-1">Marque se o cliente aceitou os termos de uso de dados.</div>
+            </div>
+            <div class="form-group mb-0">
+                <label for="consent_channel">Canal de Consentimento</label>
+                <input type="text" name="consent_channel" id="consent_channel" class="input-glass" value="{{ client.consent_channel if client else '' }}" placeholder="Ex: Assinatura PDV, Site">
+            </div>
+            <div class="form-group mb-0">
+                <label for="data_usage_purpose">Finalidade do Uso</label>
+                <input type="text" name="data_usage_purpose" id="data_usage_purpose" class="input-glass" value="{{ client.data_usage_purpose if client else '' }}" placeholder="Ex: Marketing e NF-e">
+            </div>
+            {% if client and client.opt_in_date %}
+            <div class="form-group mb-0 w-100" style="grid-column: span 2;">
+                <div class="text-xs text-success"><i class="fa-solid fa-check"></i> Consentimento registrado em {{ client.opt_in_date.strftime('%d/%m/%Y %H:%M') }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="max-w-lg d-flex flex-wrap gap-3 mt-4 mb-4">
+        <button type="submit" class="btn-primary w-auto flex-1">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Registro do Cliente
+        </button>
+        <a href="{{ url_for('crm.list_clients') }}" class="btn-primary btn-outline w-auto flex-1 text-center">
+            Cancelar
+        </a>
+    </div>
+</form>
+{% endblock %}
