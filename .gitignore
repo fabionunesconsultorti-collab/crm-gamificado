@@ -1,7 +1,48 @@
-venv/
+# Python
 __pycache__/
-*.pyc
-instance/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# Database
 *.db
+*.sqlite3
+instance/
+
+# Environments
 .env
+.venv
+
+# IDEs
+.vscode/
+.idea/
+.project
+.pydevproject
+
+# System
 .DS_Store
+Thumbs.db
+
+# Gemini / AI
+.gemini/
