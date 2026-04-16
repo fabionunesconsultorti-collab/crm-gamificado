@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .terminal-log {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        height: 250px;
+        overflow-y: auto;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.85rem;
+        color: #10b981; /* Green */
+    }
+    .terminal-log .error { color: #ef4444; }
+    .terminal-log .info { color: #3b82f6; }
+    .terminal-log .warning { color: #eab308; }
+
+    .progress-wrapper {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 9999px;
+        height: 12px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+    .progress-bar {
+        height: 100%;
+        background: #25D366;
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-glass mb-4 justify-between">
+    <h3 class="m-0"><i class="fa-solid fa-paper-plane text-success"></i> {{ title }}</h3>
+</div>
+
+<div class="d-grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Configuração de Disparo -->
+    <div class="header-glass flex-col align-start m-0">
+        <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-gears"></i> Configurações da Fila</h4>
+        
+        <div class="form-group w-100">
+            <label for="template_id">1. Escolha o Template</label>
+            <select id="template_id" class="input-glass" onchange="updateTextPreview()">
+                <option value="">-- Mensagem Avulsa (Em branco) --</option>
+                {% for t in templates %}
+                <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group w-100 mb-4">
+            <label for="message_text">Texto da Mensagem</label>
+            <textarea id="message_text" class="input-glass" rows="4" placeholder="Sua mensagem. Use [NOME] para personalizar automaticamente." style="resize:vertical;"></textarea>
+            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-circle-info"></i> Variáveis suportadas: [NOME], [NOME_COMPLETO], [STATUS], [DATA], [HORA]</div>
+        </div>
+
+        <h4 class="m-0 mt-2 mb-3 text-main"><i class="fa-solid fa-address-book"></i> Destinatários</h4>
+        
+        <div class="form-group w-100">
+            <label for="crm_filter">A. Adicionar Base do CRM</label>
+            <select id="crm_filter" class="input-glass">
+                <option value="">-- Não usar CRM --</option>
+                <option value="all">Todos os clientes ({{ clients_json|length }})</option>
+                <option value="lead">Apenas Leads</option>
+                <option value="contato">Apenas Contatos</option>
+                <option value="proposta">Apenas Propostas</option>
+            </select>
+        </div>
+
+        <div class="form-group w-100 mb-0">
+            <label for="manual_list">B. Adicionar Lista Manual <span class="text-xs font-normal text-muted">(Opcional)</span></label>
+            <textarea id="manual_list" class="input-glass" rows="4" placeholder="Nome, Telefone&#10;Maria Silva, 11999999999&#10;João S., 21988888888" style="resize:vertical;"></textarea>
+            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-triangle-exclamation text-warning"></i> Formato rigoroso: Um contato por linha, separados por vírgula.</div>
+        </div>
+    </div>
+
+    <!-- Engine / Execução -->
+    <div class="header-glass flex-col align-start m-0">
+        <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-rocket"></i> Motor de Envio</h4>
+        
+        <div class="d-flex align-center justify-between w-100 mb-2">
+            <div class="text-sm font-semibold">Progresso: <span id="progress_text">0 / 0</span></div>
+            <div class="status-badge" id="engine_status">AGUARDANDO</div>
+        </div>
+        <div class="progress-wrapper w-100 mb-4">
+            <div class="progress-bar" id="progress_bar"></div>
+        </div>
+
+        <div class="form-group w-100">
+            <label>Latência entre mensagens (Segundos)</label>
+            <input type="number" id="delay_seconds" class="input-glass" value="4" min="1" max="60">
+        </div>
+
+        <div class="d-flex gap-2 w-100 mb-4">
+            <button id="btn_compile" class="btn-secondary flex-1" onclick="compileQueue()">
+                <i class="fa-solid fa-layer-group"></i> COMPILAR FILA
+            </button>
+            <button id="btn_start" class="btn-primary flex-1" style="background:#25D366; color:#0f172a;" onclick="startEngine()" disabled>
+                <i class="fa-solid fa-play"></i> INICIAR DISPARO
+            </button>
+            <button id="btn_pause" class="btn-primary flex-1" style="background:#f59e0b; color:#0f172a; display:none;" onclick="pauseEngine()">
+                <i class="fa-solid fa-pause"></i> PAUSAR
+            </button>
+        </div>
+
+        <div class="terminal-log w-100" id="terminal">
+            <div><span class="info">[SYSTEM]</span> Engine carregado. Aguardando compilação da fila...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Dados do CRM em JSON oculto para o JS -->
+<script id="crm_data" type="application/json">
+    {{ clients_json | tojson }}
+</script>
+
+<script>
+    // Configurações e Estado do Motor
+    let queue = [];
+    let currentIndex = 0;
+    let engineRunning = false;
+    const crmClients = JSON.parse(document.getElementById('crm_data').textContent);
+    
+    // UI Elements
+    const terminal = document.getElementById('terminal');
+    const progressBar = document.getElementById('progress_bar');
+    const progressText = document.getElementById('progress_text');
+    const statusBadge = document.getElementById('engine_status');
+    const btnCompile = document.getElementById('btn_compile');
+    const btnStart = document.getElementById('btn_start');
+    const btnPause = document.getElementById('btn_pause');
+
+    function logTerminal(message, type = '') {
+        const time = new Date().toLocaleTimeString();
+        const div = document.createElement('div');
+        div.innerHTML = `<span class="text-xs text-muted">[${time}]</span> <span class="${type}">${message}</span>`;
+        terminal.appendChild(div);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function updateTextPreview() {
+        const select = document.getElementById('template_id');
+        const selectedOption = select.options[select.selectedIndex];
+        const textArea = document.getElementById('message_text');
+        
+        if (selectedOption && selectedOption.dataset.text) {
+            textArea.value = selectedOption.dataset.text;
+        } else {
+            textArea.value = '';
+        }
+    }
+
+    function interpolate(text, contact) {
+        let result = text;
+        const namePart = (contact.name || "Cliente").trim();
+        const firstName = namePart.split(' ')[0];
+        const status = (contact.status || "").toUpperCase();
+        
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('pt-BR');
+        const timeStr = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
+        result = result.replace(/\[NOME\]/gi, firstName);
+        result = result.replace(/\[NOME_COMPLETO\]/gi, namePart);
+        result = result.replace(/\[STATUS\]/gi, status);
+        result = result.replace(/\[DATA\]/gi, dateStr);
+        result = result.replace(/\[HORA\]/gi, timeStr);
+        return result;
+    }
+
+    function compileQueue() {
+        queue = [];
+        currentIndex = 0;
+        updateProgressUI();
+        
+        logTerminal("Iniciando compilação de fila...", "info");
+
+        // 1. CRM Filter
+        const crmFilter = document.getElementById('crm_filter').value;
+        if (crmFilter) {
+            let filtered = [];
+            if (crmFilter === 'all') {
+                filtered = crmClients;
+            } else {
+                filtered = crmClients.filter(c => c.status === crmFilter);
+            }
+            logTerminal(`Adicionados ${filtered.length} clientes via filtro do CRM (${crmFilter}).`);
+            
+            filtered.forEach(c => {
+                queue.push({
+                    source: 'crm',
+                    client_id: c.id,
+                    name: c.name,
+                    phone: c.phone,
+                    status: c.status
+                });
+            });
+        }
+
+        // 2. Manual List
+        const manualText = document.getElementById('manual_list').value.trim();
+        if (manualText) {
+            const lines = manualText.split('\n');
+            let addedManual = 0;
+            lines.forEach((line, index) => {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const name = parts[0].trim();
+                    const phone = parts[1].replace(/\D/g, ''); // limpa não numéricos
+                    if (phone.length >= 10) {
+                        queue.push({
+                            source: 'manual',
+                            client_id: null,
+                            name: name,
+                            phone: phone,
+                            status: ''
+                        });
+                        addedManual++;
+                    } else {
+                        logTerminal(`Linha ${index+1} inválida: Telefone muito curto.`, "warning");
+                    }
+                } else if(line.trim().length > 0) {
+                    logTerminal(`Linha ${index+1} inválida: Falta vírgula.`, "warning");
+                }
+            });
+            logTerminal(`Adicionados ${addedManual} clientes via Lista Manual.`);
+        }
+
+        if (queue.length > 0) {
+            const msg = document.getElementById('message_text').value;
+            if(!msg.trim()){
+                logTerminal("ERRO: O texto da mensagem está vazio!", "error");
+                return;
+            }
+            logTerminal(`Fila pronta! Total: ${queue.length} destinatários.`, "info");
+            btnStart.disabled = false;
+            btnCompile.innerText = "RECOMPILAR FILA";
+        } else {
+            logTerminal("Fila vazia. Selecione clientes ou adicione à lista manual.", "warning");
+            btnStart.disabled = true;
+        }
+        
+        updateProgressUI();
+    }
+
+    function updateProgressUI() {
+        progressText.innerText = `${currentIndex} / ${queue.length}`;
+        const pct = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
+        progressBar.style.width = `${pct}%`;
+        
+        if(queue.length > 0 && currentIndex === queue.length) {
+            statusBadge.innerText = "CONCLUÍDO";
+            statusBadge.style.color = "#34d399";
+        }
+    }
+
+    function pauseEngine() {
+        engineRunning = false;
+        statusBadge.innerText = "PAUSADO";
+        statusBadge.style.color = "#f59e0b";
+        btnPause.style.display = 'none';
+        btnStart.style.display = 'block';
+        logTerminal("Motor pausado pelo usuário.", "warning");
+    }
+
+    async function startEngine() {
+        if (queue.length === 0 || currentIndex >= queue.length) return;
+        
+        engineRunning = true;
+        btnStart.style.display = 'none';
+        btnPause.style.display = 'block';
+        btnCompile.disabled = true;
+        statusBadge.innerText = "RODANDO";
+        statusBadge.style.color = "#3b82f6";
+        
+        logTerminal("🚀 Motor iniciado...", "info");
+        
+        while (currentIndex < queue.length && engineRunning) {
+            const contact = queue[currentIndex];
+            const baseText = document.getElementById('message_text').value;
+            const finalMessage = interpolate(baseText, contact);
+            
+            logTerminal(`Processando [${currentIndex+1}/${queue.length}] — ${contact.name} (${contact.phone})...`);
+            
+            try {
+                const response = await fetch("{{ url_for('crm.api_external_send') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: contact.phone,
+                        text: finalMessage,
+                        client_id: contact.client_id,
+                        source: contact.source
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.ok) {
+                    logTerminal(`  ✓ Sucesso ao enviar para ${contact.name}`);
+                } else {
+                    logTerminal(`  ✗ Erro: ${data.error}`, "error");
+                }
+            } catch (error) {
+                logTerminal(`  ✗ Erro de Conexão: ${error}`, "error");
+            }
+            
+            currentIndex++;
+            updateProgressUI();
+            
+            // Wait for delay if not finished and still running
+            if (currentIndex < queue.length && engineRunning) {
+                const delayInput = parseInt(document.getElementById('delay_seconds').value) || 4;
+                // Adiciona um pouco de aleatoriedade no delay (0 a +2segundos) para imitar digitação humana e driblar robôs antispam
+                const randomJitter = Math.random() * 2;
+                const totalDelayMs = (delayInput + randomJitter) * 1000;
+                
+                logTerminal(`  ...Aguardando ${(totalDelayMs/1000).toFixed(1)}s (proteção anti-spam)`);
+                await new Promise(r => setTimeout(r, totalDelayMs));
+            }
+        }
+        
+        if (currentIndex >= queue.length) {
+            engineRunning = false;
+            btnStart.style.display = 'block';
+            btnStart.disabled = true;
+            btnPause.style.display = 'none';
+            btnCompile.disabled = false;
+            logTerminal("🎉 Disparo finalizado com sucesso!", "info");
+            updateProgressUI();
+        }
+    }
+</script>
+{% endblock %}

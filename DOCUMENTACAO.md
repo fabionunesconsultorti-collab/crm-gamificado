@@ -28,17 +28,17 @@ A aplicação usa a estrutura em **Blueprints** para facilitar a escalabilidade 
   - `admin/`: Módulo e telas administrativas, acessíveis apenas para *admind/gerentes*. Focado em adicionar/remover Lojas, visualizar todos os Logs, inserir templates novos e administrar permissionamento e configuração do motor Evolution.
   - `crm/`: Coração de Vendas. Concentra o motor visual do CRUD de Clientes, a visualização dinâmica do Kanban (*drag-n-drop*) e a funcionalidade de Importação Massiva de CSV.
   - `api/`: O roteador silencioso e moderno. Mantém endpoints focados e padronizados no padrão `REST (/api/*)` prontos para servirem Webhooks externos (ouvidoria), ou para envio massivo programado que independe do navegador do cliente.
-  - `utils/`: Contém arquivos vitais como `messaging.py` (Engine para processar as variáveis como nome/data das mensagens) e a classe `EvolutionAPI` (Empacotador abstrato para as chamadas de rede do Whatsapp).
+  - `utils/`: Contém arquivos vitais como `messaging.py` (Engine para processar as variáveis como nome/data das mensagens) e a classe `WahaAPI` (Empacotador abstrato para as chamadas de rede do Whatsapp).
 - `run.py`: O ignitor. O local onde você dá a partida no servidor web para testes em desenvolvimento ou na porta principal da sua aplicação.
 
-## 4. API, Webhooks e Módulo de Mensageria (EvolutionAPI)
-Na evolução do CRM incorporamos o Módulo Focado em Disparos e Centralização de Mensagens de WhatsApp. Em vez de usar ferramentas como **n8n** engessadas junto, a fundação está incorporada ao próprio CRM:
+## 4. API, Webhooks e Módulo de Mensageria (WAHA API)
+Na evolução do CRM incorporamos o Módulo Focado em Disparos e Centralização de Mensagens de WhatsApp via **WAHA (WhatsApp HTTP API)**. Em vez de usar ferramentas externas engessadas, a fundação está incorporada ao próprio CRM:
 
 1. **Gestão de Templates Dinâmicos (`/admin/templates`)**: Banco de matrizes de frases. Por exemplo: *"Olá, [NOME]"* pode ser parametrizado para os operadores não precisarem ficar colando textos variados.
 2. **Motor de Interpolação Textual (`utils.messaging`)**: Usa Expressões Regulares (`RegEx`) para converter as variáveis lógicas do template nos dados exatos da tabela e contexto do remetente a partir da tabela SQL.
    - Variáveis suportadas localmente: `[NOME], [NOME_COMPLETO], [DATA], [HORA], [STATUS], [VENDEDOR]`.
 3. **Tracking & Observabilidade (`MessageLog`)**: Um sistema que funciona silenciosamente no banco registrando o autor, se o cliente é validado com sucesso e se foi gerado API ou disparado um link puro (`wa.me`) via Browser.
-4. **Acoplador de API (`utils/evolution.py`)**: Arquivo Python que mapeia a documentação oficial da biblioteca do `Evolution API`. Ele pesquisa na tabela global as definições em tempo real da URL do seu Webhook (`evo_api_url`), e a Chave (`evo_api_key`) simulada como uma ponte robusta em ambiente Cloud.
+4. **Acoplador de API (`utils/waha.py`)**: Arquivo Python que mapeia a documentação oficial da WAHA API. Ele pesquisa na tabela global as definições em tempo real da URL do seu servidor (`evo_api_url`), Chave (`evo_api_key`) e a Sessão ativa (`evo_instance`).
 
 ## 5. Mapeamento Relevante das Variáveis do Banco de Dados
 A tabela **Client** possui um escopo estendido para varejo moderno:
@@ -48,4 +48,66 @@ A tabela **Client** possui um escopo estendido para varejo moderno:
 - **Parâmetros Estratégicos**: `tier` (nível: bronze, ouro, vip), `loyalty_points` (pontuação baseada na frequência e engajamento), `badges` (tags de segmentação CSV customizáveis) e LGPD (`opt_in`, permitindo auditoria local para envio em conformidade com as regras brasileiras).
 
 ---
-> *Este documento foi formatado para refletir as iterações e desenvolvimento na centralização total dos disparos do Evolution e do refinamento dos CRUDS essenciais. Deve ser modificado caso o banco ou stack primário evolua para ambientes Kubernetes / Dockers em produções avançadas.*
+
+## 6. Configuração do Servidor WAHA (Instância Remota)
+Para rodar o WAHA (WhatsApp HTTP API) em um ambiente remoto (ex: Windows com Docker), siga o procedimento de instalação profissional com persistência e cache:
+
+### 1. Pré-requisitos
+- **Docker Desktop**: Instalado e com WSL2 habilitado.
+- **Terminal**: PowerShell ou CMD.
+
+### 2. Configuração do Ambiente
+Crie uma pasta (ex: `C:\waha-api`) e salve o seguinte arquivo `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  # Banco de Dados PostgreSQL para persistência de sessões e dados
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: waha
+      POSTGRES_USER: waha_user
+      POSTGRES_PASSWORD: waha_password
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
+  # Redis para gerenciamento de cache e filas
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - ./redis_data:/data
+
+  # Instância principal do WAHA
+  waha:
+    image: devlikeapro/waha
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Configurações do Banco de Dados
+      - WHATSAPP_API_DATABASE_URL=postgresql://waha_user:waha_password@postgres:5432/waha
+      # Configurações do Redis
+      - WHATSAPP_API_REDIS_URL=redis://redis:6379
+      # Ativa a persistência
+      - WHATSAPP_API_SESSION_STORAGE=postgres
+      # Configurações básicas
+      - WHATSAPP_API_HOSTNAME=0.0.0.0
+      - TZ=America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis
+```
+
+### 3. Inicialização
+No terminal dentro da pasta escolhida, execute:
+```bash
+docker-compose up -d
+```
+O serviço estará disponível em `http://localhost:3000` ou pelo IP da máquina na rede local.
+
+---
+> *Este documento foi formatado para refletir a migração para WAHA API e a centralização dos disparos no CRM. Deve ser modificado caso o banco ou stack primário evolua para ambientes Kubernetes em produções avançadas.*

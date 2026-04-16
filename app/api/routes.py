@@ -3,12 +3,12 @@ from flask import request, jsonify
 from app.api import bp
 from app.models import MessageLog
 from app import db
-from app.utils.evolution import EvolutionAPI
+from app.utils.waha import WahaAPI
 
-@bp.route('/webhook/evolution', methods=['POST'])
-def evolution_webhook():
+@bp.route('/webhook/waha', methods=['POST'])
+def waha_webhook():
     '''
-    Endpoint for receiving event updates from Evolution API.
+    Endpoint for receiving event updates from WAHA API.
     Example Events: MESSAGES_UPDATE (read/delivered statuses), MESSAGES_UPSERT
     '''
     data = request.get_json(force=True)
@@ -48,14 +48,14 @@ def send_automated_message():
 
     # The text MUST arrive interpolated, OR the caller can pass the raw template 
     # but normally the API caller won't. Let's assume text is ready.
-    success, api_response = EvolutionAPI.send_text(client.phone, text)
+    success, api_response = WahaAPI.send_text(client.phone, text)
 
     # Log it
     log = MessageLog(
         client_id=client.id,
         user_id=user_id,
         content=text,
-        channel='evolution_api',
+        channel='waha_api',
         status='sent' if success else 'error',
         api_response=json.dumps(api_response) if isinstance(api_response, dict) else str(api_response)
     )
@@ -65,4 +65,4 @@ def send_automated_message():
     if success:
         return jsonify({"status": "sent", "response": api_response})
     else:
-        return jsonify({"error": "Evolution API Failed", "details": api_response}), 500
+        return jsonify({"error": "WAHA API Failed", "details": api_response}), 500

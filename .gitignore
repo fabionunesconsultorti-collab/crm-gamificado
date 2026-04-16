@@ -46,3 +46,7 @@ Thumbs.db
 
 # Gemini / AI
 .gemini/
+
+# Project Specific
+scratch/
+waha_data/

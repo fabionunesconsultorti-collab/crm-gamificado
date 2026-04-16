@@ -1,8 +1,10 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.admin import bp
 from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog
+from app.utils.waha import WahaAPI
+import os
 from functools import wraps
 
 def admin_required(f):
@@ -199,3 +201,41 @@ def delete_user(id):
     db.session.commit()
     flash(f'🗑️ Usuário {name} excluído.')
     return redirect(url_for('admin.list_users'))
+
+# ── Evolution API (AJAX) ──────────────────────────────────────────────────────
+@bp.route('/api/evolution/status', methods=['GET'])
+@login_required
+@admin_required
+def evo_status():
+    success, data = WahaAPI.get_connection_state()
+    return jsonify({'ok': success, 'data': data})
+
+@bp.route('/api/evolution/create', methods=['POST'])
+@login_required
+@admin_required
+def evo_create():
+    success, data = WahaAPI.create_instance()
+    return jsonify({'ok': success, 'data': data})
+
+@bp.route('/api/evolution/qr', methods=['GET'])
+@login_required
+@admin_required
+def evo_qr():
+    success, data = WahaAPI.connect_instance()
+    return jsonify({'ok': success, 'data': data})
+
+@bp.route('/api/evolution/logout', methods=['POST'])
+@login_required
+@admin_required
+def evo_logout():
+    success, data = WahaAPI.logout_instance()
+    return jsonify({'ok': success, 'data': data})
+
+@bp.route('/api/evolution/sessions', methods=['GET'])
+@login_required
+@admin_required
+def evo_list_sessions():
+    success, data = WahaAPI.list_sessions()
+    return jsonify({'ok': success, 'data': data})
+
+

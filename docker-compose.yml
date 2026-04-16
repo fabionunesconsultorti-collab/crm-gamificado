@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  waha:
+    image: devlikeapro/waha
+    container_name: waha_api
+    ports:
+      - "3000:3000"
+    environment:
+      - WAHA_API_KEY=@reds.com.br0 # OPCIONAL: Se quiser proteger sua API
+      - WHATSAPP_DEFAULT_SESSION=default # OPCIONAL: Nome da sessão padrão
+    volumes:
+      - ./waha_data:/app/.sessions # Persistência das sessões
+    restart: always

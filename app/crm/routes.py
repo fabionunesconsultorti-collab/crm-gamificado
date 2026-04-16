@@ -8,7 +8,7 @@ from datetime import datetime
 import urllib.parse
 from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog
 from app.utils.messaging import WhatsAppEngine
-
+from app.utils.waha import WahaAPI
 # ── XP Awards ────────────────────────────────────────────────────────────────
 XP_NOVO_CLIENTE  = 10
 XP_LEAD_PROPOSTA = 20
@@ -296,3 +296,68 @@ def import_csv():
             return redirect(request.url)
 
     return render_template('crm/import.html', title='Importar Clientes')
+
+# ── Bulk Message Engine ────────────────────────────────────────────────────────
+@bp.route('/bulk-message', methods=['GET'])
+@login_required
+def bulk_message():
+    templates = MessageTemplate.query.all()
+    # Listamos todos os clientes ativos com número de telefone para o usuário filtrar
+    clients_raw = Client.query.filter(Client.phone.isnot(None), Client.phone != '').all()
+    
+    clients = []
+    for c in clients_raw:
+        clients.append({
+            'id': c.id,
+            'name': c.name or '',
+            'phone': ''.join(filter(str.isdigit, str(c.phone))),
+            'status': c.status or ''
+        })
+        
+    templates_data = [{'id': t.id, 'name': t.name, 'text': t.text_content} for t in templates]
+    
+    return render_template('crm/bulk_message.html', 
+                           title='Disparo em Lote', 
+                           templates=templates_data,
+                           clients_json=clients)
+
+@bp.route('/api/external/send', methods=['POST'])
+@login_required
+def api_external_send():
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({'ok': False, 'error': 'No data provided'}), 400
+        
+    phone = data.get('phone')
+    text = data.get('text')
+    client_id = data.get('client_id')
+    source = data.get('source', 'bulk') # crm or manual
+    
+    if not phone or not text:
+        return jsonify({'ok': False, 'error': 'Phone and text are required'}), 400
+        
+    success, response = WahaAPI.send_text(phone, text)
+    
+    if success:
+        # Se veio de um cliente do CRM, vamos registrar nos Logs de Mensagem (e talvez XP?)
+        if client_id:
+            try:
+                log = MessageLog(
+                    client_id=int(client_id),
+                    user_id=current_user.id,
+                    content=text,
+                    channel='whatsapp_waha',
+                    status='sent'
+                )
+                db.session.add(log)
+                # Opcional: gamification para disparos massivos?
+                # Como será um envio em lote, XP=1 por cliente
+                current_user.performance_points += 1
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print("Error registering log:", e)
+                
+        return jsonify({'ok': True, 'response': response})
+    else:
+        return jsonify({'ok': False, 'error': response}), 400

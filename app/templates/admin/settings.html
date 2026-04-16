@@ -29,11 +29,274 @@
                       placeholder="Muito obrigado por fechar conosco!">{{ settings.get('msg_fechamento', '') }}</textarea>
         </div>
 
+        <h4 class="card-title mt-5 mb-4 border-top pt-4 d-flex align-center justify-between w-100" style="border-color: rgba(255,255,255,0.1);">
+            <span><i class="fa-solid fa-server text-primary"></i> Integração WAHA API (WhatsApp HTTP API)</span>
+        </h4>
+
+        <div class="form-group">
+            <label for="evo_api_url">URL da API</label>
+            <div class="d-flex gap-2">
+                <input type="url" name="evo_api_url" id="evo_api_url" class="input-glass flex-1" 
+                       value="{{ settings.get('evo_api_url', '') }}" placeholder="Ex: https://evo.sua-api.com">
+                <button type="button" class="btn-secondary w-auto" onclick="syncWahaSessions()" id="btn_sync_sessions">
+                    <i class="fa-solid fa-rotate"></i> Sincronizar
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="evo_instance">Sessão WhatsApp (Instância)</label>
+            <select id="evo_instance_select" class="input-glass">
+                <option value="{{ settings.get('evo_instance', '') }}">{{ settings.get('evo_instance', 'Selecione ou Sincronize...') }}</option>
+            </select>
+            <input type="hidden" name="evo_instance" id="evo_instance_hidden" value="{{ settings.get('evo_instance', '') }}">
+            <small id="sync_status" class="text-sm d-none" style="color: #10b981; font-weight: 500;">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Sincronizado com WAHA Remota
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label for="evo_api_key">API Key (Opcional)</label>
+            <input type="text" name="evo_api_key" id="evo_api_key" class="input-glass" 
+                   value="{{ settings.get('evo_api_key', '') }}" placeholder="API Key (se configurada na WAHA)">
+        </div>
+
         <button type="submit" class="btn-primary mt-3">
             <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações
         </button>
     </form>
 </div>
+
+<!-- Motor de Conexão WhatsApp -->
+<div class="header-glass max-w-lg flex-col align-start m-0 mb-4 mt-4">
+    <div class="d-flex align-center justify-between w-100 mb-3">
+        <h4 class="card-title text-primary m-0">
+            <i class="fa-brands fa-whatsapp"></i> Status do WhatsApp
+        </h4>
+        <span id="wa_status_badge" class="badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Verificando...</span>
+    </div>
+    
+    <div id="wa_actions" class="w-100 d-flex gap-2 mb-3">
+        <button id="btn_wa_connect" class="btn-primary flex-1 d-none" onclick="connectWhatsApp()">Conectar WhatsApp</button>
+        <button id="btn_wa_logout" class="btn-danger flex-1 d-none" onclick="logoutWhatsApp()" style="background:#ef4444; color:white;"><i class="fa-solid fa-power-off"></i> Desconectar</button>
+    </div>
+
+    <div id="wa_qr_container" class="w-100 d-none flex-col align-center p-3 bg-glass" style="border: 1px solid var(--glass-border); border-radius: 8px;">
+        <p class="text-sm text-center mb-2">Escaneie o QR Code abaixo com o seu WhatsApp.</p>
+        <div style="background: white; padding: 10px; border-radius: 8px;">
+            <img id="wa_qr_img" src="" alt="QR Code" style="max-width: 200px; display: block; margin: 0 auto;">
+        </div>
+        <button class="btn-secondary mt-3 w-100" onclick="checkWhatsAppStatus()">Já escaneei (Atualizar Status)</button>
+    </div>
+</div>
+
+<script>
+    async function checkWhatsAppStatus() {
+        const badge = document.getElementById('wa_status_badge');
+        const btnConnect = document.getElementById('btn_wa_connect');
+        const btnLogout = document.getElementById('btn_wa_logout');
+        const qrContainer = document.getElementById('wa_qr_container');
+        
+        badge.innerText = 'Verificando...';
+        
+        try {
+            const res = await fetch("{{ url_for('admin.evo_status') }}");
+            const data = await res.json();
+            
+            if(data.ok && data.data && data.data.instance) {
+                const state = data.data.instance.state;
+                if(state === 'open') {
+                    badge.innerText = 'CONECTADO';
+                    badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                    badge.style.color = '#10b981';
+                    btnConnect.classList.add('d-none');
+                    btnLogout.classList.remove('d-none');
+                    qrContainer.classList.add('d-none');
+                } else if(state === 'close' || state === 'connecting' || data.data.instance.waha_status === 'SCAN_QR_CODE') {
+                    if (data.data.instance.waha_status === 'SCAN_QR_CODE') {
+                        badge.innerText = 'AGUARDANDO QR CODE';
+                        badge.style.background = 'rgba(245, 158, 11, 0.2)';
+                        badge.style.color = '#f59e0b';
+                    } else {
+                        badge.innerText = 'INICIANDO SESSÃO...';
+                        badge.style.background = 'rgba(245, 158, 11, 0.2)';
+                        badge.style.color = '#f59e0b';
+                    }
+                    btnConnect.innerText = 'Gerar QR Code';
+                    btnConnect.classList.remove('d-none');
+                    btnLogout.classList.add('d-none');
+                } else if(state === 'not_found') {
+                    badge.innerText = 'NÃO CONFIGURADO';
+                    badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                    badge.style.color = '#ef4444';
+                    btnConnect.innerText = 'Criar e Conectar';
+                    btnConnect.classList.remove('d-none');
+                    btnLogout.classList.add('d-none');
+                }
+            } else {
+                badge.innerText = 'OFFLINE / ERRO';
+                badge.style.background = 'rgba(239, 68, 68, 0.2)';
+                badge.style.color = '#ef4444';
+                btnConnect.innerText = 'Tentar Conectar';
+                btnConnect.classList.remove('d-none');
+                
+                if (data.data && typeof data.data === 'string' && data.data.includes('default')) {
+                    badge.innerText = 'ERRO: USE "default"';
+                    alert(data.data);
+                }
+            }
+        } catch(e) {
+            badge.innerText = 'ERRO DE API';
+            console.error(e);
+        }
+    }
+
+    async function connectWhatsApp() {
+        const btn = document.getElementById('btn_wa_connect');
+        const originalText = btn.innerText;
+        btn.innerText = 'Processando...';
+        btn.disabled = true;
+
+        try {
+            let res, data;
+            if(originalText.includes('Criar')) {
+                res = await fetch("{{ url_for('admin.evo_create') }}", {method: 'POST'});
+            } else {
+                res = await fetch("{{ url_for('admin.evo_qr') }}");
+            }
+            data = await res.json();
+            
+            console.log("WAHA API Response:", data);
+
+            if(data.ok && data.data) {
+                // Tenta encontrar o Base64 no retorno (v1, v2, v2 nested)
+                let qrBase64 = null;
+                const d = data.data;
+                
+                if (d.base64) qrBase64 = d.base64;
+                else if (d.qrcode && d.qrcode.base64) qrBase64 = d.qrcode.base64;
+                else if (d.code && d.code.base64) qrBase64 = d.code.base64;
+                else if (d.instance && d.instance.qrcode && d.instance.qrcode.base64) qrBase64 = d.instance.qrcode.base64;
+
+                if(qrBase64) {
+                    if(!qrBase64.startsWith('data:image')) {
+                        qrBase64 = 'data:image/png;base64,' + qrBase64;
+                    }
+                    document.getElementById('wa_qr_img').src = qrBase64;
+                    document.getElementById('wa_qr_container').classList.remove('d-none');
+                    btn.classList.add('d-none');
+                } else if (d.count === 0 || d.status === 'connecting' || d.state === 'connecting') {
+                    // QR ainda não gerado pela API (v2 behavior)
+                    btn.innerText = 'Gerando QR...';
+                    setTimeout(() => connectWhatsApp(), 3000); // Tenta novamente em 3s
+                    return;
+                } else {
+                    alert("O QR Code ainda não está pronto. Por favor, aguarde 5 segundos e tente novamente.");
+                    checkWhatsAppStatus();
+                }
+            } else {
+                alert("Erro ao contatar API: " + JSON.stringify(data.data || ""));
+            }
+        } catch(e) {
+            console.error(e);
+            alert('Falha na conexão com o servidor do CRM.');
+        } finally {
+            if (!btn.innerText.includes('Gerando')) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+    }
+
+    async function logoutWhatsApp() {
+        if(!confirm("Tem certeza que deseja desconectar este número?")) return;
+        
+        try {
+            const res = await fetch("{{ url_for('admin.evo_logout') }}", {method: 'POST'});
+            const data = await res.json();
+            if(data.ok) {
+                alert("Desconectado com sucesso.");
+                document.getElementById('wa_qr_img').src = "";
+                checkWhatsAppStatus();
+            } else {
+                alert("Erro ao desconectar: " + JSON.stringify(data.data || ""));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Erro de comunicação com o servidor.");
+        }
+    }
+
+    async function syncWahaSessions() {
+        const btn = document.getElementById('btn_sync_sessions');
+        const select = document.getElementById('evo_instance_select');
+        const hiddenInput = document.getElementById('evo_instance_hidden');
+        const status = document.getElementById('sync_status');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        
+        try {
+            const res = await fetch("{{ url_for('admin.evo_list_sessions') }}");
+            const data = await res.json();
+            
+            if (data.ok && Array.isArray(data.data)) {
+                const currentVal = hiddenInput.value;
+                select.innerHTML = '';
+                
+                if (data.data.length === 0) {
+                    select.innerHTML = '<option value="">Nenhuma sessão encontrada</option>';
+                } else {
+                    data.data.forEach(session => {
+                        const opt = document.createElement('option');
+                        opt.value = session.name;
+                        opt.text = `${session.name} (${session.status})`;
+                        if (session.name === currentVal) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+                
+                status.classList.remove('d-none');
+                // Sincroniza o select com o hidden input e força a atualização inicial
+                select.onchange = () => { 
+                    hiddenInput.value = select.value; 
+                    console.log("Selecionado:", hiddenInput.value);
+                    checkWhatsAppStatus(); 
+                };
+                
+                // Força o valor atual do select para o hidden input após popular
+                if (select.value) {
+                    hiddenInput.value = select.value;
+                }
+            } else {
+                let msg = data.data || "Verifique a URL e API Key.";
+                if (msg.includes('default')) {
+                    if (confirm("Sua instância WAHA Core suporta apenas a sessão 'default'. Deseja configurar como 'default' agora?")) {
+                        hiddenInput.value = 'default';
+                        select.innerHTML = '<option value="default" selected>default (Recomendado)</option>';
+                        alert("Nome da instância alterado para 'default'. Clique em 'Salvar Configurações' para aplicar.");
+                    }
+                } else {
+                    alert("Erro ao buscar sessões: " + msg);
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Falha na conexão.");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Sincronizar';
+        }
+    }
+
+
+
+        if ("{{ settings.get('evo_api_url', '') }}" !== "") {
+            checkWhatsAppStatus();
+        } else {
+            document.getElementById('wa_status_badge').innerText = 'PROMPT: PREENCHA AS CONFIGURAÇÕES ACIMA';
+        }
+</script>
 
 <div class="header-glass max-w-lg flex-col align-start m-0 mb-4 mt-4">
     <h4 class="card-title w-100 text-primary mb-3">

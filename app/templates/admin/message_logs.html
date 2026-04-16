@@ -30,7 +30,7 @@
                         </div>
                     </td>
                     <td>
-                        {% if log.channel == 'evolution_api' %}
+                        {% if log.channel in ['evolution_api', 'waha_api'] %}
                         <span class="badge badge-primary"><i class="fa-solid fa-robot"></i> API</span>
                         {% else %}
                         <span class="badge badge-success"><i class="fa-brands fa-whatsapp"></i> ZAP Link</span>

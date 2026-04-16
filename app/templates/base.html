@@ -46,6 +46,11 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ url_for('crm.bulk_message') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.bulk_message' }}">
+                        <i class="fa-solid fa-paper-plane nav-icon text-success"></i> Disparo em Lote
+                    </a>
+                </li>
+                <li>
                     <a href="{{ url_for('main.ranking') }}" class="nav-link {{ 'active' if request.endpoint == 'main.ranking' }}">
                         <i class="fa-solid fa-trophy nav-icon"></i> Ranking XP
                     </a>
