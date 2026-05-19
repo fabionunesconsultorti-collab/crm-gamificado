@@ -1,0 +1,275 @@
+<style>
+    .mapping-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .mapping-table th, .mapping-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--glass-border); }
+    .mapping-table select { width: 100%; }
+</style>
+
+<div class="header-glass flex-col align-start m-0 w-100" id="mapping_tool_container">
+    <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-file-import text-primary"></i> Importação de Arquivo</h4>
+    
+    <div class="w-100 mb-4" id="mt_step_1">
+        <label>1. Selecione o arquivo (.csv, .xlsx)</label>
+        <div class="input-glass d-flex align-center justify-center p-4 border-bottom rounded-md" style="border: 2px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
+            <input type="file" id="mt_file_input" accept=".csv, .xlsx" class="w-100" style="color:var(--text-main);">
+        </div>
+        <button class="btn-secondary w-100 mt-2" type="button" onclick="MT_PreviewFile()">
+            <i class="fa-solid fa-eye"></i> Ler Colunas do Arquivo
+        </button>
+        <div id="mt_preview_error" class="text-danger text-sm mt-2 d-none"></div>
+    </div>
+
+    <div class="w-100 d-none" id="mt_step_2">
+        <hr class="w-100 border-bottom mb-3" style="border-color: var(--glass-border);">
+        <label>2. Mapeamento de Colunas</label>
+        
+        <div class="d-flex gap-2 w-100 mt-2 mb-3">
+            <select id="mt_template_select" class="input-glass flex-1" onchange="MT_LoadTemplate()">
+                <option value="">-- Selecionar Mapa Salvo --</option>
+            </select>
+            <button type="button" class="btn-secondary w-auto" onclick="MT_FetchTemplates()">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+        </div>
+
+        <table class="mapping-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Campo no Sistema</th>
+                    <th style="width: 50%;">Coluna no Arquivo</th>
+                </tr>
+            </thead>
+            <tbody id="mt_mapping_body">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+
+        <div class="d-flex align-center gap-2 w-100 mt-3 p-3 bg-glass rounded border-bottom" style="border: 1px solid var(--glass-border);">
+            <input type="text" id="mt_new_template_name" class="input-glass flex-1" placeholder="Nome para salvar este mapa...">
+            <button type="button" class="btn-primary w-auto text-sm" onclick="MT_SaveTemplate()">
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Mapa
+            </button>
+        </div>
+
+        <button type="button" class="btn-primary w-100 py-3 mt-4" style="background:#25D366; color:#0f172a;" onclick="MT_ProcessFile()">
+            <i class="fa-solid fa-play"></i> Processar Arquivo
+        </button>
+        <div id="mt_process_msg" class="text-sm mt-2 text-center"></div>
+    </div>
+</div>
+
+<script>
+    let MT_FileHeaders = [];
+    let MT_Templates = [];
+    const MT_Module = '{{ target_module }}'; // 'clients' or 'bulk'
+    const MT_Fields = {{ system_fields | tojson | safe }}; 
+    // Format: [{key: 'name', label: 'Nome Completo', required: true}, ...]
+
+    async function MT_PreviewFile() {
+        const fileInput = document.getElementById('mt_file_input');
+        const errDiv = document.getElementById('mt_preview_error');
+        errDiv.classList.add('d-none');
+        
+        if (!fileInput.files.length) {
+            errDiv.innerText = "Selecione um arquivo primeiro.";
+            errDiv.classList.remove('d-none');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch("{{ url_for('crm.file_preview') }}", {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                MT_FileHeaders = data.columns;
+                MT_RenderMappingTable();
+                document.getElementById('mt_step_2').classList.remove('d-none');
+                MT_FetchTemplates();
+            } else {
+                errDiv.innerText = "Erro: " + data.error;
+                errDiv.classList.remove('d-none');
+            }
+        } catch (e) {
+            errDiv.innerText = "Falha ao enviar arquivo.";
+            errDiv.classList.remove('d-none');
+        }
+    }
+
+    function MT_RenderMappingTable() {
+        const tbody = document.getElementById('mt_mapping_body');
+        tbody.innerHTML = '';
+        
+        MT_Fields.forEach(field => {
+            const tr = document.createElement('tr');
+            
+            // System field
+            const tdLabel = document.createElement('td');
+            tdLabel.innerHTML = `<span class="font-semibold">${field.label}</span> ${field.required ? '<span class="text-danger">*</span>' : ''}`;
+            
+            // File col select
+            const tdSelect = document.createElement('td');
+            const select = document.createElement('select');
+            select.className = 'input-glass mt_mapping_select';
+            select.dataset.syskey = field.key;
+            
+            select.innerHTML = '<option value="">-- Ignorar --</option>';
+            MT_FileHeaders.forEach(header => {
+                const opt = document.createElement('option');
+                opt.value = header;
+                opt.innerText = header;
+                
+                // Auto-match if header matches field key or label
+                if (header.toLowerCase() === field.label.toLowerCase() || 
+                    header.toLowerCase() === field.key.toLowerCase()) {
+                    opt.selected = true;
+                }
+                
+                select.appendChild(opt);
+            });
+            
+            tdSelect.appendChild(select);
+            tr.appendChild(tdLabel);
+            tr.appendChild(tdSelect);
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function MT_FetchTemplates() {
+        const select = document.getElementById('mt_template_select');
+        select.innerHTML = '<option value="">Buscando...</option>';
+        try {
+            const res = await fetch(`{{ url_for('crm.mapping_templates') }}?module=${MT_Module}`);
+            const data = await res.json();
+            if (data.ok) {
+                MT_Templates = data.templates;
+                select.innerHTML = '<option value="">-- Selecionar Mapa Salvo --</option>';
+                MT_Templates.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.innerText = t.name;
+                    select.appendChild(opt);
+                });
+            }
+        } catch(e) {
+            select.innerHTML = '<option value="">Erro ao buscar mapas</option>';
+        }
+    }
+
+    function MT_LoadTemplate() {
+        const tId = document.getElementById('mt_template_select').value;
+        if (!tId) return;
+        
+        const template = MT_Templates.find(t => t.id == tId);
+        if (!template) return;
+        
+        const mapping = template.mapping;
+        
+        document.querySelectorAll('.mt_mapping_select').forEach(select => {
+            const syskey = select.dataset.syskey;
+            if (mapping[syskey]) {
+                select.value = mapping[syskey];
+            } else {
+                select.value = '';
+            }
+        });
+    }
+
+    function MT_GetCurrentMapping() {
+        const mapping = {};
+        document.querySelectorAll('.mt_mapping_select').forEach(select => {
+            if (select.value) {
+                mapping[select.dataset.syskey] = select.value;
+            }
+        });
+        return mapping;
+    }
+
+    async function MT_SaveTemplate() {
+        const name = document.getElementById('mt_new_template_name').value.trim();
+        if (!name) {
+            alert("Digite um nome para o mapa.");
+            return;
+        }
+        
+        const mapping = MT_GetCurrentMapping();
+        
+        try {
+            const res = await fetch("{{ url_for('crm.mapping_templates') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    module: MT_Module,
+                    mapping: mapping
+                })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                alert("Mapa salvo com sucesso!");
+                document.getElementById('mt_new_template_name').value = '';
+                MT_FetchTemplates();
+            } else {
+                alert("Erro ao salvar: " + data.error);
+            }
+        } catch(e) {
+            alert("Erro de conexão.");
+        }
+    }
+
+    async function MT_ProcessFile() {
+        const fileInput = document.getElementById('mt_file_input');
+        const msgDiv = document.getElementById('mt_process_msg');
+        
+        // Check required fields
+        let missing = [];
+        MT_Fields.forEach(field => {
+            if (field.required) {
+                const sel = document.querySelector(`.mt_mapping_select[data-syskey="${field.key}"]`);
+                if (!sel || !sel.value) {
+                    missing.push(field.label);
+                }
+            }
+        });
+        
+        if (missing.length > 0) {
+            msgDiv.innerText = "Faltam mapear campos obrigatórios: " + missing.join(', ');
+            msgDiv.className = "text-danger mt-2 text-center text-sm font-semibold";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('mapping', JSON.stringify(MT_GetCurrentMapping()));
+        
+        msgDiv.innerText = "Processando arquivo, aguarde...";
+        msgDiv.className = "text-warning mt-2 text-center text-sm font-semibold";
+
+        try {
+            const res = await fetch("{{ url_for('crm.process_file') }}", {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                msgDiv.innerText = "Processado com sucesso!";
+                msgDiv.className = "text-success mt-2 text-center text-sm font-semibold";
+                
+                // Dispara evento customizado para o pai lidar com os dados processados
+                const event = new CustomEvent('FileProcessed', { detail: data });
+                document.dispatchEvent(event);
+            } else {
+                msgDiv.innerText = "Erro: " + data.error;
+                msgDiv.className = "text-danger mt-2 text-center text-sm font-semibold";
+            }
+        } catch (e) {
+            msgDiv.innerText = "Falha ao processar arquivo.";
+            msgDiv.className = "text-danger mt-2 text-center text-sm font-semibold";
+        }
+    }
+</script>

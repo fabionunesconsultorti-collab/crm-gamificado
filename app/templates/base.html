@@ -73,11 +73,6 @@
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.message_logs') }}" class="nav-link {{ 'active' if 'admin.message_logs' in request.endpoint }}">
-                        <i class="fa-solid fa-satellite-dish nav-icon"></i> Disparos (WA)
-                    </a>
-                </li>
-                <li>
                     <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.logs' }}">
                         <i class="fa-solid fa-scroll nav-icon"></i> Logs do Sistema
                     </a>

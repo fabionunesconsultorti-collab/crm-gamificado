@@ -31,19 +31,43 @@
         </div>
     </div>
 
-    <!-- Formulário -->
-    <div class="header-glass m-0">
-        <form action="" method="post" enctype="multipart/form-data" class="w-100 d-flex flex-col gap-4">
-            <div class="form-group mb-0">
-                <label for="file">Arquivo CSV</label>
-                <div class="input-glass d-flex align-center justify-center p-4 border-bottom rounded-md" style="border: 2px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
-                    <input type="file" name="file" id="file" accept=".csv" required class="w-100" style="color:var(--text-main);">
-                </div>
-            </div>
-            <button type="submit" class="btn-primary w-100 py-3">
-                <i class="fa-solid fa-upload"></i> Processar Arquivo
-            </button>
-        </form>
+    <!-- Formulário e Mapeamento -->
+    <div class="m-0 w-100">
+        {% with target_module='clients', system_fields=[
+            {'key': 'name', 'label': 'Nome do Cliente', 'required': true},
+            {'key': 'phone', 'label': 'Celular/WhatsApp', 'required': true},
+            {'key': 'email', 'label': 'E-mail', 'required': false}
+        ] %}
+            {% include 'crm/mapping_tool.html' %}
+        {% endwith %}
     </div>
 </div>
+
+<script>
+document.addEventListener('FileProcessed', async (e) => {
+    const clients = e.detail.data;
+    
+    if(clients && clients.length > 0) {
+        try {
+            const res = await fetch("{{ url_for('crm.import_batch') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clients)
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                alert(`Sucesso! ${data.count} clientes foram importados.`);
+                window.location.href = "{{ url_for('crm.list_clients') }}";
+            } else {
+                alert("Erro ao salvar clientes: " + data.error);
+            }
+        } catch(err) {
+            alert("Erro de conexão ao salvar.");
+        }
+    } else {
+        alert("Nenhum dado válido encontrado para importar.");
+    }
+});
+</script>
 {% endblock %}

@@ -1,13 +1,40 @@
 version: '3.8'
+
 services:
+  # Banco de Dados PostgreSQL para persistência de sessões e dados
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: waha
+      POSTGRES_USER: waha_user
+      POSTGRES_PASSWORD: waha_password
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
+  # Redis para gerenciamento de cache e filas
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - ./redis_data:/data
+
+  # Instância principal do WAHA
   waha:
     image: devlikeapro/waha
-    container_name: waha_api
+    restart: always
     ports:
       - "3000:3000"
     environment:
-      - WAHA_API_KEY=@reds.com.br0 # OPCIONAL: Se quiser proteger sua API
-      - WHATSAPP_DEFAULT_SESSION=default # OPCIONAL: Nome da sessão padrão
-    volumes:
-      - ./waha_data:/app/.sessions # Persistência das sessões
-    restart: always
+      # Configurações do Banco de Dados
+      - WHATSAPP_API_DATABASE_URL=postgresql://waha_user:waha_password@postgres:5432/waha
+      # Configurações do Redis
+      - WHATSAPP_API_REDIS_URL=redis://redis:6379
+      # Ativa a persistência
+      - WHATSAPP_API_SESSION_STORAGE=postgres
+      # Configurações básicas
+      - WHATSAPP_API_HOSTNAME=0.0.0.0
+      - TZ=America/Sao_Paulo
+    depends_on:
+      - postgres
+      - redis

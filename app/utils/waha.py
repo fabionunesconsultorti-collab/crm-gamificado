@@ -1,35 +1,48 @@
 import requests
 import json
-from app.models import Setting
+from app.models import WahaInstance
 
 class WahaAPI:
     @staticmethod
-    def get_settings():
-        settings_raw = Setting.query.all()
-        config = {s.key: s.value for s in settings_raw}
+    def get_settings(instance_id=None):
+        if instance_id:
+            instance = WahaInstance.query.get(instance_id)
+        else:
+            instance = WahaInstance.query.filter_by(is_default=True).first()
+            if not instance:
+                instance = WahaInstance.query.first() # Fallback
+                
+        if instance:
+            return {
+                'id': instance.id,
+                'api_url': instance.api_url.rstrip('/') if instance.api_url else '',
+                'api_key': instance.api_key or '',
+                'session_name': instance.session_name or 'default'
+            }
         return {
-            'api_url': config.get('evo_api_url', '').rstrip('/'), # Reaproveitando chaves evo_*
-            'api_key': config.get('evo_api_key', ''),
-            'session_name': config.get('evo_instance', 'default')
+            'id': None,
+            'api_url': '',
+            'api_key': '',
+            'session_name': 'default'
         }
 
     @staticmethod
-    def is_configured():
-        cfg = WahaAPI.get_settings()
+    def is_configured(instance_id=None):
+        cfg = WahaAPI.get_settings(instance_id)
         return bool(cfg['api_url'] and cfg['session_name'])
 
     @staticmethod
-    def get_headers():
-        cfg = WahaAPI.get_settings()
+    def get_headers(instance_id=None):
+        cfg = WahaAPI.get_settings(instance_id)
         headers = {'Content-Type': 'application/json'}
         if cfg['api_key']:
             headers['X-Api-Key'] = cfg['api_key'] # WAHA usa X-Api-Key
         return headers
 
     @staticmethod
-    def send_text(phone_number, text):
-        cfg = WahaAPI.get_settings()
-        if not WahaAPI.is_configured():
+    def send_text(phone_number, text, instance_id=None):
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
         # WAHA usa chatId: 5511999999999@c.us
@@ -47,7 +60,7 @@ class WahaAPI:
         }
         
         try:
-            response = requests.post(url, headers=WahaAPI.get_headers(), json=payload, timeout=15)
+            response = requests.post(url, headers=WahaAPI.get_headers(instance_id), json=payload, timeout=15)
             if response.status_code in [200, 201]:
                 return True, response.json()
             else:
@@ -56,16 +69,16 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
-    def get_connection_state():
-        cfg = WahaAPI.get_settings()
-        if not WahaAPI.is_configured():
+    def get_connection_state(instance_id=None):
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
         # WAHA v2/v3 usa GET /api/sessions/{session}
         url = f"{cfg['api_url']}/api/sessions/{cfg['session_name']}"
         
         try:
-            response = requests.get(url, headers=WahaAPI.get_headers(), timeout=10)
+            response = requests.get(url, headers=WahaAPI.get_headers(instance_id), timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 # Mapeamento de WAHA para o formato que o frontend espera
@@ -91,10 +104,10 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
-    def create_instance():
+    def create_instance(instance_id=None):
         """Inicia uma sessão na WAHA"""
-        cfg = WahaAPI.get_settings()
-        if not WahaAPI.is_configured():
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
             
         url = f"{cfg['api_url']}/api/sessions"
@@ -108,7 +121,7 @@ class WahaAPI:
         }
         
         try:
-            response = requests.post(url, headers=WahaAPI.get_headers(), json=payload, timeout=20)
+            response = requests.post(url, headers=WahaAPI.get_headers(instance_id), json=payload, timeout=20)
             if response.status_code in [200, 201]:
                 return True, response.json()
             else:
@@ -119,16 +132,19 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
-    def connect_instance():
+    def connect_instance(instance_id=None):
         """Obtém o QR Code da WAHA"""
-        cfg = WahaAPI.get_settings()
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
         # WAHA retorna o QR code diretamente no endpoint ou como base64
         url = f"{cfg['api_url']}/api/{cfg['session_name']}/auth/qr"
         
         try:
             # Pedindo especificamente JSON se possível, ou capturando a imagem
             params = {"format": "json"} 
-            response = requests.get(url, headers=WahaAPI.get_headers(), params=params, timeout=20)
+            response = requests.get(url, headers=WahaAPI.get_headers(instance_id), params=params, timeout=20)
             
             if response.status_code == 200:
                 # WAHA pode retornar {"qr": "..."} ou a imagem diretamente
@@ -147,15 +163,15 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
-    def list_sessions():
+    def list_sessions(instance_id=None):
         """Lista todas as sessões configuradas na WAHA"""
-        cfg = WahaAPI.get_settings()
+        cfg = WahaAPI.get_settings(instance_id)
         if not cfg['api_url']:
             return False, "URL da API não configurada."
             
         url = f"{cfg['api_url']}/api/sessions"
         try:
-            response = requests.get(url, headers=WahaAPI.get_headers(), timeout=10)
+            response = requests.get(url, headers=WahaAPI.get_headers(instance_id), timeout=10)
             if response.status_code == 200:
                 return True, response.json()
             else:
@@ -164,13 +180,16 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
-    def logout_instance():
+    def logout_instance(instance_id=None):
         """Para/Deleta a sessão na WAHA"""
-        cfg = WahaAPI.get_settings()
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
         # DELETE /api/sessions/{session} remove a sessão e os dados
         url = f"{cfg['api_url']}/api/sessions/{cfg['session_name']}"
         try:
-            response = requests.delete(url, headers=WahaAPI.get_headers(), timeout=10)
+            response = requests.delete(url, headers=WahaAPI.get_headers(instance_id), timeout=10)
             if response.status_code in [200, 201, 204]:
                 return True, {"message": "Sessão encerrada"}
             else:

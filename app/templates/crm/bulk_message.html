@@ -36,6 +36,51 @@
         border-radius: 4px;
         background: rgba(255,255,255,0.1);
     }
+
+    .tabs-header {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--glass-border);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    .tab-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 0.75rem 1.25rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+    }
+    .tab-btn:hover {
+        color: var(--text-main);
+        background: rgba(255,255,255,0.05);
+    }
+    .tab-btn.active {
+        color: #25D366;
+        border-bottom-color: #25D366;
+        background: rgba(37, 211, 102, 0.1);
+    }
+    .tab-content {
+        display: none;
+        animation: fadeIn 0.3s ease;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
 </style>
 {% endblock %}
 
@@ -43,6 +88,19 @@
 <div class="header-glass mb-4 justify-between">
     <h3 class="m-0"><i class="fa-solid fa-paper-plane text-success"></i> {{ title }}</h3>
 </div>
+
+<div class="tabs-header">
+    <button class="tab-btn {% if active_tab == 'disparo' or not active_tab %}active{% endif %}" onclick="switchTab('disparo', this)">
+        <i class="fa-solid fa-rocket text-success"></i> Motor de Disparo
+    </button>
+    <button class="tab-btn {% if active_tab == 'historico' %}active{% endif %}" onclick="switchTab('historico', this)">
+        <i class="fa-solid fa-satellite-dish text-info"></i> Histórico (WA)
+    </button>
+</div>
+
+<!-- Tab: Disparo -->
+<div id="tab-disparo" class="tab-content {% if active_tab == 'disparo' or not active_tab %}active{% endif %}">
+
 
 <div class="d-grid grid-cols-1 md:grid-cols-2 gap-4">
     <!-- Configuração de Disparo -->
@@ -55,6 +113,17 @@
                 <option value="">-- Mensagem Avulsa (Em branco) --</option>
                 {% for t in templates %}
                 <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group w-100">
+            <label for="waha_instance_id">2. Servidor de Envio (WAHA)</label>
+            <select id="waha_instance_id" class="input-glass">
+                {% for instance in waha_instances %}
+                <option value="{{ instance.id }}" {% if instance.is_default %}selected{% endif %}>{{ instance.name }} ({{ instance.session_name }})</option>
+                {% else %}
+                <option value="">Nenhum servidor configurado</option>
                 {% endfor %}
             </select>
         </div>
@@ -78,11 +147,23 @@
             </select>
         </div>
 
-        <div class="form-group w-100 mb-0">
+                <div class="form-group w-100 mb-0">
             <label for="manual_list">B. Adicionar Lista Manual <span class="text-xs font-normal text-muted">(Opcional)</span></label>
             <textarea id="manual_list" class="input-glass" rows="4" placeholder="Nome, Telefone&#10;Maria Silva, 11999999999&#10;João S., 21988888888" style="resize:vertical;"></textarea>
             <div class="text-xs text-muted mt-1"><i class="fa-solid fa-triangle-exclamation text-warning"></i> Formato rigoroso: Um contato por linha, separados por vírgula.</div>
         </div>
+
+        <div class="form-group w-100 mt-4 mb-4">
+            <label>C. Importar Planilha / CSV <span class="text-xs font-normal text-muted">(Opcional)</span></label>
+            {% with target_module='bulk', system_fields=[
+                {'key': 'name', 'label': 'Nome do Cliente', 'required': true},
+                {'key': 'phone', 'label': 'Celular/WhatsApp', 'required': true}
+            ] %}
+                {% include 'crm/mapping_tool.html' %}
+            {% endwith %}
+        </div>
+    </div>
+
     </div>
 
     <!-- Engine / Execução -->
@@ -93,13 +174,34 @@
             <div class="text-sm font-semibold">Progresso: <span id="progress_text">0 / 0</span></div>
             <div class="status-badge" id="engine_status">AGUARDANDO</div>
         </div>
-        <div class="progress-wrapper w-100 mb-4">
+        <div class="progress-wrapper w-100 mb-3">
             <div class="progress-bar" id="progress_bar"></div>
         </div>
+
+        <div class="d-flex gap-2 w-100 mb-3">
+            <div class="header-glass flex-1 m-0 p-2 text-center" style="background: rgba(16, 185, 129, 0.1);">
+                <div class="text-xs text-muted mb-0">SUCESSO</div>
+                <div class="text-lg font-bold text-success" id="counter_success">0</div>
+            </div>
+            <div class="header-glass flex-1 m-0 p-2 text-center" style="background: rgba(239, 68, 68, 0.1);">
+                <div class="text-xs text-muted mb-0">ERROS</div>
+                <div class="text-lg font-bold text-danger" id="counter_errors">0</div>
+            </div>
+        </div>
+
+        <!-- Botões de Download Rápido removidos da aba de envio (movidos para o histórico) -->
 
         <div class="form-group w-100">
             <label>Latência entre mensagens (Segundos)</label>
             <input type="number" id="delay_seconds" class="input-glass" value="4" min="1" max="60">
+        </div>
+
+        <div class="form-group w-100 mb-4">
+            <label class="d-flex align-center gap-2 cursor-pointer">
+                <input type="checkbox" id="use_ai" class="checkbox-glass">
+                <span class="text-sm font-semibold">🔄 Personalizar com IA (Evitar Spam)</span>
+            </label>
+            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-sparkles text-warning"></i> Usa o Gemini para reescrever cada mensagem de forma única.</div>
         </div>
 
         <div class="d-flex gap-2 w-100 mb-4">
@@ -120,15 +222,102 @@
     </div>
 </div>
 
+
+</div>
+
+<!-- Tab: Histórico -->
+<div id="tab-historico" class="tab-content {% if active_tab == 'historico' %}active{% endif %}">
+    <div class="header-glass max-w-full flex-col align-start m-0">
+        <div class="d-flex justify-between align-center w-100 mb-3">
+            <h4 class="m-0 text-main"><i class="fa-solid fa-list"></i> Histórico de Disparos</h4>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm d-flex align-center justify-center gap-2" style="padding: 0.5rem 1rem;">
+                    <i class="fa-solid fa-file-csv"></i> Exportar CSV
+                </a>
+                <a href="{{ url_for('admin.export_messages', format='pdf') }}" class="btn-secondary text-sm d-flex align-center justify-center gap-2" style="padding: 0.5rem 1rem;">
+                    <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+                </a>
+            </div>
+        </div>
+        
+        <div class="table-responsive w-100">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Recebedor</th>
+                        <th>Envio por</th>
+                        <th>Mensagem</th>
+                        <th>Canal</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="nowrap text-sm text-muted">{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="font-semibold">{{ log.client.name if log.client else 'Deletado' }}</td>
+                        <td class="text-sm">{{ log.user.username if log.user else 'API/Bot' }}</td>
+                        <td class="text-sm">
+                            <div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ log.content }}">
+                                {{ log.content }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if log.channel in ['evolution_api', 'waha_api', 'whatsapp_waha'] %}
+                            <span class="badge badge-primary"><i class="fa-solid fa-robot"></i> API</span>
+                            {% else %}
+                            <span class="badge badge-success"><i class="fa-brands fa-whatsapp"></i> ZAP Link</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.status == 'sent' %}
+                            <span class="badge badge-primary">Enviado</span>
+                            {% elif log.status == 'error' %}
+                            <span class="badge badge-danger">Erro</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ log.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted p-4">Nenhum registro de disparo encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Dados do CRM em JSON oculto para o JS -->
 <script id="crm_data" type="application/json">
     {{ clients_json | tojson }}
 </script>
 
 <script>
+    
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById('tab-' + tabId).classList.add('active');
+        if(btn) {
+            btn.classList.add('active');
+        }
+        
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('tab', tabId);
+        window.history.pushState({}, '', newUrl);
+    }
+
     // Configurações e Estado do Motor
     let queue = [];
+    let importedFileClients = [];
     let currentIndex = 0;
+    let successCount = 0;
+    let errorCount = 0;
     let engineRunning = false;
     const crmClients = JSON.parse(document.getElementById('crm_data').textContent);
     
@@ -179,9 +368,29 @@
         return result;
     }
 
+    
+    document.addEventListener('FileProcessed', (e) => {
+        const clients = e.detail.data;
+        if (clients && clients.length > 0) {
+            importedFileClients = clients.map(c => ({
+                source: 'file',
+                client_id: null,
+                name: c.name,
+                phone: c.phone.replace(/\D/g, ''),
+                status: ''
+            })).filter(c => c.phone.length >= 10);
+            alert(`${importedFileClients.length} contatos prontos! Clique em "COMPILAR FILA" para adicionar.`);
+        }
+    });
+
     function compileQueue() {
+
         queue = [];
         currentIndex = 0;
+        successCount = 0;
+        errorCount = 0;
+        document.getElementById('counter_success').innerText = '0';
+        document.getElementById('counter_errors').innerText = '0';
         updateProgressUI();
         
         logTerminal("Iniciando compilação de fila...", "info");
@@ -237,7 +446,15 @@
             logTerminal(`Adicionados ${addedManual} clientes via Lista Manual.`);
         }
 
+        
+        // 3. File Import
+        if (importedFileClients.length > 0) {
+            importedFileClients.forEach(c => queue.push(c));
+            logTerminal(`Adicionados ${importedFileClients.length} clientes via Arquivo Importado.`);
+        }
+
         if (queue.length > 0) {
+
             const msg = document.getElementById('message_text').value;
             if(!msg.trim()){
                 logTerminal("ERRO: O texto da mensagem está vazio!", "error");
@@ -286,6 +503,11 @@
         
         logTerminal("🚀 Motor iniciado...", "info");
         
+        const useAI = document.getElementById('use_ai').checked;
+        if (useAI) {
+            logTerminal("🤖 IA Personalização Ativa: As mensagens serão reescritas para cada cliente.", "info");
+        }
+        
         while (currentIndex < queue.length && engineRunning) {
             const contact = queue[currentIndex];
             const baseText = document.getElementById('message_text').value;
@@ -301,14 +523,25 @@
                         phone: contact.phone,
                         text: finalMessage,
                         client_id: contact.client_id,
-                        source: contact.source
+                        name: contact.name,
+                        source: contact.source,
+                        use_ai: useAI,
+                        instance_id: document.getElementById('waha_instance_id').value
                     })
                 });
 
                 const data = await response.json();
                 if (response.ok && data.ok) {
+                    successCount++;
+                    document.getElementById('counter_success').innerText = successCount;
                     logTerminal(`  ✓ Sucesso ao enviar para ${contact.name}`);
+                    
+                    if (data.ai_used && data.final_text && data.final_text !== finalMessage) {
+                        logTerminal(`  ✨ IA reescreveu: "${data.final_text.substring(0, 40)}..."`);
+                    }
                 } else {
+                    errorCount++;
+                    document.getElementById('counter_errors').innerText = errorCount;
                     logTerminal(`  ✗ Erro: ${data.error}`, "error");
                 }
             } catch (error) {

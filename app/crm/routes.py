@@ -6,9 +6,10 @@ from collections import defaultdict
 from datetime import datetime
 
 import urllib.parse
-from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog
+from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance
 from app.utils.messaging import WhatsAppEngine
 from app.utils.waha import WahaAPI
+from app.utils.ai_handler import AIHandler
 # ── XP Awards ────────────────────────────────────────────────────────────────
 XP_NOVO_CLIENTE  = 10
 XP_LEAD_PROPOSTA = 20
@@ -252,50 +253,41 @@ def delete_client(id):
 # ── CSV Import ────────────────────────────────────────────────────────────────
 import csv, io
 
-@bp.route('/import-csv', methods=['GET', 'POST'])
+@bp.route('/import-csv', methods=['GET'])
 @login_required
 def import_csv():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('Nenhum arquivo enviado')
-            return redirect(request.url)
-
-        file = request.files['file']
-        if file.filename == '':
-            flash('Nenhum arquivo selecionado')
-            return redirect(request.url)
-
-        if file and file.filename.endswith('.csv'):
-            stream    = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-            csv_input = csv.DictReader(stream)
-            count = 0
-            for row in csv_input:
-                name  = row.get('Nome')  or row.get('nome')  or row.get('Name')
-                phone = row.get('Telefone') or row.get('telefone') or row.get('Phone')
-                email = row.get('Email') or row.get('email') or row.get('E-mail')
-                if name and phone:
-                    # check unique
-                    existing = Client.query.filter_by(phone=phone).first()
-                    if not existing:
-                        db.session.add(Client(
-                            name=name, phone=phone, email=email,
-                            status='lead', assigned_to=current_user.id
-                        ))
-                        count += 1
-
-            xp_gain = count * 5
-            award_xp(current_user, xp_gain, f"Importou {count} clientes via CSV")
-            log = SystemLog(user_id=current_user.id,
-                            action=f"Importou {count} clientes via CSV")
-            db.session.add(log)
-            db.session.commit()
-            flash(f'✅ Importação concluída! {count} clientes adicionados (+{xp_gain} XP).')
-            return redirect(url_for('crm.list_clients'))
-        else:
-            flash('Formato inválido. Use .csv')
-            return redirect(request.url)
-
     return render_template('crm/import.html', title='Importar Clientes')
+
+@bp.route('/client/import_batch', methods=['POST'])
+@login_required
+def import_batch():
+    data = request.json
+    if not data or not isinstance(data, list):
+        return jsonify({'ok': False, 'error': 'Dados inválidos'}), 400
+        
+    count = 0
+    for row in data:
+        phone = ''.join(filter(str.isdigit, str(row.get('phone', ''))))
+        if row.get('name') and phone:
+            existing = Client.query.filter_by(phone=phone).first()
+            if not existing:
+                db.session.add(Client(
+                    name=row.get('name'),
+                    phone=phone,
+                    email=row.get('email'),
+                    status='lead',
+                    assigned_to=current_user.id
+                ))
+                count += 1
+                
+    if count > 0:
+        xp_gain = count * 5
+        award_xp(current_user, xp_gain, f"Importou {count} clientes")
+        log = SystemLog(user_id=current_user.id, action=f"Importou {count} clientes")
+        db.session.add(log)
+        db.session.commit()
+        
+    return jsonify({'ok': True, 'count': count})
 
 # ── Bulk Message Engine ────────────────────────────────────────────────────────
 @bp.route('/bulk-message', methods=['GET'])
@@ -316,10 +308,20 @@ def bulk_message():
         
     templates_data = [{'id': t.id, 'name': t.name, 'text': t.text_content} for t in templates]
     
+    # WAHA Instances
+    waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
+    
+    # Busca logs para a aba de histórico
+    logs = MessageLog.query.order_by(MessageLog.timestamp.desc()).limit(200).all()
+    active_tab = request.args.get('tab', 'disparo')
+    
     return render_template('crm/bulk_message.html', 
                            title='Disparo em Lote', 
                            templates=templates_data,
-                           clients_json=clients)
+                           clients_json=clients,
+                           waha_instances=waha_instances,
+                           logs=logs,
+                           active_tab=active_tab)
 
 @bp.route('/api/external/send', methods=['POST'])
 @login_required
@@ -332,32 +334,108 @@ def api_external_send():
     text = data.get('text')
     client_id = data.get('client_id')
     source = data.get('source', 'bulk') # crm or manual
+    use_ai = data.get('use_ai', False)
     
     if not phone or not text:
         return jsonify({'ok': False, 'error': 'Phone and text are required'}), 400
         
-    success, response = WahaAPI.send_text(phone, text)
+    # Reescrita com IA (apenas se solicitado e se não for manual?)
+    # Geralmente fazemos na mensagem base já interpolada
+    final_text = text
+    ai_error = None
+    if use_ai:
+        final_text, ai_error = AIHandler.rewrite_message(text)
+        if ai_error:
+            print(f"Aviso de IA: {ai_error}")
+
+    instance_id = data.get('instance_id')
+    success, response = WahaAPI.send_text(phone, final_text, instance_id)
     
     if success:
-        # Se veio de um cliente do CRM, vamos registrar nos Logs de Mensagem (e talvez XP?)
-        if client_id:
-            try:
-                log = MessageLog(
-                    client_id=int(client_id),
-                    user_id=current_user.id,
-                    content=text,
-                    channel='whatsapp_waha',
-                    status='sent'
+        # Lógica de Auto-Cadastro / Atualização
+        try:
+            # Limpa o telefone para busca (apenas dígitos)
+            clean_phone = ''.join(filter(str.isdigit, str(phone)))
+            
+            client = None
+            if client_id:
+                client = Client.query.get(int(client_id))
+            
+            if not client:
+                # Tenta buscar pelo telefone se não veio ID
+                client = Client.query.filter(Client.phone.contains(clean_phone)).first()
+
+            now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+            note_entry = f"\nContato para regularização [{now_str}]"
+            
+            if client:
+                # Atualiza cliente existente
+                client.status = "Regularização financeira"
+                client.notes = (client.notes or "") + note_entry
+                client.updated_at = datetime.utcnow()
+            else:
+                # Cria novo cliente (Lead Automático)
+                new_name = data.get('name', 'Lead Automático')
+                client = Client(
+                    name=new_name,
+                    phone=phone,
+                    status="Regularização financeira",
+                    notes=f"Contato para regularização [{now_str}]",
+                    assigned_to=current_user.id
                 )
-                db.session.add(log)
-                # Opcional: gamification para disparos massivos?
-                # Como será um envio em lote, XP=1 por cliente
-                current_user.performance_points += 1
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                print("Error registering log:", e)
+                db.session.add(client)
+            
+            # Registrar nos Logs de Mensagem
+            log = MessageLog(
+                client_id=client.id if client.id else None,
+                user_id=current_user.id,
+                content=final_text,
+                channel='whatsapp_waha',
+                status='sent',
+                waha_instance_id=instance_id
+            )
+            # Se for novo cliente, o ID só existirá após o flush/commit
+            # Mas podemos associar o objeto diretamente se o SQLAlchemy permitir
+            log.client = client
+            db.session.add(log)
+            
+            # Gamification
+            current_user.performance_points += 1
+            db.session.commit()
+            
+        except Exception as e:
+            db.session.rollback()
+            print("Error in auto-registration:", e)
                 
-        return jsonify({'ok': True, 'response': response})
+        return jsonify({
+            'ok': True, 
+            'response': response,
+            'final_text': final_text,
+            'ai_used': use_ai
+        })
     else:
+        # Registrar o ERRO no log de mensagens
+        try:
+            clean_phone = ''.join(filter(str.isdigit, str(phone)))
+            client = None
+            if client_id:
+                client = Client.query.get(int(client_id))
+            if not client:
+                client = Client.query.filter(Client.phone.contains(clean_phone)).first()
+
+            log = MessageLog(
+                client_id=client.id if client else None,
+                user_id=current_user.id,
+                content=text,
+                channel='whatsapp_waha',
+                status='error',
+                api_response=str(response),
+                waha_instance_id=instance_id
+            )
+            db.session.add(log)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print("Error logging failed message:", e)
+
         return jsonify({'ok': False, 'error': response}), 400

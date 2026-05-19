@@ -1,106 +1,355 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .btn-ai-improve {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+    }
+    .btn-ai-improve:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+        filter: brightness(1.1);
+    }
+    .btn-ai-improve:active {
+        transform: translateY(0);
+    }
+    .btn-ai-improve:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
+    }
+    .btn-ai-improve i {
+        font-size: 0.85rem;
+    }
+
+    /* Tabs Styling */
+    .tabs-header {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid var(--glass-border);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+    }
+    .tab-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 0.75rem 1.25rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+    }
+    .tab-btn:hover {
+        color: var(--text-main);
+        background: rgba(255,255,255,0.05);
+    }
+    .tab-btn.active {
+        color: var(--primary-color, #3b82f6);
+        border-bottom-color: var(--primary-color, #3b82f6);
+        background: rgba(59, 130, 246, 0.1);
+    }
+    .tab-content {
+        display: none;
+        animation: fadeIn 0.3s ease;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
 <div class="header-glass mb-4 justify-between">
     <h3 class="m-0">Configurações do Sistema</h3>
 </div>
 
-<div class="header-glass max-w-lg">
-    <form action="" method="post" class="w-100">
-        <h4 class="card-title mb-4">
-            <i class="fa-brands fa-whatsapp text-success"></i> Templates de Mensagens WhatsApp
-        </h4>
-        
-        <div class="form-group">
-            <label for="msg_boas_vindas">Mensagem de Boas-Vindas (Novo Lead)</label>
-            <textarea name="msg_boas_vindas" id="msg_boas_vindas" class="input-glass" rows="4" 
-                      placeholder="Olá! Vi que você se cadastrou...">{{ settings.get('msg_boas_vindas', '') }}</textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="msg_proposta">Envio de Proposta</label>
-            <textarea name="msg_proposta" id="msg_proposta" class="input-glass" rows="4" 
-                      placeholder="Segue a nossa proposta comercial...">{{ settings.get('msg_proposta', '') }}</textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="msg_fechamento">Agradecimento de Fechamento</label>
-            <textarea name="msg_fechamento" id="msg_fechamento" class="input-glass" rows="4" 
-                      placeholder="Muito obrigado por fechar conosco!">{{ settings.get('msg_fechamento', '') }}</textarea>
-        </div>
-
-        <h4 class="card-title mt-5 mb-4 border-top pt-4 d-flex align-center justify-between w-100" style="border-color: rgba(255,255,255,0.1);">
-            <span><i class="fa-solid fa-server text-primary"></i> Integração WAHA API (WhatsApp HTTP API)</span>
-        </h4>
-
-        <div class="form-group">
-            <label for="evo_api_url">URL da API</label>
-            <div class="d-flex gap-2">
-                <input type="url" name="evo_api_url" id="evo_api_url" class="input-glass flex-1" 
-                       value="{{ settings.get('evo_api_url', '') }}" placeholder="Ex: https://evo.sua-api.com">
-                <button type="button" class="btn-secondary w-auto" onclick="syncWahaSessions()" id="btn_sync_sessions">
-                    <i class="fa-solid fa-rotate"></i> Sincronizar
-                </button>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label for="evo_instance">Sessão WhatsApp (Instância)</label>
-            <select id="evo_instance_select" class="input-glass">
-                <option value="{{ settings.get('evo_instance', '') }}">{{ settings.get('evo_instance', 'Selecione ou Sincronize...') }}</option>
-            </select>
-            <input type="hidden" name="evo_instance" id="evo_instance_hidden" value="{{ settings.get('evo_instance', '') }}">
-            <small id="sync_status" class="text-sm d-none" style="color: #10b981; font-weight: 500;">
-                <i class="fa-solid fa-cloud-arrow-down"></i> Sincronizado com WAHA Remota
-            </small>
-        </div>
-
-        <div class="form-group">
-            <label for="evo_api_key">API Key (Opcional)</label>
-            <input type="text" name="evo_api_key" id="evo_api_key" class="input-glass" 
-                   value="{{ settings.get('evo_api_key', '') }}" placeholder="API Key (se configurada na WAHA)">
-        </div>
-
-        <button type="submit" class="btn-primary mt-3">
-            <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações
-        </button>
-    </form>
+<div class="tabs-header">
+    <button class="tab-btn {% if active_tab == 'templates' %}active{% endif %}" onclick="switchTab('templates', this)">
+        <i class="fa-brands fa-whatsapp text-success"></i> Templates
+    </button>
+    <button class="tab-btn {% if active_tab == 'waha' %}active{% endif %}" onclick="switchTab('waha', this)">
+        <i class="fa-solid fa-server text-primary"></i> WAHA API
+    </button>
+    <button class="tab-btn {% if active_tab == 'ai' %}active{% endif %}" onclick="switchTab('ai', this)">
+        <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial
+    </button>
+    <button class="tab-btn {% if active_tab == 'stores' %}active{% endif %}" onclick="switchTab('stores', this)">
+        <i class="fa-solid fa-store text-info"></i> Lojas & Filiais
+    </button>
 </div>
 
-<!-- Motor de Conexão WhatsApp -->
-<div class="header-glass max-w-lg flex-col align-start m-0 mb-4 mt-4">
-    <div class="d-flex align-center justify-between w-100 mb-3">
-        <h4 class="card-title text-primary m-0">
-            <i class="fa-brands fa-whatsapp"></i> Status do WhatsApp
-        </h4>
-        <span id="wa_status_badge" class="badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Verificando...</span>
-    </div>
-    
-    <div id="wa_actions" class="w-100 d-flex gap-2 mb-3">
-        <button id="btn_wa_connect" class="btn-primary flex-1 d-none" onclick="connectWhatsApp()">Conectar WhatsApp</button>
-        <button id="btn_wa_logout" class="btn-danger flex-1 d-none" onclick="logoutWhatsApp()" style="background:#ef4444; color:white;"><i class="fa-solid fa-power-off"></i> Desconectar</button>
-    </div>
+<!-- Tab: Templates -->
+<div id="tab-templates" class="tab-content {% if active_tab == 'templates' %}active{% endif %}">
+    <div class="header-glass max-w-lg">
+        <form action="{{ url_for('admin.settings', tab='templates') }}" method="post" class="w-100">
+            <h4 class="card-title mb-4">
+                <i class="fa-brands fa-whatsapp text-success"></i> Templates de Mensagens WhatsApp
+            </h4>
+            
+            <div class="form-group">
+                <div class="d-flex align-center justify-between mb-2">
+                    <label for="msg_boas_vindas" class="m-0">Mensagem de Boas-Vindas (Novo Lead)</label>
+                    <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_boas_vindas', this)">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                    </button>
+                </div>
+                <textarea name="msg_boas_vindas" id="msg_boas_vindas" class="input-glass" rows="4" 
+                          placeholder="Olá! Vi que você se cadastrou...">{{ settings.get('msg_boas_vindas', '') }}</textarea>
+            </div>
 
-    <div id="wa_qr_container" class="w-100 d-none flex-col align-center p-3 bg-glass" style="border: 1px solid var(--glass-border); border-radius: 8px;">
-        <p class="text-sm text-center mb-2">Escaneie o QR Code abaixo com o seu WhatsApp.</p>
-        <div style="background: white; padding: 10px; border-radius: 8px;">
-            <img id="wa_qr_img" src="" alt="QR Code" style="max-width: 200px; display: block; margin: 0 auto;">
+            <div class="form-group">
+                <div class="d-flex align-center justify-between mb-2">
+                    <label for="msg_proposta" class="m-0">Envio de Proposta</label>
+                    <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_proposta', this)">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                    </button>
+                </div>
+                <textarea name="msg_proposta" id="msg_proposta" class="input-glass" rows="4" 
+                          placeholder="Segue a nossa proposta comercial...">{{ settings.get('msg_proposta', '') }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <div class="d-flex align-center justify-between mb-2">
+                    <label for="msg_fechamento" class="m-0">Agradecimento de Fechamento</label>
+                    <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_fechamento', this)">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                    </button>
+                </div>
+                <textarea name="msg_fechamento" id="msg_fechamento" class="input-glass" rows="4" 
+                          placeholder="Muito obrigado por fechar conosco!">{{ settings.get('msg_fechamento', '') }}</textarea>
+            </div>
+
+            <button type="submit" class="btn-primary mt-3">
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Templates
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab: WAHA API -->
+<div id="tab-waha" class="tab-content {% if active_tab == 'waha' %}active{% endif %}">
+    <div class="header-glass flex-col align-start m-0">
+        <h4 class="card-title w-100 text-primary mb-3">
+            <i class="fa-solid fa-server"></i> Instâncias WAHA API (WhatsApp HTTP API)
+        </h4>
+        
+        <div class="w-100 mb-4">
+            {% for instance in waha_instances %}
+            <div class="bg-glass p-3 rounded-md mb-3" style="border: 1px solid var(--glass-border);">
+                <div class="d-flex align-center justify-between border-bottom pb-2 mb-2">
+                    <div class="font-semibold d-flex align-center gap-2">
+                        {{ instance.name }}
+                        {% if instance.is_default %}
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; font-size: 0.7rem;">PADRÃO</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% if not instance.is_default %}
+                        <form action="{{ url_for('admin.set_default_waha_instance', id=instance.id) }}" method="post" class="m-0">
+                            <button type="submit" class="btn-secondary py-1 px-2 text-sm" title="Definir como padrão">
+                                <i class="fa-solid fa-star"></i> Padrão
+                            </button>
+                        </form>
+                        {% endif %}
+                        <button class="btn-primary py-1 px-2 text-sm" onclick="toggleEdit('waha_edit_{{ instance.id }}')">
+                            <i class="fa-solid fa-pen"></i> Editar
+                        </button>
+                        <form action="{{ url_for('admin.delete_waha_instance', id=instance.id) }}" method="post" class="m-0" onsubmit="return confirm('Excluir instância {{ instance.name }}?')">
+                            <button class="btn-danger py-1 px-2 text-sm" style="background: #ef4444; color: white;">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="text-sm text-muted mb-3">
+                    <i class="fa-solid fa-link"></i> {{ instance.api_url }} | <i class="fa-solid fa-fingerprint"></i> Sessão: {{ instance.session_name }}
+                </div>
+                
+                <!-- Edit Form -->
+                <form id="waha_edit_{{ instance.id }}" action="{{ url_for('admin.edit_waha_instance', id=instance.id) }}" method="post" class="d-none bg-glass p-3 rounded-md mb-3 border">
+                    <div class="form-group">
+                        <label>Nome</label>
+                        <input type="text" name="name" class="input-glass" value="{{ instance.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>URL da API</label>
+                        <input type="url" name="api_url" class="input-glass" value="{{ instance.api_url }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Sessão WhatsApp (Instância)</label>
+                        <input type="text" name="session_name" class="input-glass" value="{{ instance.session_name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>API Key (Opcional)</label>
+                        <input type="text" name="api_key" class="input-glass" value="{{ instance.api_key }}">
+                    </div>
+                    <button type="submit" class="btn-primary">Salvar Edição</button>
+                </form>
+
+                <!-- Engine Status -->
+                <div class="d-flex align-center justify-between w-100 mb-2 mt-2">
+                    <h5 class="text-primary m-0" style="font-size: 0.9rem;">Status da Conexão</h5>
+                    <span id="wa_status_badge_{{ instance.id }}" class="badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem;">Aguardando verificação...</span>
+                </div>
+                
+                <div id="wa_actions_{{ instance.id }}" class="w-100 d-flex gap-2 mb-2">
+                    <button id="btn_wa_connect_{{ instance.id }}" class="btn-primary flex-1 py-1" onclick="connectWhatsApp({{ instance.id }})">Verificar Status / Conectar</button>
+                    <button id="btn_wa_logout_{{ instance.id }}" class="btn-danger flex-1 py-1 d-none" onclick="logoutWhatsApp({{ instance.id }})" style="background:#ef4444; color:white;"><i class="fa-solid fa-power-off"></i> Desconectar</button>
+                </div>
+
+                <div id="wa_qr_container_{{ instance.id }}" class="w-100 d-none flex-col align-center p-3 bg-glass" style="border: 1px solid var(--glass-border); border-radius: 8px;">
+                    <p class="text-sm text-center mb-2">Escaneie o QR Code abaixo com o seu WhatsApp.</p>
+                    <div style="background: white; padding: 10px; border-radius: 8px;">
+                        <img id="wa_qr_img_{{ instance.id }}" src="" alt="QR Code" style="max-width: 200px; display: block; margin: 0 auto;">
+                    </div>
+                    <button class="btn-secondary mt-3 w-100 py-1" onclick="checkWhatsAppStatus({{ instance.id }})">Já escaneei (Atualizar Status)</button>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-sm text-muted">Nenhuma instância WAHA configurada. Adicione uma abaixo.</p>
+            {% endfor %}
         </div>
-        <button class="btn-secondary mt-3 w-100" onclick="checkWhatsAppStatus()">Já escaneei (Atualizar Status)</button>
+
+        <h5 class="mt-2 mb-3 border-top pt-3 w-100">Adicionar Nova Instância</h5>
+        <form action="{{ url_for('admin.new_waha_instance') }}" method="post" class="w-100 bg-glass p-3 rounded-md border">
+            <div class="form-group">
+                <label>Nome (ex: Atendimento, Vendas)</label>
+                <input type="text" name="name" class="input-glass" required>
+            </div>
+            <div class="form-group">
+                <label>URL da API WAHA</label>
+                <input type="url" name="api_url" class="input-glass" placeholder="https://..." required>
+            </div>
+            <div class="form-group">
+                <label>Nome da Sessão (Instância)</label>
+                <input type="text" name="session_name" class="input-glass" value="default" required>
+            </div>
+            <div class="form-group">
+                <label>API Key (Opcional)</label>
+                <input type="text" name="api_key" class="input-glass">
+            </div>
+            <button type="submit" class="btn-primary w-auto mt-2">Adicionar Instância</button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab: IA -->
+<div id="tab-ai" class="tab-content {% if active_tab == 'ai' %}active{% endif %}">
+    <div class="header-glass max-w-lg">
+        <form action="{{ url_for('admin.settings', tab='ai') }}" method="post" class="w-100">
+            <h4 class="card-title mb-4">
+                <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial
+            </h4>
+
+            <div class="form-group">
+                <label for="ai_provider">Provedor de Inteligência Artificial</label>
+                <select name="ai_provider" id="ai_provider" class="input-glass">
+                    <option value="deepseek" {% if settings.get('ai_provider', 'deepseek') == 'deepseek' %}selected{% endif %}>DeepSeek (Recomendado)</option>
+                    <option value="google" {% if settings.get('ai_provider') == 'google' %}selected{% endif %}>Google Gemini</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="ai_api_key">Chave da API (API Key)</label>
+                <input type="password" name="ai_api_key" id="ai_api_key" class="input-glass" 
+                       value="{{ settings.get('ai_api_key', '') }}" placeholder="Cole sua chave de API aqui...">
+                <small class="text-sm text-muted">Para DeepSeek: <a href="https://platform.deepseek.com/" target="_blank" class="text-primary">platform.deepseek.com</a> | Para Gemini: <a href="https://aistudio.google.com/" target="_blank" class="text-primary">aistudio.google.com</a></small>
+            </div>
+
+            <div class="form-group">
+                <label for="ai_system_prompt">Tom de Voz & Instruções da IA</label>
+                <textarea name="ai_system_prompt" id="ai_system_prompt" class="input-glass" rows="4" 
+                          placeholder="Instruções para a IA reescrever a mensagem...">{{ settings.get('ai_system_prompt', 'Você é um assistente de vendas pacífico, amigável e vendedor. Reescreva a mensagem a seguir de forma natural e ligeiramente diferente, mantendo o sentido original. IMPORTANTE: Não altere nem remova as palavras dentro de colchetes, como [NOME], [DATA], [STATUS], [HORA], [VENDEDOR].') }}</textarea>
+            </div>
+
+            <button type="submit" class="btn-primary mt-3">
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações de IA
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab: Lojas -->
+<div id="tab-stores" class="tab-content {% if active_tab == 'stores' %}active{% endif %}">
+    <div class="header-glass max-w-lg flex-col align-start m-0">
+        <h4 class="card-title w-100 text-primary mb-3">
+            <i class="fa-solid fa-store"></i> Lojas & Filiais
+        </h4>
+        <div class="w-100 mb-4">
+            {% for store in stores %}
+            <div class="d-flex align-center justify-between p-3 border-bottom bg-glass mt-2 rounded-md" style="border: 1px solid var(--glass-border);">
+                <div class="font-semibold">{{ store.name }}</div>
+                <form action="{{ url_for('admin.delete_store', id=store.id) }}" method="post" onsubmit="return confirm('Excluir loja {{ store.name }}?')">
+                    <button class="icon-btn text-danger p-1 m-0">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-sm text-muted">Nenhuma loja cadastrada.</p>
+            {% endfor %}
+        </div>
+
+        <form action="{{ url_for('admin.new_store') }}" method="post" class="w-100 d-flex gap-2">
+            <input type="text" name="name" class="input-glass flex-1" placeholder="Nome da nova loja..." required>
+            <button type="submit" class="btn-primary w-auto">Adicionar</button>
+        </form>
     </div>
 </div>
 
 <script>
-    async function checkWhatsAppStatus() {
-        const badge = document.getElementById('wa_status_badge');
-        const btnConnect = document.getElementById('btn_wa_connect');
-        const btnLogout = document.getElementById('btn_wa_logout');
-        const qrContainer = document.getElementById('wa_qr_container');
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById('tab-' + tabId).classList.add('active');
+        if(btn) {
+            btn.classList.add('active');
+        }
+        
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('tab', tabId);
+        window.history.pushState({}, '', newUrl);
+    }
+
+    
+    function toggleEdit(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('d-none');
+    }
+
+    async function checkWhatsAppStatus(instanceId) {
+        const badge = document.getElementById('wa_status_badge_' + instanceId);
+        const btnConnect = document.getElementById('btn_wa_connect_' + instanceId);
+        const btnLogout = document.getElementById('btn_wa_logout_' + instanceId);
+        const qrContainer = document.getElementById('wa_qr_container_' + instanceId);
         
         badge.innerText = 'Verificando...';
         
         try {
-            const res = await fetch("{{ url_for('admin.evo_status') }}");
+            const res = await fetch(`{{ url_for('admin.evo_status') }}?instance_id=${instanceId}`);
             const data = await res.json();
             
             if(data.ok && data.data && data.data.instance) {
@@ -126,10 +375,10 @@
                     btnConnect.classList.remove('d-none');
                     btnLogout.classList.add('d-none');
                 } else if(state === 'not_found') {
-                    badge.innerText = 'NÃO CONFIGURADO';
+                    badge.innerText = 'NÃO CONFIGURADO / PARADA';
                     badge.style.background = 'rgba(239, 68, 68, 0.2)';
                     badge.style.color = '#ef4444';
-                    btnConnect.innerText = 'Criar e Conectar';
+                    btnConnect.innerText = 'Iniciar Sessão e Conectar';
                     btnConnect.classList.remove('d-none');
                     btnLogout.classList.add('d-none');
                 }
@@ -151,25 +400,24 @@
         }
     }
 
-    async function connectWhatsApp() {
-        const btn = document.getElementById('btn_wa_connect');
+    async function connectWhatsApp(instanceId) {
+        const btn = document.getElementById('btn_wa_connect_' + instanceId);
         const originalText = btn.innerText;
         btn.innerText = 'Processando...';
         btn.disabled = true;
 
         try {
             let res, data;
-            if(originalText.includes('Criar')) {
-                res = await fetch("{{ url_for('admin.evo_create') }}", {method: 'POST'});
+            if(originalText.includes('Iniciar')) {
+                res = await fetch(`{{ url_for('admin.evo_create') }}?instance_id=${instanceId}`, {method: 'POST'});
             } else {
-                res = await fetch("{{ url_for('admin.evo_qr') }}");
+                res = await fetch(`{{ url_for('admin.evo_qr') }}?instance_id=${instanceId}`);
             }
             data = await res.json();
             
             console.log("WAHA API Response:", data);
 
             if(data.ok && data.data) {
-                // Tenta encontrar o Base64 no retorno (v1, v2, v2 nested)
                 let qrBase64 = null;
                 const d = data.data;
                 
@@ -182,17 +430,16 @@
                     if(!qrBase64.startsWith('data:image')) {
                         qrBase64 = 'data:image/png;base64,' + qrBase64;
                     }
-                    document.getElementById('wa_qr_img').src = qrBase64;
-                    document.getElementById('wa_qr_container').classList.remove('d-none');
+                    document.getElementById('wa_qr_img_' + instanceId).src = qrBase64;
+                    document.getElementById('wa_qr_container_' + instanceId).classList.remove('d-none');
                     btn.classList.add('d-none');
                 } else if (d.count === 0 || d.status === 'connecting' || d.state === 'connecting') {
-                    // QR ainda não gerado pela API (v2 behavior)
                     btn.innerText = 'Gerando QR...';
-                    setTimeout(() => connectWhatsApp(), 3000); // Tenta novamente em 3s
+                    setTimeout(() => connectWhatsApp(instanceId), 3000);
                     return;
                 } else {
                     alert("O QR Code ainda não está pronto. Por favor, aguarde 5 segundos e tente novamente.");
-                    checkWhatsAppStatus();
+                    checkWhatsAppStatus(instanceId);
                 }
             } else {
                 alert("Erro ao contatar API: " + JSON.stringify(data.data || ""));
@@ -208,16 +455,16 @@
         }
     }
 
-    async function logoutWhatsApp() {
-        if(!confirm("Tem certeza que deseja desconectar este número?")) return;
+    async function logoutWhatsApp(instanceId) {
+        if(!confirm("Tem certeza que deseja desconectar esta instância?")) return;
         
         try {
-            const res = await fetch("{{ url_for('admin.evo_logout') }}", {method: 'POST'});
+            const res = await fetch(`{{ url_for('admin.evo_logout') }}?instance_id=${instanceId}`, {method: 'POST'});
             const data = await res.json();
             if(data.ok) {
                 alert("Desconectado com sucesso.");
-                document.getElementById('wa_qr_img').src = "";
-                checkWhatsAppStatus();
+                document.getElementById('wa_qr_img_' + instanceId).src = "";
+                checkWhatsAppStatus(instanceId);
             } else {
                 alert("Erro ao desconectar: " + JSON.stringify(data.data || ""));
             }
@@ -226,100 +473,52 @@
             alert("Erro de comunicação com o servidor.");
         }
     }
+async function improveTextWithAI(targetId, btnElement) {
+        const textarea = document.getElementById(targetId);
+        const text = textarea.value.trim();
+        
+        if (!text) {
+            alert("Por favor, digite algum texto para que a IA possa melhorar.");
+            return;
+        }
 
-    async function syncWahaSessions() {
-        const btn = document.getElementById('btn_sync_sessions');
-        const select = document.getElementById('evo_instance_select');
-        const hiddenInput = document.getElementById('evo_instance_hidden');
-        const status = document.getElementById('sync_status');
-        
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        
+        const originalBtnContent = btnElement.innerHTML;
+        btnElement.disabled = true;
+        btnElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+
         try {
-            const res = await fetch("{{ url_for('admin.evo_list_sessions') }}");
-            const data = await res.json();
-            
-            if (data.ok && Array.isArray(data.data)) {
-                const currentVal = hiddenInput.value;
-                select.innerHTML = '';
-                
-                if (data.data.length === 0) {
-                    select.innerHTML = '<option value="">Nenhuma sessão encontrada</option>';
-                } else {
-                    data.data.forEach(session => {
-                        const opt = document.createElement('option');
-                        opt.value = session.name;
-                        opt.text = `${session.name} (${session.status})`;
-                        if (session.name === currentVal) opt.selected = true;
-                        select.appendChild(opt);
-                    });
-                }
-                
-                status.classList.remove('d-none');
-                // Sincroniza o select com o hidden input e força a atualização inicial
-                select.onchange = () => { 
-                    hiddenInput.value = select.value; 
-                    console.log("Selecionado:", hiddenInput.value);
-                    checkWhatsAppStatus(); 
-                };
-                
-                // Força o valor atual do select para o hidden input após popular
-                if (select.value) {
-                    hiddenInput.value = select.value;
-                }
+            const response = await fetch("{{ url_for('admin.ai_improve') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ text: text })
+            });
+
+            const data = await response.json();
+
+            if (data.ok) {
+                textarea.value = data.text;
+                textarea.style.transition = "all 0.5s";
+                textarea.style.borderColor = "var(--accent-color)";
+                setTimeout(() => {
+                    textarea.style.borderColor = "var(--glass-border)";
+                }, 2000);
             } else {
-                let msg = data.data || "Verifique a URL e API Key.";
-                if (msg.includes('default')) {
-                    if (confirm("Sua instância WAHA Core suporta apenas a sessão 'default'. Deseja configurar como 'default' agora?")) {
-                        hiddenInput.value = 'default';
-                        select.innerHTML = '<option value="default" selected>default (Recomendado)</option>';
-                        alert("Nome da instância alterado para 'default'. Clique em 'Salvar Configurações' para aplicar.");
-                    }
-                } else {
-                    alert("Erro ao buscar sessões: " + msg);
-                }
+                alert("Erro da IA: " + (data.error || "Ocorreu um erro desconhecido"));
             }
-        } catch (e) {
-            console.error(e);
-            alert("Falha na conexão.");
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao conectar com o servidor.");
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Sincronizar';
+            btnElement.disabled = false;
+            btnElement.innerHTML = originalBtnContent;
         }
     }
 
-
-
-        if ("{{ settings.get('evo_api_url', '') }}" !== "") {
-            checkWhatsAppStatus();
-        } else {
-            document.getElementById('wa_status_badge').innerText = 'PROMPT: PREENCHA AS CONFIGURAÇÕES ACIMA';
-        }
+    {% for instance in waha_instances %}
+    checkWhatsAppStatus({{ instance.id }});
+{% endfor %}
 </script>
 
-<div class="header-glass max-w-lg flex-col align-start m-0 mb-4 mt-4">
-    <h4 class="card-title w-100 text-primary mb-3">
-        <i class="fa-solid fa-store"></i> Lojas & Filiais
-    </h4>
-    <div class="w-100 mb-4">
-        {% for store in stores %}
-        <div class="d-flex align-center justify-between p-3 border-bottom bg-glass mt-2 rounded-md" style="border: 1px solid var(--glass-border);">
-            <div class="font-semibold">{{ store.name }}</div>
-            <form action="{{ url_for('admin.delete_store', id=store.id) }}" method="post" onsubmit="return confirm('Excluir loja {{ store.name }}?')">
-                <button class="icon-btn text-danger p-1 m-0">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </form>
-        </div>
-        {% else %}
-        <p class="text-sm text-muted">Nenhuma loja cadastrada.</p>
-        {% endfor %}
-    </div>
-
-    <form action="{{ url_for('admin.new_store') }}" method="post" class="w-100 d-flex gap-2">
-        <input type="text" name="name" class="input-glass flex-1" placeholder="Nome da nova loja..." required>
-        <button type="submit" class="btn-primary w-auto">Adicionar</button>
-    </form>
-</div>
 {% endblock %}

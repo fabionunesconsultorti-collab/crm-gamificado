@@ -3,6 +3,14 @@
 {% block content %}
 <div class="header-glass mb-4 justify-between">
     <h3 class="m-0"><i class="fa-solid fa-satellite-dish text-success"></i> {{ title }}</h3>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm">
+            <i class="fa-solid fa-file-csv"></i> Exportar CSV
+        </a>
+        <a href="{{ url_for('admin.export_messages', format='pdf') }}" class="btn-secondary text-sm">
+            <i class="fa-solid fa-file-pdf"></i> Exportar PDF (Refinado)
+        </a>
+    </div>
 </div>
 
 <div class="header-glass max-w-full flex-col align-start m-0">

@@ -106,6 +106,31 @@ class MessageTemplate(db.Model):
     def __repr__(self):
         return f'<MessageTemplate {self.name}>'
 
+class WahaInstance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128)) # Friendly name e.g. "Server 1" or "Atendimento"
+    api_url = db.Column(db.String(256))
+    api_key = db.Column(db.String(128))
+    session_name = db.Column(db.String(128), default='default')
+    is_default = db.Column(db.Boolean, default=False)
+    status = db.Column(db.String(64), default='disconnected')
+
+    def __repr__(self):
+        return f'<WahaInstance {self.name}>'
+
+class FileMappingTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), index=True)
+    target_module = db.Column(db.String(64)) # e.g. 'clients' or 'bulk'
+    mapping_data = db.Column(db.Text) # JSON serialized
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='mapping_templates')
+
+    def __repr__(self):
+        return f'<FileMappingTemplate {self.name}>'
+
 class MessageLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'))
@@ -115,9 +140,11 @@ class MessageLog(db.Model):
     status = db.Column(db.String(32), default='sent') # 'sent', 'delivered', 'read', 'error'
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     api_response = db.Column(db.Text) # To store raw webhook/API json feedback
+    waha_instance_id = db.Column(db.Integer, db.ForeignKey('waha_instance.id'), nullable=True)
 
     client = db.relationship('Client', backref='messages')
     user = db.relationship('User', backref='sent_messages')
+    waha_instance = db.relationship('WahaInstance', backref='message_logs')
 
     def __repr__(self):
         return f'<MessageLog to {self.client_id} at {self.timestamp}>'
