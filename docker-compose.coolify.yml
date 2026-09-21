@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Aplicação Principal CRM Pro (Flask + Gunicorn)
+  crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-sua_chave_secreta_crm_coolify_2026}
+      - DATABASE_URL=sqlite:////app/data/crm.db
+    volumes:
+      - crm_data:/app/data
+    depends_on:
+      - waha
+    # No Coolify, aponte o domínio principal para a porta 5000 deste serviço
+
+  # Banco de Dados PostgreSQL para persistência do WAHA
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: waha
+      POSTGRES_USER: waha_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waha_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis para cache e filas do WAHA
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  # Instância do WAHA (WhatsApp HTTP API)
+  waha:
+    image: devlikeapro/waha
+    restart: always
+    environment:
+      - WHATSAPP_API_DATABASE_URL=postgresql://waha_user:${POSTGRES_PASSWORD:-waha_password}@postgres:5432/waha
+      - WHATSAPP_API_REDIS_URL=redis://redis:6379
+      - WHATSAPP_API_SESSION_STORAGE=postgres
+      - WHATSAPP_API_HOSTNAME=0.0.0.0
+      - TZ=America/Sao_Paulo
+      # Credenciais do Dashboard e API
+      - WAHA_DASHBOARD_ENABLED=True
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USERNAME:-admin}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD:-admin123}
+      - WHATSAPP_SWAGGER_USERNAME=${WAHA_DASHBOARD_USERNAME:-admin}
+      - WHATSAPP_SWAGGER_PASSWORD=${WAHA_DASHBOARD_PASSWORD:-admin123}
+      - WAHA_API_KEY=${WAHA_API_KEY:-admin123}
+    volumes:
+      - waha_data:/app/.waha
+    depends_on:
+      - postgres
+      - redis
+    # No Coolify, você pode expor o dashboard do WAHA apontando um subdomínio para a porta 3000
+
+volumes:
+  crm_data:
+  postgres_data:
+  redis_data:
+  waha_data:

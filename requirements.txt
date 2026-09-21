@@ -9,3 +9,4 @@ requests
 Werkzeug==3.0.1
 pandas
 openpyxl
+gunicorn

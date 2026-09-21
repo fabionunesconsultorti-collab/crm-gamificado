@@ -23,7 +23,17 @@ Um sistema web responsivo e completo para gerenciamento inteligente de clientes 
 
 ## 💻 Como Executar em um Novo Ambiente
 
-Siga os passos abaixo para configurar o ambiente de desenvolvimento e executar o CRM localmente.
+### ⚡ Inicialização Rápida (Recomendado no Linux/macOS)
+Execute o script orquestrador que configura o ambiente, sobe os containers Docker e inicia o Flask automaticamente:
+```bash
+./start.sh
+```
+Para pausar os serviços do Docker posteriormente:
+```bash
+./stop.sh
+```
+
+---
 
 ### 1. Pré-requisitos
 

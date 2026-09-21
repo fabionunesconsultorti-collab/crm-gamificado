@@ -35,6 +35,13 @@ services:
       # Configurações básicas
       - WHATSAPP_API_HOSTNAME=0.0.0.0
       - TZ=America/Sao_Paulo
+      # Credenciais do Dashboard e Swagger (Fixas para não gerar senhas aleatórias)
+      - WAHA_DASHBOARD_ENABLED=True
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=admin123
+      - WHATSAPP_SWAGGER_USERNAME=admin
+      - WHATSAPP_SWAGGER_PASSWORD=admin123
+      - WAHA_API_KEY=admin123
     depends_on:
       - postgres
       - redis

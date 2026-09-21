@@ -85,3 +85,44 @@ class AIHandler:
                 
             return text, user_msg
 
+    @staticmethod
+    def generate_reply(customer_message):
+        cfg = AIHandler.get_config()
+        if not cfg['api_key']:
+            return "Desculpe, a IA ainda não está configurada neste momento.", "API Key não configurada."
+            
+        system_prompt = "Você é um assistente de vendas educado e prestativo. Responda de forma curta e amigável ao cliente."
+        full_prompt = f"{system_prompt}\n\nCliente diz: {customer_message}\n\nResponda:"
+        
+        try:
+            if cfg['provider'] == 'deepseek':
+                headers = {"Authorization": f"Bearer {cfg['api_key']}", "Content-Type": "application/json"}
+                data = {
+                    "model": "deepseek-chat",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": customer_message}
+                    ],
+                    "stream": False
+                }
+                resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=data, timeout=30)
+                if resp.status_code == 200:
+                    resp_json = resp.json()
+                    choices = resp_json.get("choices", [])
+                    if choices and choices[0].get("message"):
+                        return choices[0]["message"]["content"].strip(), None
+                return "Tivemos um pequeno erro de comunicação interna.", f"DeepSeek Status: {resp.status_code}"
+            else:
+                # Gemini
+                client = genai.Client(api_key=cfg['api_key'])
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=full_prompt
+                )
+                if response and response.text:
+                    return response.text.strip(), None
+                return "Tivemos um erro ao gerar a resposta.", "Resposta vazia do Gemini"
+        except Exception as e:
+            print(f"Erro no generate_reply: {e}")
+            return "No momento não consigo processar sua mensagem.", str(e)
+

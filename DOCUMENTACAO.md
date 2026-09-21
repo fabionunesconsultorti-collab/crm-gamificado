@@ -49,21 +49,15 @@ A tabela **Client** possui um escopo estendido para varejo moderno:
 
 ---
 
-## 6. Configuração do Servidor WAHA (Instância Remota)
-Para rodar o WAHA (WhatsApp HTTP API) em um ambiente remoto (ex: Windows com Docker), siga o procedimento de instalação profissional com persistência e cache:
+## 6. Configuração e Credenciais do WAHA (WhatsApp API)
+O serviço WAHA (WhatsApp HTTP API) roda encapsulado via Docker junto com PostgreSQL e Redis para garantir persistência de sessões e filas assíncronas.
 
-### 1. Pré-requisitos
-- **Docker Desktop**: Instalado e com WSL2 habilitado.
-- **Terminal**: PowerShell ou CMD.
-
-### 2. Configuração do Ambiente
-Crie uma pasta (ex: `C:\waha-api`) e salve o seguinte arquivo `docker-compose.yml`:
-
+### Arquitetura do Docker Compose
+No arquivo `docker-compose.yml` da raiz:
 ```yaml
 version: '3.8'
 
 services:
-  # Banco de Dados PostgreSQL para persistência de sessões e dados
   postgres:
     image: postgres:15
     restart: always
@@ -74,40 +68,414 @@ services:
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
 
-  # Redis para gerenciamento de cache e filas
   redis:
     image: redis:alpine
     restart: always
     volumes:
       - ./redis_data:/data
 
-  # Instância principal do WAHA
   waha:
     image: devlikeapro/waha
     restart: always
     ports:
       - "3000:3000"
     environment:
-      # Configurações do Banco de Dados
       - WHATSAPP_API_DATABASE_URL=postgresql://waha_user:waha_password@postgres:5432/waha
-      # Configurações do Redis
       - WHATSAPP_API_REDIS_URL=redis://redis:6379
-      # Ativa a persistência
       - WHATSAPP_API_SESSION_STORAGE=postgres
-      # Configurações básicas
       - WHATSAPP_API_HOSTNAME=0.0.0.0
       - TZ=America/Sao_Paulo
+      # Credenciais Fixas para Dashboard e API
+      - WAHA_DASHBOARD_ENABLED=True
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=admin123
+      - WHATSAPP_SWAGGER_USERNAME=admin
+      - WHATSAPP_SWAGGER_PASSWORD=admin123
+      - WAHA_API_KEY=admin123
     depends_on:
       - postgres
       - redis
 ```
 
-### 3. Inicialização
-No terminal dentro da pasta escolhida, execute:
-```bash
-docker-compose up -d
-```
-O serviço estará disponível em `http://localhost:3000` ou pelo IP da máquina na rede local.
+### Credenciais Padrão do WAHA
+- **Dashboard / Swagger:** `http://localhost:3000/dashboard`
+- **Usuário:** `admin`
+- **Senha:** `admin123`
+- **Chave de API (`X-Api-Key`):** `admin123`
 
 ---
-> *Este documento foi formatado para refletir a migração para WAHA API e a centralização dos disparos no CRM. Deve ser modificado caso o banco ou stack primário evolua para ambientes Kubernetes em produções avançadas.*
+
+## 7. Manual Detalhado: Como Rodar a Aplicação Localmente
+
+### Método 1: Inicialização Automatizada (Recomendado)
+O projeto conta com scripts orquestradores que realizam todas as checagens e inicializações automaticamente:
+
+```bash
+# 1. Torne os scripts executáveis (apenas na primeira vez)
+chmod +x start.sh stop.sh
+
+# 2. Inicie todo o ecossistema (Docker + Banco + Flask)
+./start.sh
+```
+
+**O que o `start.sh` executa:**
+1. Valida se o Docker está instalado e com o daemon ativo.
+2. Sobe os containers (Postgres, Redis, WAHA) via `docker compose up -d`.
+3. Executa um *healthcheck* aguardando a porta `3000` do WAHA responder.
+4. Detecta ou cria o ambiente virtual Python (`venv`).
+5. Valida e instala dependências do `requirements.txt`.
+6. Executa `init_db.py` para criar tabelas e garantir o usuário `admin` padrão.
+7. Dispara o servidor Flask em `http://localhost:5000`.
+8. Ao receber `Ctrl+C`, oferece opção para pausar os containers automaticamente.
+
+Para pausar os serviços do Docker posteriormente:
+```bash
+./stop.sh
+```
+
+---
+
+### Método 2: Inicialização Manual Passo a Passo
+Caso deseje rodar cada componente manualmente:
+
+1. **Subir os serviços Docker:**
+   ```bash
+   docker compose up -d
+   ```
+2. **Ativar o ambiente virtual Python:**
+   ```bash
+   # Linux / macOS:
+   python3 -m venv venv
+   source venv/bin/activate
+
+   # Windows:
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+3. **Instalar dependências:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. **Criar tabelas e administrador padrão:**
+   ```bash
+   python init_db.py
+   ```
+5. **Iniciar a aplicação Flask:**
+   ```bash
+   python run.py
+   ```
+
+### Acessos Locais:
+- **CRM Web:** [http://localhost:5000](http://localhost:5000) (Login: `admin` / Senha: `admin123`)
+- **Painel WAHA:** [http://localhost:3000/dashboard](http://localhost:3000/dashboard) (Login: `admin` / Senha: `admin123`)
+
+---
+
+## 8. Manual de Portabilidade: Como Portar e Fazer Deploy em Servidores (VPS / Produção)
+
+Este guia cobre o passo a passo completo para migrar a aplicação para um servidor Linux (Ubuntu 22.04 / 24.04 LTS) em provedores como Hetzner, DigitalOcean, AWS, Oracle Cloud ou VPS dedicado.
+
+### 8.1. Requisitos Mínimos do Servidor
+- **SO:** Ubuntu 22.04 LTS ou superior.
+- **CPU:** Mínimo de 2 vCPUs (o Chromium do WAHA exige capacidade de processamento para renderizar webhooks de mensagens).
+- **Memória RAM:** 4 GB recomendados (mínimo 2 GB com Swap configurada).
+- **Disco:** 20 GB SSD ou superior.
+- **Domínio ou Subdomínio:** Apontado para o IP público do servidor (ex: `crm.seudominio.com.br` e `waha.seudominio.com.br`).
+
+---
+
+### 8.2. Passo 1: Preparação do Sistema Operacional
+Acesse o servidor via SSH e atualize os pacotes:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git ufw python3 python3-pip python3-venv nginx certbot python3-certbot-nginx
+```
+
+Instale o **Docker** e o **Docker Compose plugin**:
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker --version
+docker compose version
+```
+
+---
+
+### 8.3. Passo 2: Clonar o Projeto no Servidor
+Recomenda-se colocar o projeto em `/var/www/crm` ou no diretório home:
+
+```bash
+sudo mkdir -p /var/www/crm
+sudo chown -R $USER:$USER /var/www/crm
+cd /var/www/crm
+
+# Clone o repositório
+git clone <URL_DO_SEU_REPOSITORIO> .
+```
+
+---
+
+### 8.4. Passo 3: Configurar Variáveis de Ambiente e Segurança
+Em produção, não use chaves padrão. Crie um arquivo `.env` na raiz do projeto:
+
+```bash
+cat << 'EOF' > .env
+SECRET_KEY=gere_uma_chave_longa_e_aleatoria_aqui
+DATABASE_URL=sqlite:////var/www/crm/crm.db
+WAHA_DASHBOARD_USERNAME=admin
+WAHA_DASHBOARD_PASSWORD=sua_senha_forte_waha
+WAHA_API_KEY=sua_chave_secreta_api_waha
+EOF
+```
+
+> **Dica para gerar `SECRET_KEY` aleatória:**
+> ```bash
+> python3 -c "import secrets; print(secrets.token_hex(32))"
+> ```
+
+---
+
+### 8.5. Passo 4: Subir a Stack de Mensageria (Docker)
+Inicie os containers do PostgreSQL, Redis e WAHA:
+
+```bash
+docker compose up -d
+```
+
+Verifique se estão operando normalmente:
+```bash
+docker compose ps
+docker logs crm-waha-1 --tail 30
+```
+
+---
+
+### 8.6. Passo 5: Configurar o Python e Gunicorn (Servidor de Aplicação)
+Em servidores de produção, o servidor embutido do Flask (`app.run`) não deve ser utilizado. Utiliza-se o **Gunicorn** como servidor WSGI de alto desempenho.
+
+1. **Crie e ative o ambiente virtual:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. **Instale as dependências e o Gunicorn:**
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   pip install gunicorn
+   ```
+
+3. **Inicialize o Banco de Dados:**
+   ```bash
+   python init_db.py
+   ```
+
+---
+
+### 8.7. Passo 6: Configurar o Systemd (Daemon com Auto-Restart)
+Para que o CRM inicialize automaticamente com o servidor e reinicie caso caia, crie um serviço no `systemd`:
+
+```bash
+sudo nano /etc/systemd/system/crm.service
+```
+
+Insira a seguinte configuração (ajuste o usuário e caminhos se necessário):
+```ini
+[Unit]
+Description=CRM Pro - Servidor Flask via Gunicorn
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/var/www/crm
+Environment="PATH=/var/www/crm/venv/bin"
+ExecStart=/var/www/crm/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 run:app --timeout 120
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Ative e inicie o serviço:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable crm
+sudo systemctl start crm
+sudo systemctl status crm
+```
+
+---
+
+### 8.8. Passo 7: Configurar Nginx como Reverse Proxy e SSL Gratuito (HTTPS)
+
+Crie um arquivo de configuração para o site no Nginx:
+```bash
+sudo nano /etc/nginx/sites-available/crm
+```
+
+Conteúdo recomendado:
+```nginx
+server {
+    listen 80;
+    server_name crm.seudominio.com.br;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# (Opcional) Proxy para o painel WAHA com subdomínio próprio
+server {
+    listen 80;
+    server_name waha.seudominio.com.br;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Suporte a WebSocket (essencial para o WAHA QR Code dinâmico)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+Ative o site e teste a sintaxe:
+```bash
+sudo ln -s /etc/nginx/sites-available/crm /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Gere certificados SSL gratuitos com o **Certbot**:
+```bash
+sudo certbot --nginx -d crm.seudominio.com.br -d waha.seudominio.com.br
+```
+
+O Certbot renovará os certificados automaticamente a cada 90 dias.
+
+---
+
+### 8.9. Passo 8: Firewall (UFW) e Segurança de Rede
+Proteja o servidor mantendo fechadas as portas internas (3000, 5000, 5432, 6379), deixando públicas apenas as portas web e SSH:
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+---
+
+### 8.10. Passo 9: Rotina de Backup Recomendada
+Para garantir a segurança dos dados dos clientes e sessões:
+
+1. **Banco SQLite:** O arquivo `crm.db` contém todos os dados do CRM. Faça cópias periódicas via cron:
+   ```bash
+   cp /var/www/crm/crm.db /var/backups/crm_$(date +%F).db
+   ```
+2. **Dados do Docker:** As pastas `./postgres_data`, `./redis_data` e `./waha_data` armazenam as sessões conectadas do WhatsApp. Inclua-as em seus snapshots de disco ou rotinas de backup comprimidas (`tar.gz`).
+
+---
+
+## 9. Manual de Hospedagem no Coolify (PaaS Auto-Hospedado)
+
+O **Coolify** é uma plataforma open-source (alternativa ao Heroku, Railway e Render) que gerencia containers Docker, deploys automáticos via Git e certificados SSL gratuitos com renovação automática via Traefik.
+
+O projeto já conta com o arquivo [Dockerfile](Dockerfile) e a stack orquestrada [docker-compose.coolify.yml](docker-compose.coolify.yml) prontos para rodar no Coolify.
+
+---
+
+### 9.1. Como Funciona a Arquitetura no Coolify
+No Coolify, todos os 4 serviços rodam na mesma rede interna do Docker:
+- **`crm` (Porta 5000):** Aplicação Flask servida via Gunicorn.
+- **`waha` (Porta 3000):** API do WhatsApp com persistência de sessões.
+- **`postgres` (Porta 5432):** Banco de dados relacional interno do WAHA.
+- **`redis` (Porta 6379):** Fila assíncrona e cache do WAHA.
+
+> 🌟 **Grande Vantagem no Coolify:** O CRM se comunica com o WhatsApp de forma **100% interna** pela rede Docker através do endereço `http://waha:3000`, sem precisar expor a porta da API publicamente ou gastar tráfego externo!
+
+---
+
+### 9.2. Passo a Passo de Deploy no Coolify
+
+#### Passo 1: Subir o Projeto no GitHub ou GitLab
+Certifique-se de que as alterações e os novos arquivos (`Dockerfile`, `.dockerignore`, `docker-compose.coolify.yml`) foram comitados e enviados para o seu repositório Git:
+```bash
+git add Dockerfile .dockerignore docker-compose.coolify.yml requirements.txt
+git commit -m "feat: suporte a deploy no Coolify via Docker Compose"
+git push origin main
+```
+
+#### Passo 2: Criar o Recurso no Coolify
+1. Acesse o painel web do seu servidor **Coolify**.
+2. Vá em **Projects** e selecione o seu projeto/ambiente (ex: `Production`).
+3. Clique no botão **+ New Resource**.
+4. Selecione **Git Repository (ou Docker Compose)**:
+   - Se escolher **Private/Public Repository**: Conecte seu repositório Git.
+   - Na opção de **Build Pack**, selecione **Docker Compose**.
+   - Em **Docker Compose Location**, informe: `/docker-compose.coolify.yml`.
+
+#### Passo 3: Configurar os Domínios e SSL
+No painel do serviço criado no Coolify:
+1. Localize a aba de **Domains / FQDN**:
+   - **Para o CRM:** Defina o domínio principal: `https://crm.seudominio.com.br` (apontando para a porta `5000` do serviço `crm`).
+   - *(Opcional)* **Para o WAHA Dashboard:** Se quiser acessar o painel de QR Code do WhatsApp remotamente por um subdomínio, configure: `https://waha.seudominio.com.br` (apontando para a porta `3000` do serviço `waha`).
+2. O Coolify (via Traefik) gerará e configurará os certificados SSL **HTTPS (Let's Encrypt)** automaticamente.
+
+#### Passo 4: Configurar as Variáveis de Ambiente
+Na aba **Environment Variables** do Coolify, adicione:
+
+| Variável | Descrição | Exemplo de Valor |
+|---|---|---|
+| `SECRET_KEY` | Chave criptográfica do Flask | `gerar_uma_chave_longa_hex_aleatoria` |
+| `POSTGRES_PASSWORD` | Senha interna do PostgreSQL | `waha_secret_pass_2026` |
+| `WAHA_DASHBOARD_USERNAME` | Usuário do painel WAHA | `admin` |
+| `WAHA_DASHBOARD_PASSWORD` | Senha do painel WAHA | `sua_senha_forte_aqui` |
+| `WAHA_API_KEY` | Chave de autenticação da API | `sua_chave_api_secreta` |
+
+#### Passo 5: Fazer o Deploy
+1. Clique no botão **Deploy** no topo da tela do Coolify.
+2. O Coolify irá:
+   - Baixar as imagens do PostgreSQL, Redis e WAHA.
+   - Construir a imagem Docker da sua aplicação CRM Flask.
+   - Criar os volumes persistentes (`crm_data`, `postgres_data`, `redis_data`, `waha_data`).
+   - Configurar o roteamento seguro com HTTPS.
+
+---
+
+### 9.3. Configurando a Integração WAHA no CRM após o Deploy
+Assim que o deploy terminar:
+1. Abra seu navegador em `https://crm.seudominio.com.br`.
+2. Faça login com o usuário administrador padrão (`admin` / `admin123`).
+3. Vá em **Admin (`/admin`)** -> **Instâncias WAHA**.
+4. Configure a instância com os seguintes dados:
+   - **Nome:** Instância Produção
+   - **URL da API:** `http://waha:3000` *(o nome do serviço na rede interna do Coolify)*
+   - **API Key:** O mesmo valor que você configurou na variável `WAHA_API_KEY`.
+   - **Sessão:** `default`
+5. Clique em salvar e sincronizar o QR Code para conectar o WhatsApp da sua empresa!
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados e Coolify.*

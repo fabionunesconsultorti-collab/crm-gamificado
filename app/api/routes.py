@@ -1,9 +1,10 @@
 import json
 from flask import request, jsonify
 from app.api import bp
-from app.models import MessageLog
+from app.models import MessageLog, Client
 from app import db
 from app.utils.waha import WahaAPI
+from app.utils.ai_handler import AIHandler
 
 @bp.route('/webhook/waha', methods=['POST'])
 def waha_webhook():
@@ -24,6 +25,38 @@ def waha_webhook():
             # Future: Find message log by API message ID and update status
             pass
             
+    # Handle incoming messages
+    if data.get('event') in ['message', 'message.any']:
+        payload = data.get('payload', {})
+        from_phone = payload.get('from', '')
+        body = payload.get('body', '')
+        is_from_me = payload.get('fromMe', False)
+        
+        if not is_from_me and body:
+            # Identify the client by phone
+            clean_phone = from_phone.split('@')[0]
+            client = Client.query.filter(Client.phone.contains(clean_phone[-8:])).first()
+            
+            if client:
+                # Generate AI Reply
+                ai_reply, error = AIHandler.generate_reply(body)
+                
+                if ai_reply:
+                    # Send it back
+                    success, resp = WahaAPI.send_text(client.phone, ai_reply)
+                    
+                    # Log the reply
+                    log = MessageLog(
+                        client_id=client.id,
+                        user_id=None, # System/AI
+                        content=ai_reply,
+                        channel='waha_api',
+                        status='sent' if success else 'error',
+                        api_response=json.dumps(resp) if success else str(resp)
+                    )
+                    db.session.add(log)
+                    db.session.commit()
+
     return jsonify({"status": "received"}), 200
 
 @bp.route('/messages/send_automated', methods=['POST'])

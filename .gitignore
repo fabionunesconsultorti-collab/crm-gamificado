@@ -50,3 +50,5 @@ Thumbs.db
 # Project Specific
 scratch/
 waha_data/
+postgres_data/
+redis_data/
