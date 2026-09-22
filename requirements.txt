@@ -10,3 +10,4 @@ Werkzeug==3.0.1
 pandas
 openpyxl
 gunicorn
+psycopg2-binary>=2.9.9

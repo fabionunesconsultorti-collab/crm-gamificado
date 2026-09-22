@@ -15,7 +15,7 @@ A arquitetura escolhida minimiza a dependência de serviços externos complexos 
 - **Banco de Dados**: `SQLite` através do ORM `SQLAlchemy`. Foi escolhido para facilitar a distribuição e os backups iniciais sem configuração de cluster.
 - **Migrações e Modelagem**: `Flask-Migrate` (`Alembic`) para gerenciar as mudanças no banco de dados com comandos simples de terminal.
 - **Frontend / Interface Visual**: HTML5, Vanilla JS e Sistema Customizado de CSS focado em "Glassmorphism" — usando arquivos estáticos locais ao invés de grandes bibliotecas terceiras como Tailwind ou Bootstrap, para que tenhamos máximo controle e desempenho limpo, gerando o arquivo `/static/css/style.css`.
-- **Comunicação Web API (Requisições HTTP)**: A biblioteca `requests` do Python possibilita o despache instantâneo de mensagens pelo servidor diretamente para modems/APIs como o Evolution API.
+- **Comunicação Web API (Requisições HTTP)**: A biblioteca `requests` do Python possibilita o despache instantâneo de mensagens pelo servidor diretamente para a API WhatsApp (WAHA).
 
 ## 3. Estrutura de Diretórios e Blueprints
 A aplicação usa a estrutura em **Blueprints** para facilitar a escalabilidade de módulos separados:
@@ -25,7 +25,7 @@ A aplicação usa a estrutura em **Blueprints** para facilitar a escalabilidade 
   - `models.py`: Toda a estrutura (schemas) das tabelas que vão pro banco de dados (Usuários, Clientes, Lojas, Configurações e Histórico de Logs). 
   - `main/`: Módulo e rotas para Landing Page / Dashboard, incluindo o modelo da Tela de Ranking.
   - `auth/`: Módulo independente gerindo Autenticações (login, logout, session data e senhas seguras por hash).
-  - `admin/`: Módulo e telas administrativas, acessíveis apenas para *admind/gerentes*. Focado em adicionar/remover Lojas, visualizar todos os Logs, inserir templates novos e administrar permissionamento e configuração do motor Evolution.
+  - `admin/`: Módulo e telas administrativas, acessíveis apenas para *admin/gerentes*. Focado em adicionar/remover Lojas, visualizar todos os Logs, inserir templates novos e administrar permissionamento e configuração das instâncias WAHA (WhatsApp).
   - `crm/`: Coração de Vendas. Concentra o motor visual do CRUD de Clientes, a visualização dinâmica do Kanban (*drag-n-drop*) e a funcionalidade de Importação Massiva de CSV.
   - `api/`: O roteador silencioso e moderno. Mantém endpoints focados e padronizados no padrão `REST (/api/*)` prontos para servirem Webhooks externos (ouvidoria), ou para envio massivo programado que independe do navegador do cliente.
   - `utils/`: Contém arquivos vitais como `messaging.py` (Engine para processar as variáveis como nome/data das mensagens) e a classe `WahaAPI` (Empacotador abstrato para as chamadas de rede do Whatsapp).
@@ -38,7 +38,7 @@ Na evolução do CRM incorporamos o Módulo Focado em Disparos e Centralização
 2. **Motor de Interpolação Textual (`utils.messaging`)**: Usa Expressões Regulares (`RegEx`) para converter as variáveis lógicas do template nos dados exatos da tabela e contexto do remetente a partir da tabela SQL.
    - Variáveis suportadas localmente: `[NOME], [NOME_COMPLETO], [DATA], [HORA], [STATUS], [VENDEDOR]`.
 3. **Tracking & Observabilidade (`MessageLog`)**: Um sistema que funciona silenciosamente no banco registrando o autor, se o cliente é validado com sucesso e se foi gerado API ou disparado um link puro (`wa.me`) via Browser.
-4. **Acoplador de API (`utils/waha.py`)**: Arquivo Python que mapeia a documentação oficial da WAHA API. Ele pesquisa na tabela global as definições em tempo real da URL do seu servidor (`evo_api_url`), Chave (`evo_api_key`) e a Sessão ativa (`evo_instance`).
+4. **Acoplador de API (`utils/waha.py`)**: Arquivo Python que mapeia a documentação oficial da WAHA API. Ele gerencia e consulta em tempo real a URL do seu servidor (`waha_api_url`), Chave de API (`waha_api_key`) e a Sessão ativa (`waha_session_name` / `waha_instance`), persistidas no modelo `WahaInstance` do banco de dados (com suporte a fallback na tabela `Setting`).
 
 ## 5. Mapeamento Relevante das Variáveis do Banco de Dados
 A tabela **Client** possui um escopo estendido para varejo moderno:

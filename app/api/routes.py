@@ -20,7 +20,7 @@ def waha_webhook():
     if data.get('event') == 'messages.update':
         updates = data.get('data', [])
         for update in updates:
-            # Depending on how the Evolution API maps it, we might check message ID
+            # Depending on how the WAHA API maps it, we might check message ID
             # Here we just save the raw log for demonstration if needed, or match to MessageLog ID if we stored it
             # Future: Find message log by API message ID and update status
             pass

@@ -158,7 +158,7 @@ class MessageLog(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey('client.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     content = db.Column(db.Text)
-    channel = db.Column(db.String(32), default='whatsapp_link') # 'whatsapp_link', 'evolution_api'
+    channel = db.Column(db.String(32), default='whatsapp_link') # 'whatsapp_link', 'waha_api'
     status = db.Column(db.String(32), default='sent') # 'sent', 'delivered', 'read', 'error'
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     api_response = db.Column(db.Text) # To store raw webhook/API json feedback

@@ -30,15 +30,30 @@ class WahaAPI:
                 'id': instance.id,
                 'api_url': resolved_url,
                 'api_key': instance.api_key or '',
-                'session_name': instance.session_name or 'default'
+                'session_name': instance.session_name or 'default',
+                'waha_api_url': resolved_url,
+                'waha_api_key': instance.api_key or '',
+                'waha_session_name': instance.session_name or 'default',
+                'waha_instance': instance.session_name or 'default'
             }
         
+        # Fallback para configurações globais na tabela Setting (waha_* e legados evo_*)
+        from app.models import Setting
+        api_url = Setting.get('waha_api_url') or Setting.get('evo_api_url')
+        api_key = Setting.get('waha_api_key') or Setting.get('evo_api_key', '')
+        session_name = Setting.get('waha_session_name') or Setting.get('waha_instance') or Setting.get('evo_instance', 'default')
+
         connected_ip = get_connected_ip()
+        final_url = resolve_instance_api_url(api_url) if api_url else f'http://{connected_ip}:3000'
         return {
             'id': None,
-            'api_url': f'http://{connected_ip}:3000',
-            'api_key': '',
-            'session_name': 'default'
+            'api_url': final_url,
+            'api_key': api_key or '',
+            'session_name': session_name or 'default',
+            'waha_api_url': final_url,
+            'waha_api_key': api_key or '',
+            'waha_session_name': session_name or 'default',
+            'waha_instance': session_name or 'default'
         }
 
     @staticmethod
@@ -100,8 +115,7 @@ class WahaAPI:
                 # WAHA States: STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED
                 state = data.get('status', 'STOPPED')
                 
-                # Mapear para compatibilidade com o JS do Evolution:
-                # Evolution states: open, close, connecting, not_found
+                # Mapear estados WAHA para a interface (open, close, connecting, not_found):
                 mapped_state = 'close'
                 if state == 'WORKING': mapped_state = 'open'
                 elif state == 'SCAN_QR_CODE': mapped_state = 'close' # 'close' faz o JS mostrar o botão "Gerar QR"

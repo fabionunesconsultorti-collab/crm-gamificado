@@ -346,46 +346,61 @@ def delete_user(id):
     flash(f'🗑️ Usuário {name} excluído.')
     return redirect(url_for('admin.list_users'))
 
-# ── Evolution API (AJAX) ──────────────────────────────────────────────────────
+# ── WAHA WhatsApp API (AJAX) ──────────────────────────────────────────────────
+@bp.route('/api/waha/status', methods=['GET'])
 @bp.route('/api/evolution/status', methods=['GET'])
 @login_required
 @admin_required
-def evo_status():
+def waha_status():
     instance_id = request.args.get('instance_id')
     success, data = WahaAPI.get_connection_state(instance_id)
     return jsonify({'ok': success, 'data': data})
 
+evo_status = waha_status
+
+@bp.route('/api/waha/create', methods=['POST'])
 @bp.route('/api/evolution/create', methods=['POST'])
 @login_required
 @admin_required
-def evo_create():
+def waha_create():
     instance_id = request.args.get('instance_id')
     success, data = WahaAPI.create_instance(instance_id)
     return jsonify({'ok': success, 'data': data})
 
+evo_create = waha_create
+
+@bp.route('/api/waha/qr', methods=['GET'])
 @bp.route('/api/evolution/qr', methods=['GET'])
 @login_required
 @admin_required
-def evo_qr():
+def waha_qr():
     instance_id = request.args.get('instance_id')
     success, data = WahaAPI.connect_instance(instance_id)
     return jsonify({'ok': success, 'data': data})
 
+evo_qr = waha_qr
+
+@bp.route('/api/waha/logout', methods=['POST'])
 @bp.route('/api/evolution/logout', methods=['POST'])
 @login_required
 @admin_required
-def evo_logout():
+def waha_logout():
     instance_id = request.args.get('instance_id')
     success, data = WahaAPI.logout_instance(instance_id)
     return jsonify({'ok': success, 'data': data})
 
+evo_logout = waha_logout
+
+@bp.route('/api/waha/sessions', methods=['GET'])
 @bp.route('/api/evolution/sessions', methods=['GET'])
 @login_required
 @admin_required
-def evo_list_sessions():
+def waha_list_sessions():
     instance_id = request.args.get('instance_id')
     success, data = WahaAPI.list_sessions(instance_id)
     return jsonify({'ok': success, 'data': data})
+
+evo_list_sessions = waha_list_sessions
 
 
 

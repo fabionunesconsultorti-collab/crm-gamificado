@@ -454,7 +454,7 @@
         badge.innerText = 'Verificando...';
         
         try {
-            const res = await fetch(`{{ url_for('admin.evo_status') }}?instance_id=${instanceId}`);
+            const res = await fetch(`{{ url_for('admin.waha_status') }}?instance_id=${instanceId}`);
             const data = await res.json();
             
             if(data.ok && data.data && data.data.instance) {
@@ -513,9 +513,9 @@
         try {
             let res, data;
             if(originalText.includes('Iniciar')) {
-                res = await fetch(`{{ url_for('admin.evo_create') }}?instance_id=${instanceId}`, {method: 'POST'});
+                res = await fetch(`{{ url_for('admin.waha_create') }}?instance_id=${instanceId}`, {method: 'POST'});
             } else {
-                res = await fetch(`{{ url_for('admin.evo_qr') }}?instance_id=${instanceId}`);
+                res = await fetch(`{{ url_for('admin.waha_qr') }}?instance_id=${instanceId}`);
             }
             data = await res.json();
             
@@ -563,7 +563,7 @@
         if(!confirm("Tem certeza que deseja desconectar esta instância?")) return;
         
         try {
-            const res = await fetch(`{{ url_for('admin.evo_logout') }}?instance_id=${instanceId}`, {method: 'POST'});
+            const res = await fetch(`{{ url_for('admin.waha_logout') }}?instance_id=${instanceId}`, {method: 'POST'});
             const data = await res.json();
             if(data.ok) {
                 alert("Desconectado com sucesso.");

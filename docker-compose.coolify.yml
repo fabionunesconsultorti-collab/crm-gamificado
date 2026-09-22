@@ -11,6 +11,8 @@ services:
       - SECRET_KEY=${SECRET_KEY:-sua_chave_secreta_crm_coolify_2026}
       - DATABASE_URL=sqlite:////app/data/crm.db
       - OLLAMA_URL=http://ollama:11434
+      - WAHA_API_URL=http://waha:3000
+      - WAHA_API_KEY=${WAHA_API_KEY:-admin123}
     volumes:
       - crm_data:/app/data
     depends_on:
