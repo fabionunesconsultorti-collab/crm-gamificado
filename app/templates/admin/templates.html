@@ -46,27 +46,138 @@
 
     <div>
         <div class="header-glass flex-col align-start m-0">
-            <h4 class="card-title w-100 text-success">
-                <i class="fa-solid fa-plus"></i> Novo Template
+            <h4 class="card-title w-100 text-success flex justify-between align-center">
+                <span><i class="fa-solid fa-plus"></i> Novo Template</span>
             </h4>
             <div class="text-xs text-muted w-100 mb-3">
                 Variáveis Mágicas Suportadas:<br>
                 <span class="badge badge-primary mt-1">[NOME]</span>
                 <span class="badge badge-primary mt-1">[DATA]</span>
-                <span class="badge badge-primary mt-1">[HORA]</span><br>
+                <span class="badge badge-primary mt-1">[HORA]</span>
                 <span class="badge badge-primary mt-1">[VENDEDOR]</span>
                 <span class="badge badge-primary mt-1">[STATUS]</span>
             </div>
+
+            <!-- Criador de Textos com IA -->
+            <div class="w-100 p-3 mb-3 rounded-md" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                <label class="text-xs font-semibold text-warning d-block mb-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Criar Texto com IA (Ollama / Local)
+                </label>
+                <div class="w-100 mb-2">
+                    <input type="text" id="ai_prompt_input" class="input-glass text-sm w-100" 
+                           style="width: 100%; box-sizing: border-box;"
+                           placeholder="Ex: Mensagem de aniversário com cupom de 15% off..."
+                           onkeydown="if(event.key === 'Enter'){ event.preventDefault(); generateTemplateText(); }">
+                </div>
+                <button type="button" class="btn-primary text-xs py-2 w-100" id="btn_generate_ai" onclick="generateTemplateText()" style="width: 100%;">
+                    <i class="fa-solid fa-sparkles"></i> Gerar Texto
+                </button>
+                <div id="ai_generate_status" class="text-xs text-muted mt-2" style="display:none;"></div>
+            </div>
+
             <form action="" method="post" class="w-100">
                 <div class="form-group mb-2">
-                    <input type="text" name="name" class="input-glass" placeholder="Nome do Template (ex: Cobrança Tier 1)" required>
+                    <input type="text" name="name" id="template_name" class="input-glass" placeholder="Nome do Template (ex: Cobrança Amigável)" required>
                 </div>
                 <div class="form-group mb-3">
-                    <textarea name="text_content" class="input-glass" rows="6" placeholder="Olá [NOME]! Notamos que hoje, [DATA], o seu pedido..." required></textarea>
+                    <div class="d-flex justify-between align-center mb-1">
+                        <label class="text-xs text-muted">Corpo da Mensagem:</label>
+                        <button type="button" class="btn-secondary text-xs p-1 px-2" id="btn_improve_ai" onclick="improveTemplateText()">
+                            <i class="fa-solid fa-magic"></i> Humanizar / Reescrever
+                        </button>
+                    </div>
+                    <textarea name="text_content" id="template_text_content" class="input-glass" rows="6" placeholder="Olá [NOME]! Notamos que hoje, [DATA], o seu pedido..." required></textarea>
                 </div>
-                <button type="submit" class="btn-primary">Registrar Template</button>
+                <button type="submit" class="btn-primary w-100">Registrar Template</button>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+async function generateTemplateText() {
+    const promptInput = document.getElementById('ai_prompt_input');
+    const statusDiv = document.getElementById('ai_generate_status');
+    const textarea = document.getElementById('template_text_content');
+    const nameInput = document.getElementById('template_name');
+    const btn = document.getElementById('btn_generate_ai');
+
+    const instruction = promptInput.value.trim();
+    if (!instruction) {
+        alert("Por favor, digite o objetivo ou tema do texto.");
+        promptInput.focus();
+        return;
+    }
+
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'text-xs text-warning mt-1';
+    statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A IA está criando seu texto...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch("{{ url_for('admin.ai_generate') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({prompt: instruction})
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            textarea.value = data.text;
+            if (!nameInput.value) {
+                // Sugere um nome automático baseado na instrução
+                nameInput.value = instruction.substring(0, 30);
+            }
+            statusDiv.className = 'text-xs text-success mt-1';
+            statusDiv.innerHTML = '✔ Texto gerado com sucesso pela IA!';
+        } else {
+            statusDiv.className = 'text-xs text-danger mt-1';
+            statusDiv.innerHTML = '❌ ' + (data.error || 'Erro ao gerar texto.');
+        }
+    } catch (e) {
+        statusDiv.className = 'text-xs text-danger mt-1';
+        statusDiv.innerHTML = '❌ Erro de comunicação: ' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function improveTemplateText() {
+    const textarea = document.getElementById('template_text_content');
+    const text = textarea.value.trim();
+    const btn = document.getElementById('btn_improve_ai');
+
+    if (!text) {
+        alert("Digite ou gere um texto primeiro para a IA reescrever.");
+        return;
+    }
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Humanizando...';
+
+    try {
+        const resp = await fetch("{{ url_for('admin.ai_improve') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({text: text})
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            textarea.value = data.text;
+            textarea.style.transition = "border-color 0.5s";
+            textarea.style.borderColor = "var(--accent-color)";
+            setTimeout(() => { textarea.style.borderColor = "var(--glass-border)"; }, 2000);
+        } else {
+            alert("Erro da IA: " + (data.error || "Não foi possível reescrever."));
+        }
+    } catch (e) {
+        alert("Erro de conexão ao servidor.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+</script>
 {% endblock %}

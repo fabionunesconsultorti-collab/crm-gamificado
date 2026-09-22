@@ -94,8 +94,30 @@ class Setting(db.Model):
     value = db.Column(db.Text)
     description = db.Column(db.String(256))
 
+    @classmethod
+    def get_val(cls, key, default=None):
+        s = cls.query.filter_by(key=key).first()
+        return s.value if s and s.value is not None else default
+
+    @classmethod
+    def set_val(cls, key, value, description=None):
+        s = cls.query.filter_by(key=key).first()
+        if not s:
+            s = cls(key=key, value=value, description=description)
+            db.session.add(s)
+        else:
+            s.value = value
+            if description:
+                s.description = description
+        db.session.commit()
+        return s
+
+    set = set_val
+    get = get_val
+
     def __repr__(self):
         return f'<Setting {self.key}>'
+
 
 class MessageTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)

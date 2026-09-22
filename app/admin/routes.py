@@ -64,7 +64,7 @@ def settings():
     if request.method == 'POST':
         keys = [
             'msg_boas_vindas', 'msg_proposta', 'msg_fechamento', 'frase_bom_dia', 
-            'ai_api_key', 'ai_provider', 'ai_system_prompt'
+            'ai_api_key', 'ai_provider', 'ai_system_prompt', 'ai_ollama_url', 'ai_ollama_model'
         ]
         
         # Only process keys that are actually in the submitted form
@@ -88,20 +88,38 @@ def settings():
     stores = Store.query.all()
     waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
     active_tab = request.args.get('tab', 'templates')
+    from app.utils.network import get_connected_ip, resolve_instance_api_url
+    detected_ip = get_connected_ip()
     return render_template('admin/settings.html', title='Configurações do Sistema',
-                           settings=all_settings, stores=stores, waha_instances=waha_instances, active_tab=active_tab)
+                           settings=all_settings, stores=stores, waha_instances=waha_instances,
+                           active_tab=active_tab, detected_ip=detected_ip)
 
 @bp.route('/stores/new', methods=['POST'])
 @login_required
 @admin_required
 def new_store():
-    name = request.form.get('name')
+    name = request.form.get('name', '').strip()
     if name:
         store = Store(name=name)
         db.session.add(store)
         db.session.commit()
         flash(f'✅ Loja "{name}" adicionada com sucesso!')
-    return redirect(url_for('admin.settings'))
+    return redirect(url_for('admin.settings', tab='stores'))
+
+@bp.route('/stores/<int:id>/edit', methods=['POST'])
+@login_required
+@admin_required
+def edit_store(id):
+    store = Store.query.get_or_404(id)
+    new_name = request.form.get('name', '').strip()
+    if new_name:
+        old_name = store.name
+        store.name = new_name
+        db.session.commit()
+        flash(f'✏️ Loja "{old_name}" atualizada para "{new_name}" com sucesso!')
+    else:
+        flash('O nome da loja não pode ser vazio.', 'warning')
+    return redirect(url_for('admin.settings', tab='stores'))
 
 @bp.route('/stores/<int:id>/delete', methods=['POST'])
 @login_required
@@ -122,8 +140,9 @@ def delete_store(id):
 @login_required
 @admin_required
 def new_waha_instance():
+    from app.utils.network import resolve_instance_api_url
     name = request.form.get('name')
-    api_url = request.form.get('api_url')
+    api_url = resolve_instance_api_url(request.form.get('api_url'))
     api_key = request.form.get('api_key')
     session_name = request.form.get('session_name', 'default')
     
@@ -141,13 +160,30 @@ def new_waha_instance():
 @login_required
 @admin_required
 def edit_waha_instance(id):
+    from app.utils.network import resolve_instance_api_url
     instance = WahaInstance.query.get_or_404(id)
     instance.name = request.form.get('name')
-    instance.api_url = request.form.get('api_url')
+    instance.api_url = resolve_instance_api_url(request.form.get('api_url'))
     instance.api_key = request.form.get('api_key')
     instance.session_name = request.form.get('session_name')
     db.session.commit()
     flash(f'✅ Instância WAHA "{instance.name}" atualizada com sucesso!')
+    return redirect(url_for('admin.settings', tab='waha'))
+
+@bp.route('/waha/<int:id>/sync_ip', methods=['POST'])
+@login_required
+@admin_required
+def sync_waha_ip(id):
+    import re
+    from app.utils.network import get_connected_ip
+    instance = WahaInstance.query.get_or_404(id)
+    current_ip = get_connected_ip()
+    if instance.api_url:
+        instance.api_url = re.sub(r'https?://[^:/]+', f'http://{current_ip}', instance.api_url)
+    else:
+        instance.api_url = f'http://{current_ip}:3000'
+    db.session.commit()
+    flash(f'🔄 Instância "{instance.name}" atualizada para o IP conectado atual: {instance.api_url}')
     return redirect(url_for('admin.settings', tab='waha'))
 
 @bp.route('/waha/<int:id>/delete', methods=['POST'])
@@ -358,13 +394,38 @@ def evo_list_sessions():
 @login_required
 @admin_required
 def ai_improve():
-    data = request.json
+    data = request.json or {}
     text = data.get('text', '')
     if not text:
-        return jsonify({'ok': False, 'error': 'Texto vazio'})
+        return jsonify({'ok': False, 'error': 'Texto vazio'}), 400
     
     rewritten, error = AIHandler.rewrite_message(text)
     if error:
-        return jsonify({'ok': False, 'error': error})
+        return jsonify({'ok': False, 'error': error}), 400
     
     return jsonify({'ok': True, 'text': rewritten})
+
+@bp.route('/api/ai/generate', methods=['POST'])
+@login_required
+@admin_required
+def ai_generate():
+    """Gera um novo texto/template a partir de uma instrução ou objetivo comercial."""
+    data = request.json or {}
+    instruction = data.get('prompt') or data.get('instruction') or ''
+    if not instruction:
+        return jsonify({'ok': False, 'error': 'Descreva o objetivo da mensagem a ser criada.'}), 400
+    
+    generated_text, error = AIHandler.generate_text(instruction)
+    if error:
+        return jsonify({'ok': False, 'error': error}), 400
+        
+    return jsonify({'ok': True, 'text': generated_text})
+
+@bp.route('/api/ai/models', methods=['GET'])
+@login_required
+@admin_required
+def ai_models():
+    """Testa a conexão com o Ollama e lista os modelos instalados."""
+    url = request.args.get('url')
+    result = AIHandler.get_available_models(url)
+    return jsonify(result)

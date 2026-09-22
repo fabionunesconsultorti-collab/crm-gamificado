@@ -46,12 +46,12 @@ else
 fi
 echo -e "${GREEN}✔ Docker está ativo e pronto (${DOCKER_COMPOSE}).${NC}"
 
-# 2. Subir containers Docker (WAHA, PostgreSQL, Redis)
-echo -e "\n${CYAN}[2/5] Subindo serviços de mensageria no Docker (WAHA, Postgres, Redis)...${NC}"
+# 2. Subir containers Docker (WAHA, PostgreSQL, Redis, Ollama)
+echo -e "\n${CYAN}[2/5] Subindo serviços no Docker (WAHA, Postgres, Redis, Ollama)...${NC}"
 $DOCKER_COMPOSE up -d
 
 # Aguardar WAHA inicializar na porta 3000
-echo -n -e "${YELLOW}Aguardando serviço WAHA responder na porta 3000...${NC}"
+echo -n -e "${YELLOW}Aguardando serviços WAHA (3000) e Ollama (11434)...${NC}"
 MAX_RETRIES=30
 RETRY_COUNT=0
 WAHA_READY=false
@@ -68,9 +68,9 @@ done
 
 echo ""
 if [ "$WAHA_READY" = true ]; then
-    echo -e "${GREEN}✔ Serviço WAHA online em http://localhost:3000${NC}"
+    echo -e "${GREEN}✔ Serviços WAHA e Ollama prontos.${NC}"
 else
-    echo -e "${YELLOW}⚠ WAHA ainda está inicializando em segundo plano. Continuando...${NC}"
+    echo -e "${YELLOW}⚠ Containers ainda estão inicializando em segundo plano. Continuando...${NC}"
 fi
 
 # 3. Configurar e Ativar Ambiente Virtual Python
@@ -98,17 +98,23 @@ python init_db.py
 
 # 5. Iniciar a Aplicação Flask
 echo -e "\n${CYAN}[5/5] Iniciando o servidor web do CRM...${NC}"
+CONNECTED_IP=$(python -c "from app.utils.network import get_connected_ip; print(get_connected_ip())" 2>/dev/null || echo "127.0.0.1")
+
 echo -e "${GREEN}${BOLD}------------------------------------------------------${NC}"
 echo -e "${GREEN}${BOLD} ✅ Sistema CRM Pro pronto para uso!                  ${NC}"
-echo -e "${BOLD} 👉 Painel Web:${NC}     ${CYAN}http://localhost:5000${NC}"
-echo -e "${BOLD} 👉 WAHA Dashboard:${NC} ${CYAN}http://localhost:3000${NC}"
-echo -e "${BOLD} 🔑 Login Padrão:${NC}   Usuário: ${BOLD}admin${NC} | Senha: ${BOLD}admin123${NC}"
+echo -e "${BOLD} 👉 Painel Web (Local):${NC}  ${CYAN}http://localhost:5000${NC}"
+if [ "$CONNECTED_IP" != "127.0.0.1" ]; then
+    echo -e "${BOLD} 👉 Painel Web (Rede):${NC}   ${CYAN}http://${CONNECTED_IP}:5000${NC}"
+fi
+echo -e "${BOLD} 👉 WAHA API / Dash:${NC}    ${CYAN}http://${CONNECTED_IP}:3000${NC}"
+echo -e "${BOLD} 👉 Ollama IA:${NC}          ${CYAN}http://localhost:11434${NC}"
+echo -e "${BOLD} 🔑 Login Padrão:${NC}       Usuário: ${BOLD}admin${NC} | Senha: ${BOLD}admin123${NC}"
 echo -e "${GREEN}${BOLD}------------------------------------------------------${NC}"
 echo -e "${YELLOW}(Pressione Ctrl+C para encerrar o servidor Flask)${NC}\n"
 
 cleanup() {
     echo -e "\n\n${YELLOW}Servidor Flask encerrado.${NC}"
-    echo -n -e "Deseja parar também os containers Docker (WAHA, Postgres, Redis)? [s/N]: "
+    echo -n -e "Deseja parar também os containers Docker (WAHA, Postgres, Redis, Ollama)? [s/N]: "
     read -r -t 10 response || response="n"
     if [[ "$response" =~ ^([sS][iI][mM]|[sS])$ ]]; then
         echo -e "${YELLOW}Parando containers Docker...${NC}"

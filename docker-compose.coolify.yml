@@ -10,10 +10,12 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY:-sua_chave_secreta_crm_coolify_2026}
       - DATABASE_URL=sqlite:////app/data/crm.db
+      - OLLAMA_URL=http://ollama:11434
     volumes:
       - crm_data:/app/data
     depends_on:
       - waha
+      - ollama
     # No Coolify, aponte o domínio principal para a porta 5000 deste serviço
 
   # Banco de Dados PostgreSQL para persistência do WAHA
@@ -58,8 +60,20 @@ services:
       - redis
     # No Coolify, você pode expor o dashboard do WAHA apontando um subdomínio para a porta 3000
 
+  # Servidor Ollama (IA Local no Coolify)
+  ollama:
+    image: ollama/ollama:latest
+    restart: always
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+
 volumes:
   crm_data:
   postgres_data:
   redis_data:
   waha_data:
+  ollama_data:
+

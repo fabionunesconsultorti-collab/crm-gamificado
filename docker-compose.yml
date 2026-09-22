@@ -45,3 +45,16 @@ services:
     depends_on:
       - postgres
       - redis
+
+  # Servidor de Inteligência Artificial Local (Ollama)
+  ollama:
+    image: ollama/ollama:latest
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+

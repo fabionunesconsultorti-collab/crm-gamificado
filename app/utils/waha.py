@@ -1,6 +1,7 @@
 import requests
 import json
 from app.models import WahaInstance
+from app.utils.network import get_connected_ip, resolve_instance_api_url
 
 class WahaAPI:
     @staticmethod
@@ -13,15 +14,29 @@ class WahaAPI:
                 instance = WahaInstance.query.first() # Fallback
                 
         if instance:
+            raw_url = instance.api_url.rstrip('/') if instance.api_url else ''
+            resolved_url = resolve_instance_api_url(raw_url)
+            
+            # Se a URL foi corrigida de um IP inválido (como 192.168.1.44), persiste no banco
+            if resolved_url != raw_url and raw_url:
+                try:
+                    from app import db
+                    instance.api_url = resolved_url
+                    db.session.commit()
+                except Exception:
+                    pass
+
             return {
                 'id': instance.id,
-                'api_url': instance.api_url.rstrip('/') if instance.api_url else '',
+                'api_url': resolved_url,
                 'api_key': instance.api_key or '',
                 'session_name': instance.session_name or 'default'
             }
+        
+        connected_ip = get_connected_ip()
         return {
             'id': None,
-            'api_url': '',
+            'api_url': f'http://{connected_ip}:3000',
             'api_key': '',
             'session_name': 'default'
         }
@@ -100,6 +115,10 @@ class WahaAPI:
                 return False, "Sua instância WAHA Core suporta apenas a sessão 'default'. Altere o nome da instância para 'default'."
             else:
                 return False, response.text
+        except requests.exceptions.ConnectionError:
+            return False, f"Falha de conexão com WAHA em {cfg['api_url']}. Verifique se o container está em execução."
+        except requests.exceptions.Timeout:
+            return False, f"Tempo limite excedido ao conectar ao WAHA em {cfg['api_url']}."
         except Exception as e:
             return False, str(e)
 

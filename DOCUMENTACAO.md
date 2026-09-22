@@ -478,4 +478,47 @@ Assim que o deploy terminar:
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados e Coolify.*
+## 10. Inteligência Artificial com Ollama (Docker Local)
+
+O **CRM Pro** conta com suporte nativo ao **Ollama**, rodando diretamente em container Docker na porta `11434`.
+
+### 10.1. Principais Vantagens do Ollama Local
+- **100% Gratuito & Ilimitado:** Não há cobrança por token ou limite mensal como em APIs de terceiros.
+- **Privacidade Total:** Os dados e conversas de seus clientes não saem do seu servidor VPS/Local.
+- **Resiliente & Offline:** Não depende de estabilidade de conexões externas com OpenAI ou Google.
+
+### 10.2. Funcionalidades da IA no Sistema
+1. **Reescrita de Mensagens (Anti-Spam Humanizado):** Durante o disparo em massa no CRM, cada mensagem gerada para o cliente é sutilmente reescrita mantendo o sentido original e preservando as variáveis mágicas (`[NOME]`, `[DATA]`, `[STATUS]`, `[VENDEDOR]`).
+2. **Respostas Automáticas no WhatsApp:** Responde clientes de maneira atenciosa e comercial através de webhooks.
+3. **Criação de Novos Textos e Templates (`/admin/templates`):** Permite aos operadores ou gerentes digitar uma instrução (ex: *"Cobrança amigável com desconto para pagamento à vista hoje"*) e a IA gera a mensagem pronta e estruturada.
+
+### 10.3. Como Baixar e Gerenciar Modelos no Docker
+
+Para baixar e usar um modelo leve e rápido (ideal para CPU):
+
+```bash
+# Opção Recomendada: Meta Llama 3.2 (3B - rápido e preciso)
+docker exec -it crm-ollama-1 ollama run llama3.2
+
+# Opção Ultra-Leve: Meta Llama 3.2 1B (~1.3 GB, altíssima velocidade em CPUs modestas)
+docker exec -it crm-ollama-1 ollama run llama3.2:1b
+
+# Opção Raciocínio: DeepSeek R1 1.5B
+docker exec -it crm-ollama-1 ollama run deepseek-r1:1.5b
+```
+
+Para listar os modelos atualmente instalados:
+```bash
+docker exec -it crm-ollama-1 ollama list
+```
+
+### 10.4. Configurações no Painel Admin (`/admin/settings` -> Aba IA)
+- **Provedor:** Selecione `🦙 Ollama (Docker Local - 100% Gratuito & Ilimitado)`
+- **URL do Ollama:** `http://localhost:11434` (ou `http://ollama:11434` no Coolify/Docker)
+- **Modelo:** `llama3.2` (ou o nome do modelo que você baixou)
+- Clique no botão **"Testar Conexão & Listar Modelos"** para verificar em tempo real o status do container.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify e Ollama IA Local.*
+

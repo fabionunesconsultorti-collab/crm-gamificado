@@ -52,3 +52,5 @@ scratch/
 waha_data/
 postgres_data/
 redis_data/
+ollama_data/
+

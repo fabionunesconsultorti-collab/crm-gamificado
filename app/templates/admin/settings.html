@@ -111,7 +111,7 @@
                 <div class="d-flex align-center justify-between mb-2">
                     <label for="msg_boas_vindas" class="m-0">Mensagem de Boas-Vindas (Novo Lead)</label>
                     <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_boas_vindas', this)">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com IA
                     </button>
                 </div>
                 <textarea name="msg_boas_vindas" id="msg_boas_vindas" class="input-glass" rows="4" 
@@ -122,7 +122,7 @@
                 <div class="d-flex align-center justify-between mb-2">
                     <label for="msg_proposta" class="m-0">Envio de Proposta</label>
                     <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_proposta', this)">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com IA
                     </button>
                 </div>
                 <textarea name="msg_proposta" id="msg_proposta" class="input-glass" rows="4" 
@@ -133,7 +133,7 @@
                 <div class="d-flex align-center justify-between mb-2">
                     <label for="msg_fechamento" class="m-0">Agradecimento de Fechamento</label>
                     <button type="button" class="btn-ai-improve" onclick="improveTextWithAI('msg_fechamento', this)">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com Gemini
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Melhorar com IA
                     </button>
                 </div>
                 <textarea name="msg_fechamento" id="msg_fechamento" class="input-glass" rows="4" 
@@ -153,6 +153,18 @@
         <h4 class="card-title w-100 text-primary mb-3">
             <i class="fa-solid fa-server"></i> Instâncias WAHA API (WhatsApp HTTP API)
         </h4>
+
+        <!-- IP Conectado Info Banner -->
+        <div class="w-100 p-3 mb-3 bg-glass rounded-md border d-flex align-center justify-between flex-wrap gap-2" style="border-left: 4px solid var(--primary-color);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-network-wired text-primary" style="font-size: 1.1rem;"></i>
+                <div>
+                    <span class="text-sm font-semibold">IP da Máquina Conectada:</span>
+                    <code class="px-2 py-1 rounded" style="background: rgba(99, 102, 241, 0.15); color: var(--primary-color); font-weight: 600;">{{ detected_ip }}</code>
+                </div>
+            </div>
+            <span class="text-xs text-muted">Detectado dinamicamente via interface de rede ativa (sempre atualizado)</span>
+        </div>
         
         <div class="w-100 mb-4">
             {% for instance in waha_instances %}
@@ -183,8 +195,19 @@
                     </div>
                 </div>
                 
-                <div class="text-sm text-muted mb-3">
-                    <i class="fa-solid fa-link"></i> {{ instance.api_url }} | <i class="fa-solid fa-fingerprint"></i> Sessão: {{ instance.session_name }}
+                <div class="text-sm text-muted mb-3 d-flex align-center justify-between flex-wrap gap-2">
+                    <div>
+                        <i class="fa-solid fa-link"></i> <code>{{ instance.api_url }}</code>
+                        {% if '192.168.1.44' in (instance.api_url or '') %}
+                        <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; font-size: 0.7rem;">IP 192.168.1.44 Inválido</span>
+                        {% endif %}
+                        | <i class="fa-solid fa-fingerprint"></i> Sessão: <strong>{{ instance.session_name }}</strong>
+                    </div>
+                    <form action="{{ url_for('admin.sync_waha_ip', id=instance.id) }}" method="post" class="m-0">
+                        <button type="submit" class="btn-secondary py-1 px-2 text-xs" title="Atualizar URL para o IP conectado atual">
+                            <i class="fa-solid fa-arrows-rotate"></i> Sincronizar com IP Conectado ({{ detected_ip }})
+                        </button>
+                    </form>
                 </div>
                 
                 <!-- Edit Form -->
@@ -195,7 +218,11 @@
                     </div>
                     <div class="form-group">
                         <label>URL da API</label>
-                        <input type="url" name="api_url" class="input-glass" value="{{ instance.api_url }}" required>
+                        <input type="url" id="edit_api_url_{{ instance.id }}" name="api_url" class="input-glass" value="{{ instance.api_url }}" required>
+                        <div class="d-flex gap-2 mt-1">
+                            <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="document.getElementById('edit_api_url_{{ instance.id }}').value = 'http://{{ detected_ip }}:3000'">Usar IP Conectado (http://{{ detected_ip }}:3000)</button>
+                            <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="document.getElementById('edit_api_url_{{ instance.id }}').value = 'http://localhost:3000'">Usar Localhost</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Sessão WhatsApp (Instância)</label>
@@ -239,8 +266,15 @@
                 <input type="text" name="name" class="input-glass" required>
             </div>
             <div class="form-group">
-                <label>URL da API WAHA</label>
-                <input type="url" name="api_url" class="input-glass" placeholder="https://..." required>
+                <div class="d-flex align-center justify-between mb-1">
+                    <label class="m-0">URL da API WAHA</label>
+                    <span class="text-xs text-muted">IP Conectado: <strong class="text-primary">{{ detected_ip }}</strong></span>
+                </div>
+                <input type="url" id="new_waha_api_url" name="api_url" class="input-glass" value="http://{{ detected_ip }}:3000" placeholder="http://{{ detected_ip }}:3000" required>
+                <div class="d-flex gap-2 mt-1">
+                    <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="document.getElementById('new_waha_api_url').value = 'http://{{ detected_ip }}:3000'">Usar IP Conectado (http://{{ detected_ip }}:3000)</button>
+                    <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="document.getElementById('new_waha_api_url').value = 'http://localhost:3000'">Usar Localhost</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Nome da Sessão (Instância)</label>
@@ -260,18 +294,59 @@
     <div class="header-glass max-w-lg">
         <form action="{{ url_for('admin.settings', tab='ai') }}" method="post" class="w-100">
             <h4 class="card-title mb-4">
-                <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial
+                <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial & Automação
             </h4>
 
-            <div class="form-group">
+            <div class="form-group mb-3">
                 <label for="ai_provider">Provedor de Inteligência Artificial</label>
-                <select name="ai_provider" id="ai_provider" class="input-glass">
-                    <option value="deepseek" {% if settings.get('ai_provider', 'deepseek') == 'deepseek' %}selected{% endif %}>DeepSeek (Recomendado)</option>
-                    <option value="google" {% if settings.get('ai_provider') == 'google' %}selected{% endif %}>Google Gemini</option>
+                <select name="ai_provider" id="ai_provider" class="input-glass" onchange="toggleAiProviderFields()">
+                    <option value="ollama" {% if settings.get('ai_provider', 'ollama') == 'ollama' %}selected{% endif %}>🦙 Ollama (Docker Local - 100% Gratuito & Ilimitado)</option>
+                    <option value="deepseek" {% if settings.get('ai_provider') == 'deepseek' %}selected{% endif %}>DeepSeek (Cloud API)</option>
+                    <option value="google" {% if settings.get('ai_provider') == 'google' %}selected{% endif %}>Google Gemini (Cloud API)</option>
                 </select>
+                <small class="text-xs text-muted mt-1 d-block">Ollama roda direto no seu Docker sem custos de API por mensagem.</small>
             </div>
 
-            <div class="form-group">
+            <!-- Bloco Específico do Ollama -->
+            <div id="ollama_settings_box" class="p-3 mb-3 rounded-md" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                <div class="d-flex justify-between align-center mb-2">
+                    <span class="font-semibold text-sm text-primary"><i class="fa-solid fa-server"></i> Conexão Ollama (Docker)</span>
+                    <button type="button" class="btn-secondary text-xs p-1 px-2" onclick="testOllamaConnection()">
+                        <i class="fa-solid fa-plug"></i> Testar Conexão & Listar Modelos
+                    </button>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label for="ai_ollama_url" class="text-xs">URL do Servidor Ollama</label>
+                    <input type="text" name="ai_ollama_url" id="ai_ollama_url" class="input-glass" 
+                           value="{{ settings.get('ai_ollama_url', 'http://localhost:11434') }}" placeholder="http://localhost:11434">
+                    <small class="text-xs text-muted">Local: <code>http://localhost:11434</code> | No Coolify/Docker interno: <code>http://ollama:11434</code></small>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label for="ai_ollama_model" class="text-xs">Modelo Selecionado</label>
+                    <input type="text" name="ai_ollama_model" id="ai_ollama_model" class="input-glass" list="ollama_models_list"
+                           value="{{ settings.get('ai_ollama_model', 'llama3.2') }}" placeholder="ex: llama3.2">
+                    <datalist id="ollama_models_list">
+                        <option value="llama3.2">llama3.2 (Recomendado - Meta 3B)</option>
+                        <option value="llama3.2:1b">llama3.2:1b (Ultra leve e rápido para CPU)</option>
+                        <option value="deepseek-r1:1.5b">deepseek-r1:1.5b (Raciocínio rápido)</option>
+                        <option value="qwen2.5:3b">qwen2.5:3b (Excelente para português)</option>
+                        <option value="mistral">mistral (7B clássico)</option>
+                    </datalist>
+                </div>
+
+                <div id="ollama_status_feedback" class="text-xs mt-2" style="display:none;"></div>
+
+                <div class="text-xs text-muted mt-2 p-2 rounded" style="background: rgba(0,0,0,0.2);">
+                    💡 <strong>Como baixar novos modelos no Docker:</strong><br>
+                    No terminal do servidor, execute:<br>
+                    <code>docker exec -it crm-ollama-1 ollama run llama3.2</code>
+                </div>
+            </div>
+
+            <!-- Bloco de Chave de API (Para DeepSeek e Gemini) -->
+            <div class="form-group" id="ai_api_key_box">
                 <label for="ai_api_key">Chave da API (API Key)</label>
                 <input type="password" name="ai_api_key" id="ai_api_key" class="input-glass" 
                        value="{{ settings.get('ai_api_key', '') }}" placeholder="Cole sua chave de API aqui...">
@@ -299,12 +374,34 @@
         </h4>
         <div class="w-100 mb-4">
             {% for store in stores %}
-            <div class="d-flex align-center justify-between p-3 border-bottom bg-glass mt-2 rounded-md" style="border: 1px solid var(--glass-border);">
-                <div class="font-semibold">{{ store.name }}</div>
-                <form action="{{ url_for('admin.delete_store', id=store.id) }}" method="post" onsubmit="return confirm('Excluir loja {{ store.name }}?')">
-                    <button class="icon-btn text-danger p-1 m-0">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+            <div class="p-3 border-bottom bg-glass mt-2 rounded-md" style="border: 1px solid var(--glass-border);">
+                <div class="d-flex align-center justify-between">
+                    <div class="font-semibold d-flex align-center gap-2">
+                        <i class="fa-solid fa-shop text-muted"></i>
+                        <span id="store_name_{{ store.id }}">{{ store.name }}</span>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <button type="button" class="icon-btn text-primary p-1 m-0" onclick="toggleEdit('store_edit_{{ store.id }}')" title="Editar Loja">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <form action="{{ url_for('admin.delete_store', id=store.id) }}" method="post" class="m-0" onsubmit="return confirm('Excluir loja {{ store.name }}?')">
+                            <button type="submit" class="icon-btn text-danger p-1 m-0" title="Excluir Loja">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Formulário de Edição Inline -->
+                <form id="store_edit_{{ store.id }}" action="{{ url_for('admin.edit_store', id=store.id) }}" method="post" class="d-none mt-3 pt-3 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
+                    <div class="form-group mb-2">
+                        <label class="text-xs text-muted mb-1 d-block">Editar Nome da Loja / Filial:</label>
+                        <input type="text" name="name" class="input-glass w-100" style="width: 100%; box-sizing: border-box;" value="{{ store.name }}" required>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn-primary text-xs py-1 px-3">Salvar</button>
+                        <button type="button" class="btn-secondary text-xs py-1 px-3" onclick="toggleEdit('store_edit_{{ store.id }}')">Cancelar</button>
+                    </div>
                 </form>
             </div>
             {% else %}
@@ -312,9 +409,17 @@
             {% endfor %}
         </div>
 
-        <form action="{{ url_for('admin.new_store') }}" method="post" class="w-100 d-flex gap-2">
-            <input type="text" name="name" class="input-glass flex-1" placeholder="Nome da nova loja..." required>
-            <button type="submit" class="btn-primary w-auto">Adicionar</button>
+        <!-- Formulário Adicionar Nova Loja -->
+        <form action="{{ url_for('admin.new_store') }}" method="post" class="w-100 bg-glass p-3 rounded-md" style="border: 1px solid var(--glass-border);">
+            <label class="text-xs font-semibold text-primary d-block mb-2">
+                <i class="fa-solid fa-plus"></i> Adicionar Nova Loja / Filial
+            </label>
+            <div class="w-100 mb-2">
+                <input type="text" name="name" class="input-glass w-100" style="width: 100%; box-sizing: border-box;" placeholder="Nome da nova loja (ex: Matriz, Filial Centro)..." required>
+            </div>
+            <button type="submit" class="btn-primary text-xs py-2 w-100" style="width: 100%;">
+                <i class="fa-solid fa-plus"></i> Adicionar Loja
+            </button>
         </form>
     </div>
 </div>
@@ -389,9 +494,8 @@
                 btnConnect.innerText = 'Tentar Conectar';
                 btnConnect.classList.remove('d-none');
                 
-                if (data.data && typeof data.data === 'string' && data.data.includes('default')) {
+                if (data.data && typeof data.data === 'string' && data.data.includes('suporta apenas a sessão')) {
                     badge.innerText = 'ERRO: USE "default"';
-                    alert(data.data);
                 }
             }
         } catch(e) {
@@ -515,6 +619,65 @@ async function improveTextWithAI(targetId, btnElement) {
             btnElement.innerHTML = originalBtnContent;
         }
     }
+
+    function toggleAiProviderFields() {
+        const provider = document.getElementById("ai_provider").value;
+        const ollamaBox = document.getElementById("ollama_settings_box");
+        const apiKeyBox = document.getElementById("ai_api_key_box");
+
+        if (provider === "ollama") {
+            ollamaBox.style.display = "block";
+            apiKeyBox.style.display = "none";
+        } else {
+            ollamaBox.style.display = "none";
+            apiKeyBox.style.display = "block";
+        }
+    }
+
+    async function testOllamaConnection() {
+        const urlInput = document.getElementById("ai_ollama_url").value;
+        const feedback = document.getElementById("ollama_status_feedback");
+        feedback.style.display = "block";
+        feedback.className = "text-xs mt-2 text-warning";
+        feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando ao Ollama...';
+
+        try {
+            const resp = await fetch("{{ url_for('admin.ai_models') }}?url=" + encodeURIComponent(urlInput));
+            const data = await resp.json();
+
+            if (data.online) {
+                feedback.className = "text-xs mt-2 text-success";
+                let modelsText = data.models.length > 0 
+                    ? `Modelos instalados: <strong>${data.models.join(', ')}</strong>` 
+                    : 'Nenhum modelo baixado ainda. Rode: <code>docker exec -it crm-ollama-1 ollama run llama3.2</code>';
+                feedback.innerHTML = `✔ <strong>Ollama Conectado!</strong> (${data.url})<br>${modelsText}`;
+
+                // Se houver modelos instalados, preenche o datalist
+                const datalist = document.getElementById("ollama_models_list");
+                if (data.models.length > 0 && datalist) {
+                    datalist.innerHTML = "";
+                    data.models.forEach(m => {
+                        const opt = document.createElement("option");
+                        opt.value = m;
+                        datalist.appendChild(opt);
+                    });
+                }
+            } else {
+                feedback.className = "text-xs mt-2 text-danger";
+                feedback.innerHTML = `❌ Falha ao conectar no Ollama (${data.url}): ${data.error || 'Servidor offline'}`;
+            }
+        } catch (e) {
+            feedback.className = "text-xs mt-2 text-danger";
+            feedback.innerHTML = `❌ Erro de requisição: ${e.message}`;
+        }
+    }
+
+    // Inicializa campos de IA ao carregar
+    document.addEventListener("DOMContentLoaded", () => {
+        if (document.getElementById("ai_provider")) {
+            toggleAiProviderFields();
+        }
+    });
 
     {% for instance in waha_instances %}
     checkWhatsAppStatus({{ instance.id }});
