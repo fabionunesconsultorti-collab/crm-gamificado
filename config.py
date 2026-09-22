@@ -10,4 +10,5 @@ class Config:
     SQLALCHEMY_DATABASE_URI = db_url or \
         'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'crm.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
 

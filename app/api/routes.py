@@ -6,58 +6,92 @@ from app import db
 from app.utils.waha import WahaAPI
 from app.utils.ai_handler import AIHandler
 
+import logging
+from app.tasks.queue import get_queue, is_duplicate_message
+from app.tasks.whatsapp import process_whatsapp_message
+
+logger = logging.getLogger(__name__)
+
+@bp.route('/webhook/whatsapp', methods=['POST'])
 @bp.route('/webhook/waha', methods=['POST'])
-def waha_webhook():
+def whatsapp_webhook():
     '''
-    Endpoint for receiving event updates from WAHA API.
-    Example Events: MESSAGES_UPDATE (read/delivered statuses), MESSAGES_UPSERT
+    Endpoint assíncrono de alta performance para receber webhooks do WhatsApp (WAHA).
+    Responde em menos de 50ms confirmando o recebimento e delega o processamento da IA para o RQ Worker.
     '''
-    data = request.get_json(force=True)
+    data = request.get_json(force=True, silent=True)
     if not data:
-        return jsonify({"status": "no data"}), 400
+        return jsonify({"status": "error", "message": "Payload JSON vazio ou inválido"}), 400
 
-    # Handle status updates (e.g., delivered, read, error)
-    if data.get('event') == 'messages.update':
+    event = data.get('event')
+    
+    # 1. Trata atualizações de status de mensagem (lida, entregue, etc.)
+    if event == 'messages.update':
         updates = data.get('data', [])
-        for update in updates:
-            # Depending on how the WAHA API maps it, we might check message ID
-            # Here we just save the raw log for demonstration if needed, or match to MessageLog ID if we stored it
-            # Future: Find message log by API message ID and update status
-            pass
-            
-    # Handle incoming messages
-    if data.get('event') in ['message', 'message.any']:
-        payload = data.get('payload', {})
-        from_phone = payload.get('from', '')
-        body = payload.get('body', '')
-        is_from_me = payload.get('fromMe', False)
-        
-        if not is_from_me and body:
-            # Identify the client by phone
-            clean_phone = from_phone.split('@')[0]
-            client = Client.query.filter(Client.phone.contains(clean_phone[-8:])).first()
-            
-            if client:
-                # Generate AI Reply
-                ai_reply, error = AIHandler.generate_reply(body)
-                
-                if ai_reply:
-                    # Send it back
-                    success, resp = WahaAPI.send_text(client.phone, ai_reply)
-                    
-                    # Log the reply
-                    log = MessageLog(
-                        client_id=client.id,
-                        user_id=None, # System/AI
-                        content=ai_reply,
-                        channel='waha_api',
-                        status='sent' if success else 'error',
-                        api_response=json.dumps(resp) if success else str(resp)
-                    )
-                    db.session.add(log)
-                    db.session.commit()
+        logger.info(f"[Webhook WhatsApp] Atualização de status recebida: {len(updates)} eventos")
+        return jsonify({"status": "received", "event": event, "count": len(updates)}), 200
 
-    return jsonify({"status": "received"}), 200
+    # 2. Trata mensagens recebidas
+    if event in ['message', 'message.any']:
+        payload = data.get('payload', {})
+        if not payload:
+            return jsonify({"status": "ignored", "reason": "empty_payload"}), 200
+
+        is_from_me = payload.get('fromMe', False)
+        if is_from_me:
+            return jsonify({"status": "ignored", "reason": "sent_by_me"}), 200
+
+        from_raw = payload.get('from', '')
+        if '@g.us' in from_raw or payload.get('participant') or payload.get('isGroup', False):
+            return jsonify({"status": "ignored", "reason": "group_message"}), 200
+
+        if '@broadcast' in from_raw or from_raw == 'status@broadcast':
+            return jsonify({"status": "ignored", "reason": "broadcast"}), 200
+
+        body = payload.get('body', '')
+        if not body or not body.strip():
+            return jsonify({"status": "ignored", "reason": "empty_body"}), 200
+
+        # Extração de ID para deduplicação
+        raw_id = payload.get('id') or payload.get('message_id')
+        msg_id = None
+        if isinstance(raw_id, dict):
+            msg_id = raw_id.get('_serialized') or raw_id.get('id') or str(raw_id)
+        elif raw_id:
+            msg_id = str(raw_id)
+
+        # Verificação atômica de idempotência no Redis
+        if msg_id and is_duplicate_message(msg_id):
+            logger.info(f"[Webhook WhatsApp] Mensagem duplicada ignorada: ID={msg_id}")
+            return jsonify({"status": "ignored", "reason": "duplicate_message", "message_id": msg_id}), 200
+
+        # Enfileiramento na fila assíncrona do RQ
+        try:
+            queue = get_queue('whatsapp_messages')
+            job = queue.enqueue(
+                process_whatsapp_message,
+                payload=payload,
+                event=event,
+                instance_id=data.get('instance_id') or payload.get('instance_id'),
+                job_timeout='2m',
+                result_ttl=3600
+            )
+            logger.info(f"[Webhook WhatsApp] Mensagem enfileirada com sucesso: Job={job.id}, ID={msg_id}")
+            return jsonify({
+                "status": "queued",
+                "job_id": job.id,
+                "message_id": msg_id
+            }), 200
+        except Exception as e:
+            logger.error(f"[Webhook WhatsApp] Erro ao enfileirar no Redis/RQ: {e}", exc_info=True)
+            # Se o Redis falhar por algum motivo imprevisto, retorna 200 para evitar que o WAHA fique reenviando em loop
+            return jsonify({
+                "status": "error_queuing",
+                "error": str(e),
+                "message_id": msg_id
+            }), 200
+
+    return jsonify({"status": "received", "event": event}), 200
 
 @bp.route('/messages/send_automated', methods=['POST'])
 def send_automated_message():
