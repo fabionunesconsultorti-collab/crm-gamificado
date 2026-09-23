@@ -147,9 +147,31 @@ def new_waha_instance():
     session_name = request.form.get('session_name', 'default')
     
     is_first = WahaInstance.query.count() == 0
+    
+    enable_anti_ban = 'enable_anti_ban' in request.form
+    min_delay = int(request.form.get('min_delay_seconds', 5) or 5)
+    max_delay = int(request.form.get('max_delay_seconds', 15) or 15)
+    max_hour = int(request.form.get('max_messages_per_hour', 80) or 80)
+    max_day = int(request.form.get('max_messages_per_day', 500) or 500)
+    quiet_enabled = 'quiet_hours_enabled' in request.form
+    quiet_start = request.form.get('quiet_hours_start', '22:00') or '22:00'
+    quiet_end = request.form.get('quiet_hours_end', '08:00') or '08:00'
+    warmup = 'warmup_mode' in request.form
+    warmup_start = datetime.utcnow() if warmup else None
+
     instance = WahaInstance(
         name=name, api_url=api_url, api_key=api_key, 
-        session_name=session_name, is_default=is_first
+        session_name=session_name, is_default=is_first,
+        enable_anti_ban=enable_anti_ban,
+        min_delay_seconds=min_delay,
+        max_delay_seconds=max_delay,
+        max_messages_per_hour=max_hour,
+        max_messages_per_day=max_day,
+        quiet_hours_enabled=quiet_enabled,
+        quiet_hours_start=quiet_start,
+        quiet_hours_end=quiet_end,
+        warmup_mode=warmup,
+        warmup_start_date=warmup_start
     )
     db.session.add(instance)
     db.session.commit()
@@ -166,8 +188,28 @@ def edit_waha_instance(id):
     instance.api_url = resolve_instance_api_url(request.form.get('api_url'))
     instance.api_key = request.form.get('api_key')
     instance.session_name = request.form.get('session_name')
+    
+    # Anti-ban settings
+    instance.enable_anti_ban = 'enable_anti_ban' in request.form
+    instance.min_delay_seconds = int(request.form.get('min_delay_seconds', 5) or 5)
+    instance.max_delay_seconds = int(request.form.get('max_delay_seconds', 15) or 15)
+    instance.max_messages_per_hour = int(request.form.get('max_messages_per_hour', 80) or 80)
+    instance.max_messages_per_day = int(request.form.get('max_messages_per_day', 500) or 500)
+    
+    instance.quiet_hours_enabled = 'quiet_hours_enabled' in request.form
+    instance.quiet_hours_start = request.form.get('quiet_hours_start', '22:00') or '22:00'
+    instance.quiet_hours_end = request.form.get('quiet_hours_end', '08:00') or '08:00'
+    
+    was_warmup = instance.warmup_mode
+    is_warmup = 'warmup_mode' in request.form
+    instance.warmup_mode = is_warmup
+    if is_warmup and not was_warmup:
+        instance.warmup_start_date = datetime.utcnow()
+    elif not is_warmup:
+        instance.warmup_start_date = None
+
     db.session.commit()
-    flash(f'✅ Instância WAHA "{instance.name}" atualizada com sucesso!')
+    flash(f'✅ Instância WAHA "{instance.name}" e regras anti-ban atualizadas com sucesso!')
     return redirect(url_for('admin.settings', tab='waha'))
 
 @bp.route('/waha/<int:id>/sync_ip', methods=['POST'])

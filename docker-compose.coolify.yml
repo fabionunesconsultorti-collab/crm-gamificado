@@ -9,18 +9,21 @@ services:
     restart: always
     environment:
       - SECRET_KEY=${SECRET_KEY:-sua_chave_secreta_crm_coolify_2026}
-      - DATABASE_URL=sqlite:////app/data/crm.db
+      - DATABASE_URL=postgresql://waha_user:${POSTGRES_PASSWORD:-waha_password}@postgres:5432/crm_db
+      - REDIS_URL=redis://redis:6379/0
       - OLLAMA_URL=http://ollama:11434
       - WAHA_API_URL=http://waha:3000
       - WAHA_API_KEY=${WAHA_API_KEY:-admin123}
     volumes:
       - crm_data:/app/data
     depends_on:
+      - postgres
+      - redis
       - waha
       - ollama
     # No Coolify, aponte o domínio principal para a porta 5000 deste serviço
 
-  # Banco de Dados PostgreSQL para persistência do WAHA
+  # Banco de Dados PostgreSQL para persistência do WAHA e CRM Pro
   postgres:
     image: postgres:15
     restart: always
@@ -30,6 +33,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waha_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-user-db.sh:/docker-entrypoint-initdb.d/init-user-db.sh:ro
 
   # Redis para cache e filas do WAHA
   redis:

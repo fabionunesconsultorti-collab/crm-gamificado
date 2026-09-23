@@ -516,9 +516,140 @@ docker exec -it crm-ollama-1 ollama list
 - **Provedor:** Selecione `🦙 Ollama (Docker Local - 100% Gratuito & Ilimitado)`
 - **URL do Ollama:** `http://localhost:11434` (ou `http://ollama:11434` no Coolify/Docker)
 - **Modelo:** `llama3.2` (ou o nome do modelo que você baixou)
-- Clique no botão **"Testar Conexão & Listar Modelos"** para verificar em tempo real o status do container.
+- **Clique no botão "Testar Conexão & Listar Modelos"** para verificar em tempo real o status do container.
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify e Ollama IA Local.*
+## 11. Sistema Anti-Ban / Anti-Spam e Proteção de Disparos WhatsApp (WAHA)
+
+O **CRM Pro** conta com um ecossistema nativo e completo de **Proteção Anti-Ban e Anti-Spam** projetado especificamente para mitigar os riscos de bloqueio ou banimento de chips no WhatsApp durante disparos individuais e campanhas em massa.
+
+### 11.1. Por que a Proteção Anti-Spam é Fundamental?
+O WhatsApp utiliza inteligência algorítmica e análise comportamental rigorosa para identificar automações abusivas. Os principais gatilhos de bloqueio são:
+1. **Rajadas não-humanas:** Disparos de dezenas de mensagens no mesmo segundo sem nenhum intervalo.
+2. **Textos idênticos em massa:** O mesmo hash de mensagem enviado para centenas de contatos sem personalização.
+3. **Pico repentino em números novos:** Linhas recém-cadastradas no WhatsApp enviando centenas de mensagens no primeiro dia.
+4. **Denúncias de usuários (Spam Report):** Mensagens recebidas em horários inoportunos (como madrugada ou noite) aumentam exponencialmente a taxa de bloqueios e denúncias diretas.
+
+Para neutralizar esses fatores, o CRM Pro implementa uma **estratégia de defesa em 5 camadas**:
+
+```mermaid
+graph TD
+    A[Disparo Iniciado] --> B{Horário de Silêncio?}
+    B -- Sim --> C[Bloqueia Envio - Protege o Chip]
+    B -- Não --> D{Cota Horária / Diária Atingida?}
+    D -- Sim --> E[Pausa Envio com Alerta 429]
+    D -- Não --> F[Calcula Delay Humanizado Aleatório]
+    F --> G[Opcional: Reescrita com IA Ollama]
+    G --> H[Envia via WAHA API]
+    H --> I[Incrementa Contadores e Agenda Próximo]
+```
+
+---
+
+### 11.2. As 5 Camadas de Proteção
+
+#### 1. Delays Dinâmicos e Pausas Humanizadas (Random Jitter)
+- Cada mensagem consecutiva aguarda um tempo randômico configurável entre `min_delay_seconds` e `max_delay_seconds` (ex: 5 a 15 segundos).
+- Durante o disparo em massa na interface web (`/crm/bulk-message`), uma barra visual exibe uma contagem regressiva em tempo real: *"Aguardando 9s (anti-ban humanizado)..."*, simulando o comportamento de digitação de um ser humano.
+
+#### 2. Rate Limiting e Cotas de Disparo (Por Hora e Por Dia)
+- **Limite Horário (`max_messages_per_hour`):** Limite máximo seguro por hora (padrão sugerido: 60 a 80 msgs/hora).
+- **Limite Diário (`max_messages_per_day`):** Teto máximo diário de mensagens por instância (padrão sugerido: 300 a 500 msgs/dia para números maduros).
+- **Auto-Reset Inteligente:** Os contadores de hora e dia resetam automaticamente assim que o relógio vira a hora cheia ou a meia-noite, sem necessidade de rotinas cron externas complexas.
+
+#### 3. Modo Aquecimento Gradual (Warm-up de Chips Novos)
+Se o número do WhatsApp foi ativado recentemente, ativar o **Modo Aquecimento** calcula uma rampa progressiva automática baseada nos dias decorridos desde a data de início (`warmup_start_date`):
+- **Dia 1:** Máximo de 20 mensagens/dia
+- **Dia 2:** Máximo de 40 mensagens/dia
+- **Dia 3:** Máximo de 70 mensagens/dia
+- **Dia 4:** Máximo de 110 mensagens/dia
+- **Dia 5:** Máximo de 160 mensagens/dia
+- **Dia 6:** Máximo de 220 mensagens/dia
+- **Dia 7 em diante:** Máximo de 300 mensagens/dia (ou o teto diário configurado)
+
+#### 4. Horário de Silêncio (Quiet Hours)
+- Bloqueia envios automáticos e disparos em massa em horários de repouso definidos (ex: das **22:00** às **08:00**).
+- O algoritmo calcula com precisão inclusive faixas que atravessam a meia-noite.
+- Evita que clientes recebam notificações tarde da noite e cliquem no botão "Denunciar como Spam" do WhatsApp.
+
+#### 5. Variação Textual com IA Ollama Local (Anti-Spam Semântico)
+- Integrado ao módulo de IA (`/admin/settings` e tela de envio em massa), o sistema pode reescrever ligeiramente cada texto de forma semântica preservando as variáveis mágicas (`[NOME]`, `[DATA]`, `[STATUS]`, `[VENDEDOR]`).
+- Isso faz com que cada mensagem enviada tenha uma estrutura léxica ligeiramente diferente, quebrando o padrão de "mensagens clone".
+
+---
+
+### 11.3. Parâmetros do Banco de Dados (`WahaInstance`)
+
+| Campo | Tipo | Descrição | Valor Padrão |
+|---|---|---|---|
+| `enable_anti_ban` | Boolean | Liga ou desliga as proteções nesta instância | `True` |
+| `min_delay_seconds` | Integer | Intervalo mínimo aleatório entre mensagens (segundos) | `5` |
+| `max_delay_seconds` | Integer | Intervalo máximo aleatório entre mensagens (segundos) | `15` |
+| `max_messages_per_hour` | Integer | Limite máximo de mensagens enviadas por hora | `80` |
+| `max_messages_per_day` | Integer | Limite nominal máximo de mensagens por dia | `500` |
+| `quiet_hours_enabled` | Boolean | Ativa bloqueio de envios fora do horário comercial | `True` |
+| `quiet_hours_start` | String | Hora de início do silêncio no formato HH:MM | `22:00` |
+| `quiet_hours_end` | String | Hora de término do silêncio no formato HH:MM | `08:00` |
+| `warmup_mode` | Boolean | Liga o algoritmo de escalonamento para chips novos | `False` |
+| `warmup_start_date` | DateTime | Data do início do ciclo de aquecimento | *Data de ativação* |
+| `hourly_count` | Integer | Mensagens disparadas na hora corrente | `0` |
+| `daily_count` | Integer | Mensagens disparadas no dia corrente | `0` |
+| `last_sent_at` | DateTime | Timestamp do último disparo realizado | `None` |
+
+---
+
+### 11.4. Como Configurar e Operar no Painel do CRM
+
+#### 1. Configurar na Administração (`/admin/settings` -> Seção Instâncias WAHA)
+1. Acesse o CRM como Administrador e navegue até **Configurações (`/admin/settings`)**.
+2. No card de cada instância conectada, você verá as barras de progresso de **Cota Horária** e **Cota Diária** em tempo real.
+3. Clique em **"🛡️ Configurar Anti-Ban"**:
+   - Ative/Desative a proteção global daquela linha.
+   - Ajuste os delays mínimo e máximo (recomendado: entre 5s e 20s).
+   - Defina os limites por hora e por dia de acordo com a maturidade do seu chip.
+   - Ative o Horário de Silêncio e configure as horas permitidas.
+   - Para números novos, marque **"Modo Aquecimento (Warm-up)"**.
+4. Se necessário, utilize o botão **"Zerar Contadores"** para reiniciar as contagens daquele dia/hora.
+
+#### 2. Operação no Disparo em Massa (`/crm/bulk-message`)
+- Ao selecionar a instância de envio, o sistema exibe dinamicamente o resumo de segurança e o delay configurado.
+- Durante o processo, cada mensagem é processada individualmente:
+  1. O CRM envia a mensagem para o contato atual.
+  2. Atualiza a contagem da instância.
+  3. Sorteia um tempo de descanso (ex: 8 segundos).
+  4. Exibe a contagem regressiva na tela antes de seguir para o próximo contato.
+- Se o limite de cota ou o horário de silêncio for atingido durante o disparo, o processo é pausado com segurança, preservando a lista de clientes para envio posterior.
+
+#### 3. API Externa de Envio (`/crm/api/external/send`)
+- Aplicações externas ou automações que chamem o endpoint de envio do CRM são protegidas pelas mesmas regras:
+  - Se a instância estiver no horário de silêncio ou atingir o limite, a requisição retorna status **429 (Too Many Requests)** com mensagem descritiva do motivo do bloqueio.
+  - A tentativa é registrada nos logs do sistema sem queimar a sessão do WhatsApp.
+
+---
+
+### 11.5. Testes Automatizados
+
+O sistema inclui uma suíte completa de testes unitários para certificar a estabilidade do Anti-Ban:
+
+```bash
+# Executar a suíte de testes de Anti-Ban
+./venv/bin/python3 -m unittest tests/test_antiban.py
+
+# Ou rodar todos os testes do projeto
+./venv/bin/python3 -m unittest discover tests
+```
+
+**Cenários testados automaticamente:**
+- Curva de aquecimento progressiva dia a dia (`test_warmup_daily_limits`).
+- Detecção de horários de silêncio com e sem travessia de meia-noite (`test_quiet_hours`).
+- Reset automático de contadores na virada de hora e dia (`test_auto_reset_counters`).
+- Bloqueio por estouro de cota horária e diária (`test_hourly_and_daily_limit_blocking`).
+- Incremento correto ao enviar mensagem (`test_record_message_sent`).
+- Endpoints REST de estatísticas (`/crm/api/waha/<id>/anti_ban_stats`) e reset (`/crm/api/waha/<id>/reset_counters`).
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local e Sistema Anti-Ban / Anti-Spam WhatsApp.*
+
 

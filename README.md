@@ -15,9 +15,9 @@ Um sistema web responsivo e completo para gerenciamento inteligente de clientes 
 ## 🛠 Tecnologias Utilizadas
 
 - **Backend:** Python 3.12, Flask, Flask-SQLAlchemy, Flask-Migrate
-- **Banco de Dados (Aplicação):** SQLite (fácil distribuição e setup inicial)
+- **Banco de Dados (Aplicação):** PostgreSQL (produção/Docker/Coolify) ou SQLite (desenvolvimento leve) configurável via `DATABASE_URL`
 - **Frontend:** HTML5, Vanilla JS, CSS Customizado focado em "Glassmorphism"
-- **Integrações:** WAHA API (WhatsApp) com PostgreSQL + Redis via Docker, Google Generative AI (Gemini SDK)
+- **Integrações:** WAHA API (WhatsApp) com PostgreSQL + Redis via Docker, Ollama / Google Generative AI (Gemini SDK)
 
 ---
 
@@ -74,12 +74,17 @@ pip install -r requirements.txt
 
 ### 4. Configuração do Banco de Dados da Aplicação
 
-Inicie e crie as tabelas do banco de dados (SQLite) pela primeira vez:
+Por padrão, a aplicação pode utilizar SQLite (`crm.db`) ou PostgreSQL (conectando-se ao container Docker ou banco externo via variável `DATABASE_URL` no `.env`):
 
 ```bash
-flask db upgrade
-# Se houver script de inserção inicial de dados:
-# python init_db.py
+# Inicializar o banco de dados e criar usuário Admin (admin / admin123):
+python init_db.py
+```
+
+#### Migração de SQLite para PostgreSQL:
+Se você já possui dados no SQLite (`crm.db`) e deseja transferi-los para o PostgreSQL:
+```bash
+python scripts/migrate_sqlite_to_postgres.py crm.db
 ```
 
 ### 5. Configuração do Serviço WAHA (WhatsApp API)

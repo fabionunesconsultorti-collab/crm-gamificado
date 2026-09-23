@@ -209,9 +209,50 @@
                         </button>
                     </form>
                 </div>
+
+                <!-- Anti-Ban Status Overview -->
+                <div class="p-3 mb-3 rounded-md" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border);">
+                    <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                        <div class="d-flex align-center gap-2">
+                            <i class="fa-solid fa-shield-halved {% if instance.enable_anti_ban %}text-success{% else %}text-muted{% endif %}"></i>
+                            <span class="text-sm font-semibold">Sistema Anti-Ban & Aquecimento:</span>
+                            {% if instance.enable_anti_ban %}
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; font-size: 0.72rem;">ATIVO</span>
+                            {% else %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-size: 0.72rem;">DESATIVADO</span>
+                            {% endif %}
+
+                            {% if instance.warmup_mode %}
+                            <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.72rem;">
+                                <i class="fa-solid fa-fire"></i> MODO AQUECIMENTO
+                            </span>
+                            {% endif %}
+
+                            {% if instance.quiet_hours_enabled %}
+                            <span class="badge" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-size: 0.72rem;">
+                                <i class="fa-solid fa-moon"></i> SILENCIOSO ({{ instance.quiet_hours_start }} - {{ instance.quiet_hours_end }})
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="resetWahaCounters({{ instance.id }})">
+                            <i class="fa-solid fa-rotate-left"></i> Zerar Contadores
+                        </button>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-3 text-xs text-muted">
+                        <div><i class="fa-solid fa-stopwatch"></i> Latência Aleatória: <strong class="text-primary">{{ instance.min_delay_seconds or 5 }}s a {{ instance.max_delay_seconds or 15 }}s</strong></div>
+                        <div><i class="fa-solid fa-gauge-high"></i> Limite Hora: <strong class="text-primary">{{ instance.hourly_sent_count or 0 }} / {{ instance.max_messages_per_hour or 80 }}</strong></div>
+                        <div><i class="fa-solid fa-calendar-day"></i> Limite Diário: <strong class="text-primary">{{ instance.daily_sent_count or 0 }} / {{ instance.effective_daily_limit() if instance.effective_daily_limit else (instance.max_messages_per_day or 500) }}</strong></div>
+                        {% if instance.warmup_mode and instance.warmup_start_date %}
+                        <div><i class="fa-solid fa-clock-rotate-left"></i> Aquecimento iniciado em: <strong class="text-warning">{{ instance.warmup_start_date.strftime('%d/%m/%Y') }}</strong></div>
+                        {% endif %}
+                    </div>
+                </div>
                 
                 <!-- Edit Form -->
                 <form id="waha_edit_{{ instance.id }}" action="{{ url_for('admin.edit_waha_instance', id=instance.id) }}" method="post" class="d-none bg-glass p-3 rounded-md mb-3 border">
+                    <h5 class="text-primary mb-3"><i class="fa-solid fa-pen-to-square"></i> Editar Instância: {{ instance.name }}</h5>
                     <div class="form-group">
                         <label>Nome</label>
                         <input type="text" name="name" class="input-glass" value="{{ instance.name }}" required>
@@ -230,9 +271,73 @@
                     </div>
                     <div class="form-group">
                         <label>API Key (Opcional)</label>
-                        <input type="text" name="api_key" class="input-glass" value="{{ instance.api_key }}">
+                        <input type="text" name="api_key" class="input-glass" value="{{ instance.api_key or '' }}">
                     </div>
-                    <button type="submit" class="btn-primary">Salvar Edição</button>
+
+                    <!-- Configurações Anti-Ban -->
+                    <div class="p-3 mb-3 rounded-md" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--glass-border);">
+                        <div class="d-flex align-center justify-between mb-3">
+                            <label class="d-flex align-center gap-2 m-0 cursor-pointer font-semibold text-primary">
+                                <input type="checkbox" name="enable_anti_ban" class="checkbox-glass" {% if instance.enable_anti_ban %}checked{% endif %}>
+                                🛡️ Ativar Proteção Anti-Ban Inteligente
+                            </label>
+                            <span class="text-xs text-muted">Controle de taxa, delays e horários seguros</span>
+                        </div>
+
+                        <div class="d-grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div class="form-group mb-0">
+                                <label class="text-xs">Latência Mínima (Segundos)</label>
+                                <input type="number" name="min_delay_seconds" class="input-glass" value="{{ instance.min_delay_seconds or 5 }}" min="1" max="120" required>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="text-xs">Latência Máxima (Segundos)</label>
+                                <input type="number" name="max_delay_seconds" class="input-glass" value="{{ instance.max_delay_seconds or 15 }}" min="1" max="180" required>
+                            </div>
+                        </div>
+
+                        <div class="d-grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div class="form-group mb-0">
+                                <label class="text-xs">Limite Máximo de Mensagens por Hora</label>
+                                <input type="number" name="max_messages_per_hour" class="input-glass" value="{{ instance.max_messages_per_hour or 80 }}" min="5" max="1000" required>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="text-xs">Limite Máximo de Mensagens por Dia</label>
+                                <input type="number" name="max_messages_per_day" class="input-glass" value="{{ instance.max_messages_per_day or 500 }}" min="10" max="10000" required>
+                            </div>
+                        </div>
+
+                        <div class="border-top pt-3 mb-3" style="border-color: rgba(255,255,255,0.08);">
+                            <label class="d-flex align-center gap-2 cursor-pointer font-semibold mb-2">
+                                <input type="checkbox" name="quiet_hours_enabled" class="checkbox-glass" {% if instance.quiet_hours_enabled %}checked{% endif %}>
+                                🌙 Horário Silencioso (Pausar envios fora do expediente)
+                            </label>
+                            <div class="d-flex gap-3">
+                                <div class="form-group mb-0 flex-1">
+                                    <label class="text-xs text-muted">Início (Bloquear a partir de)</label>
+                                    <input type="text" name="quiet_hours_start" class="input-glass" value="{{ instance.quiet_hours_start or '22:00' }}" placeholder="22:00">
+                                </div>
+                                <div class="form-group mb-0 flex-1">
+                                    <label class="text-xs text-muted">Fim (Liberar a partir de)</label>
+                                    <input type="text" name="quiet_hours_end" class="input-glass" value="{{ instance.quiet_hours_end or '08:00' }}" placeholder="08:00">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border-top pt-3" style="border-color: rgba(255,255,255,0.08);">
+                            <label class="d-flex align-center gap-2 cursor-pointer font-semibold mb-1 text-warning">
+                                <input type="checkbox" name="warmup_mode" class="checkbox-glass" {% if instance.warmup_mode %}checked{% endif %}>
+                                🔥 Modo Aquecimento / Maturação (Warmup)
+                            </label>
+                            <p class="text-xs text-muted m-0">
+                                Recomendado para números ou chips novos. Escala gradualmente o limite diário (20 no Dia 1 até 500 no Dia 14) para evitar bloqueio preventivo do WhatsApp.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn-primary">Salvar Edição</button>
+                        <button type="button" class="btn-secondary" onclick="toggleEdit('waha_edit_{{ instance.id }}')">Cancelar</button>
+                    </div>
                 </form>
 
                 <!-- Engine Status -->
@@ -284,6 +389,37 @@
                 <label>API Key (Opcional)</label>
                 <input type="text" name="api_key" class="input-glass">
             </div>
+
+            <!-- Anti-Ban Opções Adicionais na Criação -->
+            <div class="p-3 mb-3 rounded-md" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--glass-border);">
+                <label class="d-flex align-center gap-2 cursor-pointer font-semibold mb-2 text-primary">
+                    <input type="checkbox" name="enable_anti_ban" class="checkbox-glass" checked>
+                    🛡️ Ativar Proteção Anti-Ban por Padrão (Recomendado)
+                </label>
+                <div class="d-grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <label class="text-muted">Latência Mín/Máx (segundos)</label>
+                        <div class="d-flex gap-1">
+                            <input type="number" name="min_delay_seconds" class="input-glass py-1" value="5" min="1" max="60">
+                            <input type="number" name="max_delay_seconds" class="input-glass py-1" value="15" min="1" max="180">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-muted">Limites Hora/Dia</label>
+                        <div class="d-flex gap-1">
+                            <input type="number" name="max_messages_per_hour" class="input-glass py-1" value="80" min="5">
+                            <input type="number" name="max_messages_per_day" class="input-glass py-1" value="500" min="10">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <label class="d-flex align-center gap-2 cursor-pointer text-xs text-warning">
+                        <input type="checkbox" name="warmup_mode" class="checkbox-glass">
+                        🔥 Modo Aquecimento (Marque se for um chip novo com menos de 30 dias)
+                    </label>
+                </div>
+            </div>
+
             <button type="submit" class="btn-primary w-auto mt-2">Adicionar Instância</button>
         </form>
     </div>
@@ -577,6 +713,24 @@
             alert("Erro de comunicação com o servidor.");
         }
     }
+
+    async function resetWahaCounters(instanceId) {
+        if(!confirm("Deseja zerar os contadores de envio (hora e dia) desta instância?")) return;
+        try {
+            const res = await fetch(`/crm/api/waha/${instanceId}/reset_counters`, { method: 'POST' });
+            const data = await res.json();
+            if(data.ok) {
+                alert("Contadores zerados com sucesso!");
+                window.location.reload();
+            } else {
+                alert("Erro ao zerar contadores: " + (data.error || "Erro desconhecido"));
+            }
+        } catch(e) {
+            console.error(e);
+            alert("Erro de comunicação com o servidor.");
+        }
+    }
+
 async function improveTextWithAI(targetId, btnElement) {
         const textarea = document.getElementById(targetId);
         const text = textarea.value.trim();

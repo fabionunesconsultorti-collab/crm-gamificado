@@ -310,6 +310,7 @@ def bulk_message():
     
     # WAHA Instances
     waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
+    waha_instances_stats = {inst.id: inst.get_anti_ban_stats() for inst in waha_instances}
     
     # Busca logs para a aba de histórico
     logs = MessageLog.query.order_by(MessageLog.timestamp.desc()).limit(200).all()
@@ -320,6 +321,7 @@ def bulk_message():
                            templates=templates_data,
                            clients_json=clients,
                            waha_instances=waha_instances,
+                           waha_instances_stats=waha_instances_stats,
                            logs=logs,
                            active_tab=active_tab)
 
@@ -339,8 +341,29 @@ def api_external_send():
     if not phone or not text:
         return jsonify({'ok': False, 'error': 'Phone and text are required'}), 400
         
+    instance_id = data.get('instance_id')
+    instance = None
+    if instance_id:
+        try:
+            instance = WahaInstance.query.get(int(instance_id))
+        except (ValueError, TypeError):
+            pass
+    if not instance:
+        instance = WahaInstance.query.filter_by(is_default=True).first() or WahaInstance.query.first()
+
+    # Validação Anti-Ban e Rate Limiting
+    if instance and instance.enable_anti_ban:
+        can_send, reason, stats = instance.check_anti_ban_limits()
+        if not can_send:
+            return jsonify({
+                'ok': False,
+                'error': reason,
+                'anti_ban_blocked': True,
+                'reason_code': stats.get('reason_code'),
+                'stats': stats
+            }), 429
+
     # Reescrita com IA (apenas se solicitado e se não for manual?)
-    # Geralmente fazemos na mensagem base já interpolada
     final_text = text
     ai_error = None
     if use_ai:
@@ -348,10 +371,14 @@ def api_external_send():
         if ai_error:
             print(f"Aviso de IA: {ai_error}")
 
-    instance_id = data.get('instance_id')
-    success, response = WahaAPI.send_text(phone, final_text, instance_id)
+    resolved_instance_id = instance.id if instance else instance_id
+    success, response = WahaAPI.send_text(phone, final_text, resolved_instance_id)
     
     if success:
+        # Registrar cota anti-ban
+        if instance:
+            instance.record_message_sent()
+
         # Lógica de Auto-Cadastro / Atualização
         try:
             # Limpa o telefone para busca (apenas dígitos)
@@ -392,10 +419,8 @@ def api_external_send():
                 content=final_text,
                 channel='whatsapp_waha',
                 status='sent',
-                waha_instance_id=instance_id
+                waha_instance_id=resolved_instance_id
             )
-            # Se for novo cliente, o ID só existirá após o flush/commit
-            # Mas podemos associar o objeto diretamente se o SQLAlchemy permitir
             log.client = client
             db.session.add(log)
             
@@ -407,11 +432,13 @@ def api_external_send():
             db.session.rollback()
             print("Error in auto-registration:", e)
                 
+        stats = instance.get_anti_ban_stats() if instance else None
         return jsonify({
             'ok': True, 
             'response': response,
             'final_text': final_text,
-            'ai_used': use_ai
+            'ai_used': use_ai,
+            'stats': stats
         })
     else:
         # Registrar o ERRO no log de mensagens
@@ -430,7 +457,7 @@ def api_external_send():
                 channel='whatsapp_waha',
                 status='error',
                 api_response=str(response),
-                waha_instance_id=instance_id
+                waha_instance_id=resolved_instance_id
             )
             db.session.add(log)
             db.session.commit()
@@ -438,4 +465,24 @@ def api_external_send():
             db.session.rollback()
             print("Error logging failed message:", e)
 
-        return jsonify({'ok': False, 'error': response}), 400
+        stats = instance.get_anti_ban_stats() if instance else None
+        return jsonify({'ok': False, 'error': response, 'stats': stats}), 400
+
+@bp.route('/api/waha/<int:id>/anti_ban_stats', methods=['GET'])
+@login_required
+def api_waha_anti_ban_stats(id):
+    instance = WahaInstance.query.get_or_404(id)
+    return jsonify({'ok': True, 'stats': instance.get_anti_ban_stats()})
+
+@bp.route('/api/waha/<int:id>/reset_counters', methods=['POST'])
+@login_required
+def api_waha_reset_counters(id):
+    instance = WahaInstance.query.get_or_404(id)
+    instance.hourly_count = 0
+    instance.daily_count = 0
+    db.session.commit()
+    return jsonify({
+        'ok': True,
+        'message': f'Contadores da instância "{instance.name}" zerados com sucesso.',
+        'stats': instance.get_anti_ban_stats()
+    })

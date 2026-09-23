@@ -86,11 +86,11 @@ echo -e "${GREEN}✔ Ambiente virtual ativado ($(python --version)).${NC}"
 # 4. Verificar dependências e Inicializar Banco de Dados
 echo -e "\n${CYAN}[4/5] Verificando dependências e banco de dados...${NC}"
 
-if ! python -c "import flask, flask_sqlalchemy" &> /dev/null; then
+if ! python -c "import flask, flask_sqlalchemy, psycopg2" &> /dev/null; then
     echo -e "${YELLOW}Instalando dependências do requirements.txt...${NC}"
     pip install -r requirements.txt
 else
-    echo -e "${GREEN}✔ Dependências Python instaladas.${NC}"
+    echo -e "${GREEN}✔ Dependências Python instaladas (PostgreSQL driver incluído).${NC}"
 fi
 
 # Garante criação das tabelas e do usuário admin inicial

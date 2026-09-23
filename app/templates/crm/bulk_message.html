@@ -119,13 +119,64 @@
 
         <div class="form-group w-100">
             <label for="waha_instance_id">2. Servidor de Envio (WAHA)</label>
-            <select id="waha_instance_id" class="input-glass">
+            <select id="waha_instance_id" class="input-glass" onchange="renderInstanceAntiBanInfo()">
                 {% for instance in waha_instances %}
                 <option value="{{ instance.id }}" {% if instance.is_default %}selected{% endif %}>{{ instance.name }} ({{ instance.session_name }})</option>
                 {% else %}
                 <option value="">Nenhum servidor configurado</option>
                 {% endfor %}
             </select>
+        </div>
+
+        <!-- Card de Monitoramento Anti-Ban da Instância -->
+        <div id="antiban_card" class="p-3 mb-4 rounded-md" style="background: rgba(15, 23, 42, 0.45); border: 1px solid var(--glass-border); display: none;">
+            <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                <div class="d-flex align-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-success" id="antiban_shield_icon"></i>
+                    <span class="text-sm font-semibold">Proteção Anti-Ban:</span>
+                    <span id="antiban_status_badge" class="badge" style="font-size: 0.72rem;">ATIVO</span>
+                    <span id="antiban_warmup_badge" class="badge d-none" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.72rem;">
+                        <i class="fa-solid fa-fire"></i> MODO AQUECIMENTO
+                    </span>
+                    <span id="antiban_quiet_badge" class="badge d-none" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-size: 0.72rem;">
+                        <i class="fa-solid fa-moon"></i> HORÁRIO SILENCIOSO
+                    </span>
+                </div>
+                <a href="{{ url_for('admin.settings') }}?tab=waha" class="text-xs text-primary text-decoration-none">
+                    <i class="fa-solid fa-gear"></i> Ajustar Limites
+                </a>
+            </div>
+
+            <div id="antiban_quiet_warning" class="p-2 mb-2 text-xs d-none" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; color: #fbbf24;">
+                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atenção:</strong> Esta instância está no <strong>Horário Silencioso</strong> (<span id="antiban_quiet_time"></span>). Disparos em lote fora do expediente aumentam o risco de denúncias de spam.
+            </div>
+
+            <!-- Medidores de Cota -->
+            <div class="d-grid grid-cols-2 gap-3 mt-2">
+                <div>
+                    <div class="d-flex justify-between text-xs mb-1">
+                        <span class="text-muted">Limite da Hora Atual:</span>
+                        <strong id="antiban_hourly_label">0 / 80</strong>
+                    </div>
+                    <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
+                        <div id="antiban_hourly_bar" class="progress-bar" style="width: 0%; background: #3b82f6;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="d-flex justify-between text-xs mb-1">
+                        <span class="text-muted">Limite do Dia:</span>
+                        <strong id="antiban_daily_label">0 / 500</strong>
+                    </div>
+                    <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
+                        <div id="antiban_daily_bar" class="progress-bar" style="width: 0%; background: #10b981;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-xs text-muted mt-2 d-flex justify-between flex-wrap gap-2">
+                <span><i class="fa-solid fa-stopwatch"></i> Latência Segura: <strong id="antiban_delay_label" class="text-primary">5s a 15s</strong></span>
+                <span id="antiban_warmup_detail" class="text-warning"></span>
+            </div>
         </div>
 
         <div class="form-group w-100 mb-4">
@@ -192,8 +243,14 @@
         <!-- Botões de Download Rápido removidos da aba de envio (movidos para o histórico) -->
 
         <div class="form-group w-100">
-            <label>Latência entre mensagens (Segundos)</label>
-            <input type="number" id="delay_seconds" class="input-glass" value="4" min="1" max="60">
+            <div class="d-flex justify-between align-center mb-1">
+                <label class="m-0">Latência entre mensagens (Segundos)</label>
+                <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="applyRecommendedDelay()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Usar Latência Anti-Ban
+                </button>
+            </div>
+            <input type="number" id="delay_seconds" class="input-glass" value="6" min="1" max="180">
+            <div class="text-xs text-muted mt-1">O sistema adiciona micro-variações aleatórias para simular digitação e comportamento humano autêntico.</div>
         </div>
 
         <div class="form-group w-100 mb-4">
@@ -312,6 +369,92 @@
         window.history.pushState({}, '', newUrl);
     }
 
+    // Instâncias WAHA e Configurações Anti-Ban
+    const instancesData = {{ (waha_instances_stats or []) | tojson }};
+
+    function getSelectedInstance() {
+        const select = document.getElementById('waha_instance_id');
+        if (!select || !select.value) return null;
+        return instancesData.find(i => String(i.id) === String(select.value)) || null;
+    }
+
+    function renderInstanceAntiBanInfo() {
+        const card = document.getElementById('antiban_card');
+        if (!card) return;
+        const inst = getSelectedInstance();
+        if (!inst) {
+            card.style.display = 'none';
+            return;
+        }
+        card.style.display = 'block';
+
+        const statusBadge = document.getElementById('antiban_status_badge');
+        const warmupBadge = document.getElementById('antiban_warmup_badge');
+        const quietBadge = document.getElementById('antiban_quiet_badge');
+        const quietWarning = document.getElementById('antiban_quiet_warning');
+        const quietTime = document.getElementById('antiban_quiet_time');
+        const delayLabel = document.getElementById('antiban_delay_label');
+        const warmupDetail = document.getElementById('antiban_warmup_detail');
+
+        if (inst.enable_anti_ban) {
+            statusBadge.textContent = 'ATIVO';
+            statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            statusBadge.style.color = '#34d399';
+            document.getElementById('antiban_shield_icon').className = 'fa-solid fa-shield-halved text-success';
+        } else {
+            statusBadge.textContent = 'DESATIVADO';
+            statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
+            statusBadge.style.color = '#94a3b8';
+            document.getElementById('antiban_shield_icon').className = 'fa-solid fa-shield-slash text-muted';
+        }
+
+        if (inst.warmup_mode) {
+            warmupBadge.classList.remove('d-none');
+            warmupDetail.innerHTML = `<i class="fa-solid fa-fire"></i> Aquecimento progressivo ativo`;
+        } else {
+            warmupBadge.classList.add('d-none');
+            warmupDetail.innerHTML = '';
+        }
+
+        if (inst.is_in_quiet_hours) {
+            quietBadge.classList.remove('d-none');
+            quietWarning.classList.remove('d-none');
+            quietTime.textContent = `${inst.quiet_hours_start} às ${inst.quiet_hours_end}`;
+        } else {
+            quietBadge.classList.add('d-none');
+            quietWarning.classList.add('d-none');
+        }
+
+        const hourlySent = inst.hourly_sent_count || 0;
+        const hourlyMax = inst.max_messages_per_hour || 80;
+        const hourlyPct = Math.min(100, Math.round((hourlySent / hourlyMax) * 100));
+        document.getElementById('antiban_hourly_label').textContent = `${hourlySent} / ${hourlyMax}`;
+        const hourlyBar = document.getElementById('antiban_hourly_bar');
+        hourlyBar.style.width = `${hourlyPct}%`;
+        hourlyBar.style.background = hourlyPct > 85 ? '#ef4444' : (hourlyPct > 60 ? '#f59e0b' : '#3b82f6');
+
+        const dailySent = inst.daily_sent_count || 0;
+        const dailyMax = inst.effective_daily_limit || inst.max_messages_per_day || 500;
+        const dailyPct = Math.min(100, Math.round((dailySent / dailyMax) * 100));
+        document.getElementById('antiban_daily_label').textContent = `${dailySent} / ${dailyMax}`;
+        const dailyBar = document.getElementById('antiban_daily_bar');
+        dailyBar.style.width = `${dailyPct}%`;
+        dailyBar.style.background = dailyPct > 85 ? '#ef4444' : (dailyPct > 60 ? '#f59e0b' : '#10b981');
+
+        delayLabel.textContent = `${inst.min_delay_seconds || 5}s a ${inst.max_delay_seconds || 15}s`;
+    }
+
+    function applyRecommendedDelay() {
+        const inst = getSelectedInstance();
+        if (inst && inst.enable_anti_ban) {
+            const avg = Math.round(((inst.min_delay_seconds || 5) + (inst.max_delay_seconds || 15)) / 2);
+            document.getElementById('delay_seconds').value = avg;
+            logTerminal(`Latência ajustada para ${avg}s (intervalo seguro: ${inst.min_delay_seconds}s - ${inst.max_delay_seconds}s).`);
+        } else {
+            document.getElementById('delay_seconds').value = 6;
+        }
+    }
+
     // Configurações e Estado do Motor
     let queue = [];
     let importedFileClients = [];
@@ -329,6 +472,11 @@
     const btnCompile = document.getElementById('btn_compile');
     const btnStart = document.getElementById('btn_start');
     const btnPause = document.getElementById('btn_pause');
+
+    // Inicializar visualização do Anti-Ban ao carregar
+    document.addEventListener('DOMContentLoaded', () => {
+        renderInstanceAntiBanInfo();
+    });
 
     function logTerminal(message, type = '') {
         const time = new Date().toLocaleTimeString();
@@ -494,6 +642,32 @@
     async function startEngine() {
         if (queue.length === 0 || currentIndex >= queue.length) return;
         
+        const inst = getSelectedInstance();
+        if (inst && inst.enable_anti_ban) {
+            if (inst.is_in_quiet_hours) {
+                const proceed = confirm(`⚠️ ATENÇÃO: Esta instância (${inst.name}) está no Horário Silencioso configurado (${inst.quiet_hours_start} às ${inst.quiet_hours_end}).\n\nDisparar fora do horário comercial aumenta expressivamente o risco de denúncias de spam e bloqueio do chip.\n\nDeseja continuar mesmo assim?`);
+                if (!proceed) {
+                    logTerminal("Envio abortado pelo usuário devido ao Horário Silencioso.", "warning");
+                    return;
+                }
+            }
+
+            const maxHour = inst.max_messages_per_hour || 80;
+            const maxDay = inst.effective_daily_limit || inst.max_messages_per_day || 500;
+
+            if (inst.hourly_sent_count >= maxHour) {
+                alert(`⛔ Limite horário da instância atingido (${inst.hourly_sent_count}/${maxHour} msgs). Aguarde o início da próxima hora para continuar com segurança.`);
+                logTerminal(`⛔ Bloqueado pelo Anti-Ban: Cota horária esgotada (${inst.hourly_sent_count}/${maxHour}).`, "error");
+                return;
+            }
+
+            if (inst.daily_sent_count >= maxDay) {
+                alert(`⛔ Limite diário da instância atingido (${inst.daily_sent_count}/${maxDay} msgs). O envio foi bloqueado para proteger sua conta.`);
+                logTerminal(`⛔ Bloqueado pelo Anti-Ban: Cota diária esgotada (${inst.daily_sent_count}/${maxDay}).`, "error");
+                return;
+            }
+        }
+
         engineRunning = true;
         btnStart.style.display = 'none';
         btnPause.style.display = 'block';
@@ -531,11 +705,30 @@
                 });
 
                 const data = await response.json();
+
+                // Detecção de Bloqueio por Anti-Ban / Rate Limiting
+                if (response.status === 429 || data.anti_ban_blocked) {
+                    errorCount++;
+                    document.getElementById('counter_errors').innerText = errorCount;
+                    logTerminal(`  ⛔ [PROTEÇÃO ANTI-BAN ATIVADA] ${data.error}`, "error");
+                    logTerminal(`  ⚠️ Disparo pausado automaticamente para resguardar seu número contra banimento.`, "warning");
+                    pauseEngine();
+                    alert(`[ANTI-BAN WAHA ATIVADO]\n${data.error}\n\nO motor de envio foi pausado automaticamente.`);
+                    break;
+                }
+
                 if (response.ok && data.ok) {
                     successCount++;
                     document.getElementById('counter_success').innerText = successCount;
                     logTerminal(`  ✓ Sucesso ao enviar para ${contact.name}`);
                     
+                    // Atualiza contador local da instância e medidores
+                    if (inst) {
+                        inst.hourly_sent_count = (inst.hourly_sent_count || 0) + 1;
+                        inst.daily_sent_count = (inst.daily_sent_count || 0) + 1;
+                        renderInstanceAntiBanInfo();
+                    }
+
                     if (data.ai_used && data.final_text && data.final_text !== finalMessage) {
                         logTerminal(`  ✨ IA reescreveu: "${data.final_text.substring(0, 40)}..."`);
                     }
@@ -553,12 +746,24 @@
             
             // Wait for delay if not finished and still running
             if (currentIndex < queue.length && engineRunning) {
-                const delayInput = parseInt(document.getElementById('delay_seconds').value) || 4;
-                // Adiciona um pouco de aleatoriedade no delay (0 a +2segundos) para imitar digitação humana e driblar robôs antispam
-                const randomJitter = Math.random() * 2;
-                const totalDelayMs = (delayInput + randomJitter) * 1000;
+                let userDelay = parseInt(document.getElementById('delay_seconds').value) || 6;
+                let minAllowed = 2;
+                let maxAllowed = 30;
+
+                if (inst && inst.enable_anti_ban) {
+                    minAllowed = inst.min_delay_seconds || 5;
+                    maxAllowed = inst.max_delay_seconds || 15;
+                    if (maxAllowed < minAllowed) maxAllowed = minAllowed + 2;
+                }
+
+                // Variação humana randômica (jitter)
+                const jitterRange = Math.max(1, (maxAllowed - minAllowed) * 0.4);
+                const randomJitter = (Math.random() * jitterRange) - (jitterRange / 2);
+                let appliedDelay = Math.max(minAllowed, userDelay + randomJitter);
+
+                const totalDelayMs = Math.round(appliedDelay * 1000);
                 
-                logTerminal(`  ...Aguardando ${(totalDelayMs/1000).toFixed(1)}s (proteção anti-spam)`);
+                logTerminal(`  ...Aguardando ${(totalDelayMs/1000).toFixed(1)}s (proteção anti-spam/anti-ban)`);
                 await new Promise(r => setTimeout(r, totalDelayMs));
             }
         }
