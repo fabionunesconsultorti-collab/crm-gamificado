@@ -1,3 +1,15 @@
+"""
+Módulo de Integração com a API do WAHA (WhatsApp HTTP API).
+
+Responsabilidades:
+1. Gerenciamento de Sessões: Inicialização, logout, verificação de status e leitura de QR code.
+2. Sincronização Automática de Webhook (ensure_webhook): Garante que a sessão ativa no WAHA
+   esteja configurada para encaminhar eventos de mensagem para o endpoint do CRM.
+3. Comunicação Bidirecional: Envio de texto, ativação/desativação de presença ('digitando...')
+   e confirmação visual de leitura (seen).
+4. Resolução Dinâmica de Rede: Resolução de IPs e URLs compatíveis com Docker e rede local.
+"""
+
 import requests
 import json
 from app.models import WahaInstance
@@ -6,9 +18,14 @@ from app.utils.network import get_connected_ip, resolve_instance_api_url
 class WahaAPI:
     @staticmethod
     def get_settings(instance_id=None):
-        if instance_id:
-            instance = WahaInstance.query.get(instance_id)
-        else:
+        instance = None
+        if instance_id is not None:
+            if isinstance(instance_id, int) or (isinstance(instance_id, str) and instance_id.isdigit()):
+                instance = WahaInstance.query.get(int(instance_id))
+            elif isinstance(instance_id, str):
+                instance = WahaInstance.query.filter_by(session_name=instance_id).first()
+
+        if not instance:
             instance = WahaInstance.query.filter_by(is_default=True).first()
             if not instance:
                 instance = WahaInstance.query.first() # Fallback
@@ -57,6 +74,18 @@ class WahaAPI:
         }
 
     @staticmethod
+    def get_webhook_url():
+        """
+        Retorna a URL onde o container WAHA deve enviar os webhooks para o backend do CRM.
+        """
+        from app.models import Setting
+        custom_url = Setting.get('whatsapp_webhook_url')
+        if custom_url and custom_url.strip():
+            return custom_url.strip()
+        # Default para container na rede docker interna falando com o host
+        return "http://172.18.0.1:5000/api/webhook/whatsapp"
+
+    @staticmethod
     def is_configured(instance_id=None):
         cfg = WahaAPI.get_settings(instance_id)
         return bool(cfg['api_url'] and cfg['session_name'])
@@ -75,12 +104,12 @@ class WahaAPI:
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
-        # WAHA usa chatId: 5511999999999@c.us
-        clean_phone = ''.join(filter(str.isdigit, str(phone_number)))
-        if not clean_phone.endswith('@c.us'):
-            chat_id = f"{clean_phone}@c.us"
+        raw_phone = str(phone_number).strip()
+        if '@' in raw_phone:
+            chat_id = raw_phone
         else:
-            chat_id = clean_phone
+            clean_phone = ''.join(filter(str.isdigit, raw_phone))
+            chat_id = f"{clean_phone}@c.us"
         
         url = f"{cfg['api_url']}/api/sendText"
         payload = {
@@ -195,18 +224,24 @@ class WahaAPI:
 
     @staticmethod
     def create_instance(instance_id=None):
-        """Inicia uma sessão na WAHA"""
+        """Inicia uma sessão na WAHA com webhooks configurados automaticamente"""
         cfg = WahaAPI.get_settings(instance_id)
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
             
+        webhook_url = WahaAPI.get_webhook_url()
         url = f"{cfg['api_url']}/api/sessions"
         payload = {
             "name": cfg['session_name'],
             "start": True,
             "config": {
                 "proxy": None,
-                "webhooks": []
+                "webhooks": [
+                    {
+                        "url": webhook_url,
+                        "events": ["message", "message.any"]
+                    }
+                ]
             }
         }
         
@@ -215,9 +250,61 @@ class WahaAPI:
             if response.status_code in [200, 201]:
                 return True, response.json()
             else:
-                # Se já existir, a WAHA pode dar erro ou ignorar. 
-                # Se der 409 (Conflict), tentamos apenas dar start
+                # Se já existir, tenta assegurar que o webhook está configurado
+                WahaAPI.ensure_webhook(instance_id)
                 return False, response.text
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def ensure_webhook(instance_id=None):
+        """
+        Garante que a sessão ativa no WAHA esteja despachando webhooks para o backend do CRM.
+        Consulta a sessão atual; se os webhooks estiverem ausentes ou divergentes,
+        aplica a configuração via PUT /api/sessions/{session}.
+        """
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
+        session_name = cfg['session_name']
+        webhook_url = WahaAPI.get_webhook_url()
+        events = ["message", "message.any"]
+        headers = WahaAPI.get_headers(instance_id)
+
+        url = f"{cfg['api_url']}/api/sessions/{session_name}"
+        try:
+            get_resp = requests.get(url, headers=headers, timeout=10)
+            if get_resp.status_code != 200:
+                return False, f"Sessão '{session_name}' não encontrada ou inativa no WAHA."
+
+            data = get_resp.json()
+            config = data.get('config') or {}
+            existing_webhooks = config.get('webhooks') or []
+
+            # Verifica se já possui o webhook desejado
+            has_matching = any(
+                w.get('url') == webhook_url and 'message' in (w.get('events') or [])
+                for w in existing_webhooks
+            )
+
+            if has_matching:
+                return True, f"Webhook já configurado em {webhook_url}"
+
+            # Atualiza a sessão com o webhook
+            put_payload = {
+                "name": session_name,
+                "config": {
+                    "webhooks": [
+                        {"url": webhook_url, "events": events}
+                    ]
+                }
+            }
+            put_resp = requests.put(url, headers=headers, json=put_payload, timeout=15)
+            if put_resp.status_code in [200, 201]:
+                return True, f"Webhook registrado com sucesso: {webhook_url}"
+            else:
+                return False, f"Falha ao registrar webhook no WAHA ({put_resp.status_code}): {put_resp.text}"
         except Exception as e:
             return False, str(e)
 

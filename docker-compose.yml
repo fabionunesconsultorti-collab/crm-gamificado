@@ -27,6 +27,8 @@ services:
   waha:
     image: devlikeapro/waha
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "3000:3000"
     environment:
@@ -46,6 +48,9 @@ services:
       - WHATSAPP_SWAGGER_USERNAME=admin
       - WHATSAPP_SWAGGER_PASSWORD=admin123
       - WAHA_API_KEY=admin123
+      # Webhook Global para captura automática de mensagens
+      - WHATSAPP_HOOK_URL=http://172.18.0.1:5000/api/webhook/whatsapp
+      - WHATSAPP_HOOK_EVENTS=message,message.any
     depends_on:
       - postgres
       - redis

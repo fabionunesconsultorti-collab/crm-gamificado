@@ -1,5 +1,21 @@
+"""
+Módulo de Agregação Temporal e Debounce de Mensagens (WhatsApp Buffer).
+
+Responsabilidades:
+1. Retenção Temporária (Buffer): Armazena mensagens consecutivas no Redis
+   durante uma janela de silêncio (ex: 12 segundos) antes de processar.
+2. Agrupamento Semântico: Concatena mensagens picadas ("Oi", "tudo bem?", "quanto custa?")
+   em um bloco unificado de contexto antes de enviar para o LLM.
+3. Despacho Autônomo e Confiável: Agenda a execução tanto no RQ (Redis Queue)
+   quanto via Timer em Thread Daemon em segundo plano, garantindo processamento
+   mesmo se nenhum RQ worker externo estiver rodando.
+4. Mutex e Idempotência: Invalidação de batches obsoletos por tokens únicos
+   e locks atômicos no Redis para evitar processamentos duplicados.
+"""
+
 import json
 import logging
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from app.tasks.queue import get_redis_connection, get_queue
@@ -14,6 +30,42 @@ REDIS_PREFIX_LOCK = "crm:wa:lock"
 DEFAULT_DEBOUNCE_DELAY = 12  # segundos de silêncio para fechar a janela
 BUFFER_TTL = 3600  # 1 hora de segurança para mensagens no buffer
 TIMER_KEY_TTL = 300  # 5 minutos para o token ativo
+
+
+def _run_autonomous_buffer_dispatch(chat_id: str, batch_token: str, instance_id: str = None):
+    """
+    Executado após o término da janela de silêncio (debounce) por uma thread daemon autônoma.
+    
+    Garante que a resposta ao cliente seja gerada pela IA e enviada via WAHA MESMO se
+    não houver nenhum worker externo do RQ em execução no ambiente.
+    """
+    try:
+        from app.tasks.whatsapp import process_buffered_whatsapp_messages
+        process_buffered_whatsapp_messages(chat_id, batch_token, instance_id)
+    except Exception as e:
+        logger.error(f"[Buffer Dispatcher] Erro ao processar lote para '{chat_id}': {e}", exc_info=True)
+
+
+def _schedule_autonomous_fallback(chat_id: str, batch_token: str, delay_seconds: int, instance_id: str = None):
+    """
+    Agenda um timer daemon em background no Python com pequena margem de segurança.
+    
+    Se o cliente enviar novas mensagens antes do timer expirar, o token no Redis é
+    sobrescrito e este timer é descartado de forma limpa pelo `is_valid_batch`.
+    """
+    try:
+        # Adiciona 0.3s de margem para garantir que a janela de debounce fechou completamente
+        t = threading.Timer(
+            delay_seconds + 0.3,
+            _run_autonomous_buffer_dispatch,
+            kwargs={"chat_id": chat_id, "batch_token": batch_token, "instance_id": instance_id}
+        )
+        t.daemon = True
+        t.name = f"wa-debounce-{batch_token}"
+        t.start()
+        logger.info(f"[Buffer] Dispatcher autônomo agendado para '{chat_id}' em {delay_seconds + 0.3:.1f}s.")
+    except Exception as e:
+        logger.warning(f"[Buffer] Não foi possível agendar timer em thread para '{chat_id}': {e}")
 
 
 def get_debounce_delay() -> int:
@@ -32,7 +84,7 @@ def get_debounce_delay() -> int:
 def add_to_buffer(chat_id: str, message_payload: dict, instance_id: str = None) -> tuple[str, int]:
     """
     Adiciona a mensagem ao buffer do Redis para o chat_id especificado e agenda
-    um job de processamento no RQ com atraso (debouncing).
+    o processamento garantido tanto via RQ quanto via timer autônomo em thread.
     
     Retorna (batch_token, delay_seconds).
     """
@@ -86,7 +138,7 @@ def add_to_buffer(chat_id: str, message_payload: dict, instance_id: str = None) 
     except Exception as e:
         logger.debug(f"[Buffer] Tracker error: {e}")
 
-    # Agenda a execução no RQ com delay
+    # 1. Agenda no RQ (se houver workers externos em execução)
     try:
         queue = get_queue('whatsapp_messages')
         queue.enqueue_in(
@@ -102,8 +154,10 @@ def add_to_buffer(chat_id: str, message_payload: dict, instance_id: str = None) 
             f"Token={batch_token}, delay={delay_seconds}s. Agendado no RQ."
         )
     except Exception as e:
-        logger.error(f"[Buffer] Falha ao enfileirar job atrasado no RQ para '{chat_id}': {e}", exc_info=True)
+        logger.warning(f"[Buffer] RQ indisponível para '{chat_id}' (usando fallback autônomo): {e}")
 
+    # 2. Agenda fallback autônomo em thread para garantia total de execução sem RQ
+    _schedule_autonomous_fallback(chat_id, batch_token, delay_seconds, instance_id)
 
     return batch_token, delay_seconds
 

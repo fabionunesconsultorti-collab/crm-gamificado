@@ -49,6 +49,21 @@ def create_app(config_class=Config):
         except Exception as e:
             app.logger.warning(f"Não foi possível iniciar o agendador de backup: {e}")
 
+        try:
+            import threading
+            import time
+            def _init_waha_webhook():
+                time.sleep(2)
+                with app.app_context():
+                    try:
+                        from app.utils.waha import WahaAPI
+                        WahaAPI.ensure_webhook()
+                    except Exception as ex:
+                        app.logger.debug(f"[Waha Init] Não foi possível verificar webhook no startup: {ex}")
+            threading.Thread(target=_init_waha_webhook, daemon=True, name="waha-webhook-init").start()
+        except Exception as e:
+            app.logger.warning(f"Erro ao agendar verificação do webhook WAHA: {e}")
+
     return app
 
 from app import models

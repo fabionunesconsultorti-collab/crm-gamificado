@@ -1,3 +1,23 @@
+"""
+Módulo de Processamento e Envio de Mensagens de WhatsApp (WAHA + Ollama + CRM).
+
+Responsabilidades:
+1. Processamento em Lote (_do_process_buffered_whatsapp_messages):
+   - Valida idempotência por token de batch.
+   - Adquire mutex distribuído (lock) no Redis para evitar condições de corrida.
+   - Consome mensagens acumuladas na janela de silêncio e as agrega em um texto coeso.
+   - Ativa presença no WhatsApp: Confirmação visual de leitura (seen) e simulação de 'digitando...'.
+   - Localiza o cliente no CRM ou realiza auto-cadastro como lead.
+   - Aplica regras de negócio: Validação de horário comercial e gatilhos de transbordo humano.
+   - Constrói o contexto multi-turno a partir do histórico preservado no Redis.
+   - Aciona o modelo de IA local (Ollama com Llama 3.2) para gerar respostas precisas.
+   - Envia a resposta final sintetizada via API do WAHA e grava MessageLog no PostgreSQL.
+   - Emite telemetria em tempo real para o monitor gráfico (LiveTracker).
+
+2. Processamento Imediato / Legado (_do_process_whatsapp_message):
+   - Utilizado para mensagens avulsas sem janela de debounce quando aplicável.
+"""
+
 import json
 import logging
 import time
@@ -14,12 +34,31 @@ def _extract_message_id(payload):
     return str(raw_id) if raw_id else None
 
 def _clean_phone_number(raw_phone):
-    """Limpa e formata o número do remetente."""
+    """Limpa e formata o número do remetente, removendo sufixos como @c.us e caracteres especiais."""
     if not raw_phone:
         return ""
-    # Remove sufixos como @c.us ou @s.whatsapp.net se presentes
     phone_clean = raw_phone.split('@')[0]
     return ''.join(filter(str.isdigit, phone_clean))
+
+def _resolve_waha_instance_pk(instance_id):
+    """
+    Traduz instance_id (que pode ser string como 'default' ou ID numérico)
+    para a Primary Key inteira da tabela WahaInstance no PostgreSQL.
+    Evita erros de coerção de tipo (DataError) ao salvar MessageLog.
+    """
+    if not instance_id:
+        return None
+    if isinstance(instance_id, int) or (isinstance(instance_id, str) and instance_id.isdigit()):
+        return int(instance_id)
+    try:
+        from app.models import WahaInstance
+        inst = WahaInstance.query.filter_by(session_name=str(instance_id)).first()
+        if inst:
+            return inst.id
+        default_inst = WahaInstance.query.filter_by(is_default=True).first() or WahaInstance.query.first()
+        return default_inst.id if default_inst else None
+    except Exception:
+        return None
 
 def _do_process_whatsapp_message(payload, event=None, instance_id=None):
     """Execução interna do processamento da mensagem dentro do contexto do Flask."""
@@ -114,7 +153,7 @@ def _do_process_whatsapp_message(payload, event=None, instance_id=None):
             status='sent' if success else 'error',
             timestamp=datetime.now(timezone.utc),
             api_response=raw_response_str,
-            waha_instance_id=instance_id
+            waha_instance_id=_resolve_waha_instance_pk(instance_id)
         )
         db.session.add(log)
         db.session.commit()
@@ -413,7 +452,7 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                 status='sent' if success else 'error',
                 timestamp=datetime.now(timezone.utc),
                 api_response=raw_response_str,
-                waha_instance_id=instance_id
+                waha_instance_id=_resolve_waha_instance_pk(instance_id)
             )
             db.session.add(log)
             db.session.commit()

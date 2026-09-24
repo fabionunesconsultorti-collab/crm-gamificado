@@ -95,6 +95,14 @@ def settings():
                     
         db.session.commit()
         
+        # Sincroniza o webhook no WAHA em background caso haja alterações
+        try:
+            import threading
+            from app.utils.waha import WahaAPI
+            threading.Thread(target=WahaAPI.ensure_webhook, daemon=True).start()
+        except Exception:
+            pass
+        
         tab_param = request.args.get('tab', '')
         flash('✅ Configurações atualizadas com sucesso!')
         return redirect(url_for('admin.settings') + (f'?tab={tab_param}' if tab_param else ''))

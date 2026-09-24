@@ -157,7 +157,6 @@ class AIHandler:
             return text, f"Erro na IA ({cfg['provider']}): {error_msg[:100]}"
 
     @staticmethod
-    @staticmethod
     def generate_chat_reply(customer_message, chat_history=None, client_info=None):
         """
         Gera respostas inteligentes e contextualizadas para o WhatsApp utilizando histórico
@@ -213,9 +212,12 @@ class AIHandler:
                     "model": cfg['ollama_model'],
                     "messages": messages,
                     "stream": False,
-                    "options": {"temperature": 0.7}
+                    "options": {
+                        "temperature": 0.7,
+                        "num_predict": 160
+                    }
                 }
-                resp = requests.post(url, json=payload, timeout=75)
+                resp = requests.post(url, json=payload, timeout=60)
                 if resp.status_code == 200:
                     content = resp.json().get("message", {}).get("content", "")
                     cleaned = AIHandler.clean_text(content)

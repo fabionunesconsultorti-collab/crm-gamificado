@@ -848,7 +848,58 @@ Para garantir a **preservação perpétua e consistência absoluta dos dados de 
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot e Central de Backup Completo com Google Drive.*
+---
+
+## 15. Arquitetura de Captura Ativa e Despacho Autônomo do Bot WhatsApp
+
+Para que o bot entre em ação **imediatamente e de forma totalmente autônoma** ao receber qualquer mensagem no WhatsApp conectado ao WAHA, o sistema conta com uma esteira de captura em tempo real que não depende de workers RQ externos ou rotinas manuais:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as Contato / WhatsApp
+    participant WAHA as WAHA Container (Porta 3000)
+    participant Flask as Backend Flask (Webhook /api/webhook/whatsapp)
+    participant Redis as Redis Buffer & Lock
+    participant Ollama as Ollama IA Local (Porta 11434)
+    participant Live as LiveTracker (Monitor Web)
+
+    Cliente->>WAHA: Envia mensagem no WhatsApp
+    WAHA->>Flask: POST /api/webhook/whatsapp (Payload com from, body, id)
+    Flask->>Redis: Salva mensagem no buffer (LPUSH) e define token de lote
+    Flask->>Live: Emite evento 'webhook_received' e inicia contagem regressiva
+    Flask->>Flask: Agenda Dispatcher Autônomo (threading.Timer com delay configurado)
+    Note over Flask,Redis: Janela de debounce (ex: 12s de silêncio) consolida múltiplas mensagens
+    Flask->>Redis: Timer expira: Valida se o batch_token ainda é o ativo e adquire lock
+    Flask->>Redis: Extrai todas as mensagens acumuladas no lote
+    Flask->>WAHA: Ativa presença: Marca como lida (seen) e inicia 'digitando...'
+    Flask->>Redis: Carrega histórico multi-turno do cliente
+    Flask->>Ollama: POST /api/chat (Contexto + Histórico + Dados CRM, num_predict=160)
+    Ollama-->>Flask: Retorna resposta sintetizada rápida (~5s)
+    Flask->>WAHA: POST /api/sendText com a resposta personalizada
+    WAHA->>Cliente: Entrega mensagem no WhatsApp
+    Flask->>Redis: Registra turno na memória conversacional
+    Flask->>Flask: Grava MessageLog auditável com ID da instância
+    Flask->>Live: Emite 'waha_dispatched' e finaliza o ciclo no painel gráfico
+```
+
+### 15.1. Pilares da Confiabilidade de Captura:
+1. **Garantia de Webhook no WAHA (`WahaAPI.ensure_webhook`):**
+   - Configurado no `docker-compose.yml` (`WHATSAPP_HOOK_URL=http://172.18.0.1:5000/api/webhook/whatsapp`).
+   - Sincronização automática na inicialização da aplicação (`create_app`) e ao salvar configurações.
+   - Atualização automática via `PUT /api/sessions/{session}` com eventos `['message', 'message.any']`.
+2. **Dispatcher Autônomo em Thread (`_schedule_autonomous_fallback`):**
+   - Cada mensagem recebida agenda um timer daemon em background no Python.
+   - Ao término da janela de debounce configurada, o timer valida o `batch_token` no Redis e processa o lote automaticamente, funcionando com 100% de autonomia mesmo quando nenhum worker externo do RQ estiver rodando.
+3. **Controle de Tokens e Performance na IA:**
+   - Adicionado parâmetro `num_predict: 160` na geração do Ollama, garantindo respostas rápidas em celular (5 a 10 segundos) sem extrapolar timeouts.
+4. **Resolução de Chaves Primárias no Banco:**
+   - Tratamento universal para converter instâncias passadas por nome de sessão (ex: `'default'`) para as PKs numéricas inteiras do PostgreSQL em `MessageLog.waha_instance_id`.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo e Captura Ativa de Mensagens do WhatsApp.*
+
 
 
 

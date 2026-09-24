@@ -1,12 +1,24 @@
+"""
+Endpoints da API REST e Webhooks Externos (CRM Pro).
+
+Responsabilidades:
+1. Webhooks do WhatsApp (/api/webhook/whatsapp e aliases):
+   - Recepção veloz (<50ms) de mensagens do WAHA.
+   - Filtragem de mensagens de broadcast, grupos e eco do próprio remetente (fromMe).
+   - Deduplicação atômica no Redis.
+   - Envio imediato para o buffer de agregação temporal (debounce).
+2. Mensageria Externa (/api/messages/send_automated):
+   - Endpoint autenticado para integrações externas (N8N, Zapier, Webhooks).
+"""
+
 import json
+import logging
 from flask import request, jsonify
 from app.api import bp
 from app.models import MessageLog, Client
 from app import db
 from app.utils.waha import WahaAPI
 from app.utils.ai_handler import AIHandler
-
-import logging
 from app.tasks.queue import get_queue, is_duplicate_message
 from app.tasks.whatsapp import process_whatsapp_message
 
@@ -14,10 +26,12 @@ logger = logging.getLogger(__name__)
 
 @bp.route('/webhook/whatsapp', methods=['POST'])
 @bp.route('/webhook/waha', methods=['POST'])
+@bp.route('/whatsapp/webhook', methods=['POST'])
+@bp.route('/waha/webhook', methods=['POST'])
 def whatsapp_webhook():
     '''
     Endpoint assíncrono de alta performance para receber webhooks do WhatsApp (WAHA).
-    Responde em menos de 50ms confirmando o recebimento e delega o processamento da IA para o RQ Worker.
+    Responde em menos de 50ms confirmando o recebimento e delega o processamento da IA para o buffer inteligente.
     '''
     data = request.get_json(force=True, silent=True)
     if not data:
@@ -68,10 +82,10 @@ def whatsapp_webhook():
         # Envio para o buffer de agregação temporal (Debounce) via Redis
         try:
             from app.tasks.buffer import add_to_buffer
-            instance_id = data.get('instance_id') or payload.get('instance_id')
-            batch_token, delay = add_to_buffer(chat_id=from_raw, message_payload=payload, instance_id=instance_id)
+            session_name = data.get('session') or data.get('instance_id') or payload.get('instance_id') or 'default'
+            batch_token, delay = add_to_buffer(chat_id=from_raw, message_payload=payload, instance_id=session_name)
 
-            logger.info(f"[Webhook WhatsApp] Mensagem recebida e retida no buffer: Chat={from_raw}, MsgID={msg_id}, Token={batch_token}, Delay={delay}s")
+            logger.info(f"[Webhook WhatsApp] Mensagem recebida e retida no buffer: Chat={from_raw}, MsgID={msg_id}, Token={batch_token}, Delay={delay}s, Session={session_name}")
             return jsonify({
                 "status": "buffered",
                 "chat_id": from_raw,
