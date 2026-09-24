@@ -17,6 +17,7 @@
             <thead>
                 <tr>
                     <th>Nome</th>
+                    <th>Segmento</th>
                     <th>Telefone</th>
                     <th>E-mail</th>
                     <th>Status</th>
@@ -26,9 +27,23 @@
             <tbody>
                 {% for client in clients %}
                 <tr>
-                    <td>{{ client.name }}</td>
+                    <td>
+                        <div class="font-semibold">{{ client.name }}</div>
+                        {% if client.cpf %}
+                        <div class="text-xs text-muted" style="font-size:0.75rem;">{{ client.cpf }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if client.display_segment %}
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.72rem; padding: 0.2rem 0.5rem;">
+                            <i class="fa-solid fa-briefcase"></i> {{ client.display_segment }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted text-xs">-</span>
+                        {% endif %}
+                    </td>
                     <td>{{ client.phone }}</td>
-                    <td>{{ client.email }}</td>
+                    <td>{{ client.email or '-' }}</td>
                     <td>
                         <span class="badge 
                             {% if client.status == 'fechado' %} badge-success
@@ -40,12 +55,22 @@
                         </span>
                     </td>
                     <td>
-                        <div class="d-flex gap-2">
-                            <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn">
+                        <div class="d-flex gap-2 align-center">
+                            {% if client.instagram %}
+                            <a href="{{ client.instagram_url }}" target="_blank" rel="noopener noreferrer" class="icon-btn" style="color: #E1306C;" title="Abrir Instagram ({{ client.instagram }})">
+                                <i class="fa-brands fa-instagram"></i>
+                            </a>
+                            {% endif %}
+                            {% if client.website %}
+                            <a href="{{ client.website_url }}" target="_blank" rel="noopener noreferrer" class="icon-btn" style="color: #38bdf8;" title="Abrir Website ({{ client.website }})">
+                                <i class="fa-solid fa-globe"></i>
+                            </a>
+                            {% endif %}
+                            <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn" title="Editar">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
                             <form action="{{ url_for('crm.delete_client', id=client.id) }}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este cliente?')">
-                                <button type="submit" class="icon-btn text-danger">
+                                <button type="submit" class="icon-btn text-danger" title="Excluir">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>
@@ -57,7 +82,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="p-4 text-center text-muted">Nenhum cliente cadastrado ainda.</td>
+                    <td colspan="6" class="p-4 text-center text-muted">Nenhum cliente cadastrado ainda.</td>
                 </tr>
                 {% endfor %}
             </tbody>

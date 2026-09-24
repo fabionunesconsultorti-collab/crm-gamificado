@@ -36,7 +36,11 @@
         {% with target_module='clients', system_fields=[
             {'key': 'name', 'label': 'Nome do Cliente', 'required': true},
             {'key': 'phone', 'label': 'Celular/WhatsApp', 'required': true},
-            {'key': 'email', 'label': 'E-mail', 'required': false}
+            {'key': 'cpf', 'label': 'CPF / CNPJ', 'required': false},
+            {'key': 'segment', 'label': 'Segmento', 'required': false},
+            {'key': 'email', 'label': 'E-mail', 'required': false},
+            {'key': 'instagram', 'label': 'Instagram', 'required': false},
+            {'key': 'website', 'label': 'Site / Website', 'required': false}
         ] %}
             {% include 'crm/mapping_tool.html' %}
         {% endwith %}

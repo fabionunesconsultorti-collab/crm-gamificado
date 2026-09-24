@@ -48,7 +48,7 @@ class Client(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # 1. Campos Essenciais (Operação e Fiscal)
-    cpf = db.Column(db.String(14), unique=True, index=True)
+    cpf = db.Column(db.String(32), unique=True, index=True) # Suporta CPF (11/14 chars) e CNPJ (14/18 chars)
     cep = db.Column(db.String(10))
     address = db.Column(db.String(256))
     birth_date = db.Column(db.Date)
@@ -75,7 +75,41 @@ class Client(db.Model):
     data_usage_purpose = db.Column(db.String(256))
     consent_channel = db.Column(db.String(128))
 
+    # 5. Prospecção Ativa (Google Maps / Outbound) & Presença Digital
+    website = db.Column(db.Text)
+    instagram = db.Column(db.String(256))
+    category = db.Column(db.String(256))
+    segment = db.Column(db.String(256))
+    google_rating = db.Column(db.Float, default=0.0)
+    google_reviews_count = db.Column(db.Integer, default=0)
+
     referred_by = db.relationship('User', foreign_keys=[referred_by_id], backref='referrals')
+
+    @property
+    def display_segment(self):
+        """Retorna o segmento prioritário ou categoria da prospecção."""
+        return (self.segment or self.category or '').strip()
+
+    @property
+    def instagram_url(self):
+        """Retorna a URL completa para o Instagram do cliente se preenchido."""
+        if not self.instagram:
+            return None
+        handle = self.instagram.strip()
+        if handle.startswith(('http://', 'https://')):
+            return handle
+        handle = handle.lstrip('@')
+        return f"https://instagram.com/{handle}"
+
+    @property
+    def website_url(self):
+        """Retorna a URL do website garantindo protocolo http/https."""
+        if not self.website:
+            return None
+        url = self.website.strip()
+        if not url.startswith(('http://', 'https://')):
+            return f"https://{url}"
+        return url
 
     def __repr__(self):
         return f'<Client {self.name}>'
@@ -329,3 +363,57 @@ class MessageLog(db.Model):
 
     def __repr__(self):
         return f'<MessageLog to {self.client_id} at {self.timestamp}>'
+
+class ScrapingJob(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
+    query_term = db.Column(db.String(256), nullable=False)
+    depth = db.Column(db.Integer, default=1)
+    extract_emails = db.Column(db.Boolean, default=True)
+    status = db.Column(db.String(32), default='queued') # queued, processing, completed, failed
+    total_scraped = db.Column(db.Integer, default=0)
+    total_imported = db.Column(db.Integer, default=0)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    external_job_id = db.Column(db.String(128), nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    progress = db.Column(db.Integer, default=0)
+    current_step = db.Column(db.String(128), default='')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    created_by = db.relationship('User', backref='scraping_jobs')
+
+    def __init__(self, **kwargs):
+        if 'query' in kwargs and 'query_term' not in kwargs:
+            kwargs['query_term'] = kwargs.pop('query')
+        super().__init__(**kwargs)
+
+    def to_dict(self):
+        elapsed = 0
+        if self.created_at:
+            end = self.finished_at or datetime.utcnow()
+            elapsed = max(0, int((end - self.created_at).total_seconds()))
+
+        return {
+            'id': self.id,
+            'public_id': self.public_id,
+            'query': self.query_term,
+            'query_term': self.query_term,
+            'depth': self.depth,
+            'extract_emails': self.extract_emails,
+            'status': self.status,
+            'progress': self.progress if self.progress is not None else 0,
+            'current_step': self.current_step or '',
+            'elapsed_seconds': elapsed,
+            'total_scraped': self.total_scraped or 0,
+            'total_imported': self.total_imported or 0,
+            'created_by': self.created_by.username if self.created_by else 'Sistema',
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else None,
+            'finished_at': self.finished_at.strftime('%d/%m/%Y %H:%M') if self.finished_at else None,
+            'error_message': self.error_message
+        }
+
+    def __repr__(self):
+        return f'<ScrapingJob {self.id}: {self.query_term} [{self.status}]>'
+
+

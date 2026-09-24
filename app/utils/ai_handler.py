@@ -263,6 +263,8 @@ class AIHandler:
                         if AIHandler.is_refusal(cleaned):
                             return None, f"A IA recusou a instrução ('{cleaned[:60]}...'). Tente reformular o objetivo da mensagem."
                         return cleaned, None
+                elif resp.status_code == 404:
+                    return None, f"Modelo '{cfg['ollama_model']}' não encontrado no Ollama. Execute 'docker exec -it crm-ollama-1 ollama pull {cfg['ollama_model']}' ou selecione outro modelo em Configurações."
                 return None, f"Erro ao gerar com Ollama: {resp.text}"
 
             # Provedor 2: DEEPSEEK

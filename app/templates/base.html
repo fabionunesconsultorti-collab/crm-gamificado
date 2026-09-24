@@ -51,6 +51,12 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ url_for('crm.prospeccao') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.prospeccao' }}">
+                        <i class="fa-solid fa-map-location-dot nav-icon text-warning"></i> Prospecção Ativa
+                    </a>
+                </li>
+
+                <li>
                     <a href="{{ url_for('main.ranking') }}" class="nav-link {{ 'active' if request.endpoint == 'main.ranking' }}">
                         <i class="fa-solid fa-trophy nav-icon"></i> Ranking XP
                     </a>

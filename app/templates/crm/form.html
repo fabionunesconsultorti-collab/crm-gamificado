@@ -20,16 +20,28 @@
                 <input type="text" name="name" id="name" class="input-glass" value="{{ client.name if client else '' }}" required placeholder="Ex: João Silva">
             </div>
             <div class="form-group mb-0">
-                <label for="cpf">CPF</label>
-                <input type="text" name="cpf" id="cpf" class="input-glass" value="{{ client.cpf if client else '' }}" placeholder="000.000.000-00">
+                <label for="cpf">CPF / CNPJ</label>
+                <input type="text" name="cpf" id="cpf" class="input-glass" value="{{ client.cpf if client else '' }}" placeholder="000.000.000-00 ou 00.000.000/0001-00" maxlength="18">
+            </div>
+            <div class="form-group mb-0">
+                <label for="phone">Celular / WhatsApp *</label>
+                <input type="text" name="phone" id="phone" class="input-glass" value="{{ client.phone if client else '' }}" required placeholder="Ex: (11) 99999-9999">
             </div>
             <div class="form-group mb-0">
                 <label for="email">E-mail</label>
                 <input type="email" name="email" id="email" class="input-glass" value="{{ client.email if client else '' }}" placeholder="exemplo@email.com">
             </div>
             <div class="form-group mb-0">
-                <label for="phone">Celular / WhatsApp *</label>
-                <input type="text" name="phone" id="phone" class="input-glass" value="{{ client.phone if client else '' }}" required placeholder="Ex: (11) 99999-9999">
+                <label for="segment"><i class="fa-solid fa-briefcase text-warning"></i> Segmento do Lead</label>
+                <input type="text" name="segment" id="segment" class="input-glass" value="{{ client.segment or client.category if client else '' }}" placeholder="Ex: Padaria, Academia, Moda, Farmácia...">
+            </div>
+            <div class="form-group mb-0">
+                <label for="instagram"><i class="fa-brands fa-instagram" style="color: #E1306C;"></i> Instagram</label>
+                <input type="text" name="instagram" id="instagram" class="input-glass" value="{{ client.instagram if client else '' }}" placeholder="Ex: @empresa ou instagram.com/empresa">
+            </div>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="website"><i class="fa-solid fa-globe text-primary"></i> Site / Website</label>
+                <input type="text" name="website" id="website" class="input-glass" value="{{ client.website if client else '' }}" placeholder="Ex: https://www.empresa.com.br">
             </div>
             <div class="form-group mb-0">
                 <label for="birth_date">Data de Nascimento</label>
@@ -42,6 +54,25 @@
             <div class="form-group mb-0" style="grid-column: span 2;">
                 <label for="address">Endereço Completo</label>
                 <input type="text" name="address" id="address" class="input-glass" value="{{ client.address if client else '' }}" placeholder="Rua, Número, Bairro, Cidade, UF">
+            </div>
+
+            <!-- Quadro com Mapinha do Google Maps -->
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <div class="d-flex justify-between align-center mb-1">
+                    <label class="d-flex align-center gap-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
+                        <i class="fa-solid fa-map-location-dot text-primary"></i> Localização no Google Maps
+                    </label>
+                    <a id="btn_open_google_maps" href="#" target="_blank" rel="noopener noreferrer" class="text-xs text-primary d-none" style="text-decoration: underline;">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir no Google Maps
+                    </a>
+                </div>
+                <div id="map_container" class="rounded-md overflow-hidden border border-glass" style="height: 230px; width: 100%; position: relative; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 8px;">
+                    <iframe id="map_iframe" src="" width="100%" height="100%" style="border: 0; display: none; border-radius: 8px;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                    <div id="map_placeholder" class="d-flex flex-col justify-center align-center h-100 p-3 text-center text-muted" style="height: 100%;">
+                        <i class="fa-solid fa-map-pin text-primary mb-2 opacity-50" style="font-size: 2rem;"></i>
+                        <span class="text-sm">Digite o endereço acima para carregar o mapa.</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -179,4 +210,104 @@
         </a>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cpfInput = document.getElementById('cpf');
+    if (cpfInput) {
+        function formatCpfCnpj(value) {
+            // Remove tudo que não for dígito
+            let v = value.replace(/\D/g, '');
+            if (v.length > 14) {
+                v = v.substring(0, 14);
+            }
+
+            if (v.length <= 11) {
+                // Formato CPF: 000.000.000-00
+                v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            } else {
+                // Formato CNPJ: 00.000.000/0000-00
+                v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+                v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+            }
+            return v;
+        }
+
+        cpfInput.addEventListener('input', function() {
+            this.value = formatCpfCnpj(this.value);
+        });
+
+        // Formata valor inicial se houver
+        if (cpfInput.value) {
+            cpfInput.value = formatCpfCnpj(cpfInput.value);
+        }
+    }
+
+    // Google Maps Embed dinâmico
+    const addressInput = document.getElementById('address');
+    const cepInput = document.getElementById('cep');
+    const mapIframe = document.getElementById('map_iframe');
+    const mapPlaceholder = document.getElementById('map_placeholder');
+    const btnOpenMaps = document.getElementById('btn_open_google_maps');
+    let mapDebounceTimer = null;
+
+    function updateGoogleMap() {
+        if (!mapIframe) return;
+
+        const addr = (addressInput ? addressInput.value.trim() : '');
+        const cep = (cepInput ? cepInput.value.trim() : '');
+        
+        let query = addr;
+        if (!query && cep) {
+            query = `CEP ${cep}, Brasil`;
+        } else if (query && cep && !query.includes(cep)) {
+            query = `${query}, CEP ${cep}`;
+        }
+
+        if (query && query.length >= 4) {
+            const encoded = encodeURIComponent(query);
+            const embedUrl = `https://maps.google.com/maps?q=${encoded}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+            const directSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+
+            if (mapIframe.src !== embedUrl) {
+                mapIframe.src = embedUrl;
+            }
+            mapIframe.style.display = 'block';
+            if (mapPlaceholder) mapPlaceholder.style.display = 'none';
+            if (btnOpenMaps) {
+                btnOpenMaps.href = directSearchUrl;
+                btnOpenMaps.classList.remove('d-none');
+            }
+        } else {
+            mapIframe.style.display = 'none';
+            mapIframe.src = '';
+            if (mapPlaceholder) mapPlaceholder.style.display = 'flex';
+            if (btnOpenMaps) btnOpenMaps.classList.add('d-none');
+        }
+    }
+
+    if (addressInput) {
+        addressInput.addEventListener('input', function() {
+            clearTimeout(mapDebounceTimer);
+            mapDebounceTimer = setTimeout(updateGoogleMap, 600);
+        });
+        addressInput.addEventListener('change', updateGoogleMap);
+    }
+
+    if (cepInput) {
+        cepInput.addEventListener('input', function() {
+            clearTimeout(mapDebounceTimer);
+            mapDebounceTimer = setTimeout(updateGoogleMap, 600);
+        });
+        cepInput.addEventListener('change', updateGoogleMap);
+    }
+
+    // Atualiza imediatamente na carga da página
+    updateGoogleMap();
+});
+</script>
 {% endblock %}

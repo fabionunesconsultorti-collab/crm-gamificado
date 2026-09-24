@@ -41,11 +41,14 @@ Na evolução do CRM incorporamos o Módulo Focado em Disparos e Centralização
 4. **Acoplador de API (`utils/waha.py`)**: Arquivo Python que mapeia a documentação oficial da WAHA API. Ele gerencia e consulta em tempo real a URL do seu servidor (`waha_api_url`), Chave de API (`waha_api_key`) e a Sessão ativa (`waha_session_name` / `waha_instance`), persistidas no modelo `WahaInstance` do banco de dados (com suporte a fallback na tabela `Setting`).
 
 ## 5. Mapeamento Relevante das Variáveis do Banco de Dados
-A tabela **Client** possui um escopo estendido para varejo moderno:
+A tabela **Client** possui um escopo estendido para varejo moderno e prospecção ativa:
 - **`public_id`** (UUIDv4): Criado para integração robusta com outros sistemas via API, para não expor a contagem de Identificação do Banco Central (Nº ID).
-- **`cpf`**: Não obrigatório, porém atrelado a integridade Única se acionado (Única String).
+- **`cpf`**: Compatível com **CPF** (11 dígitos / `000.000.000-00`) e **CNPJ** (14 dígitos / `00.000.000/0001-00`). Atrelado a integridade única se informado (`VARCHAR(32)`).
 - **`phone`**: Celular com verificação única, crucial para disparo unificado sem contatar a mesma pessoa com ruídos idênticos.
-- **Parâmetros Estratégicos**: `tier` (nível: bronze, ouro, vip), `loyalty_points` (pontuação baseada na frequência e engajamento), `badges` (tags de segmentação CSV customizáveis) e LGPD (`opt_in`, permitindo auditoria local para envio em conformidade com as regras brasileiras).
+- **`segment` / `category`**: Segmento de mercado / nicho de atuação do contato (ex: *Panificadora, Academia, Restaurante*), preenchido automaticamente pela **Prospecção Ativa (Google Maps)** ou informado manualmente no cadastro.
+- **`instagram`**: Perfil ou URL de Instagram do contato (ex: `@empresa` ou link completo).
+- **`website`**: Site / domínio oficial da empresa prospectada.
+- **Parâmetros Estratégicos**: `tier` (nível: bronze, prata, ouro, vip), `loyalty_points` (pontuação baseada na frequência e engajamento), `badges` (tags de segmentação CSV customizáveis) e LGPD (`opt_in`, permitindo auditoria local para envio em conformidade com as regras brasileiras).
 
 ---
 
@@ -650,6 +653,69 @@ O sistema inclui uma suíte completa de testes unitários para certificar a esta
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local e Sistema Anti-Ban / Anti-Spam WhatsApp.*
+## 12. Prospecção Ativa de Leads (Google Maps Scraper)
+
+O **CRM Pro** conta com um motor nativo de **Prospecção Ativa (Outbound Lead Generation)** integrado ao container Docker `gosom/google-maps-scraper` (porta `8080`).
+
+### 12.1. Arquitetura do Módulo
+
+1. **Interface do Usuário (`/crm/prospeccao`):**
+   - Formulário para submissão de buscas geográficas (ex: *"Academias em Sumaré SP"* ou *"Clínicas odontológicas Campinas"*).
+   - Seletor de profundidade de páginas (1 a 5).
+   - Checkbox para extração de e-mails em websites comerciais.
+   - Tabela de monitoramento em tempo real com polling automático via JavaScript Vanilla (atualiza badges, contadores de minerados e leads importados sem recarregar a tela).
+   - Acesso direto com filtros aplicados ao **Funil Kanban** (`/crm/kanban?badge=job_<id>`) e à **Lista de Clientes** (`/crm/clients?badge=job_<id>`).
+
+2. **Processamento Assíncrono (`app/tasks/lead_scraper.py`):**
+   - Cria o registro de controle na tabela `ScrapingJob`.
+   - Dispara a requisição REST para `http://localhost:8080/api/v1/jobs`.
+   - Executa polling seguro até o container finalizar a extração.
+   - Realiza download dos dados brutos e inicia a higienização.
+
+3. **Higienização e Normalização E.164 (`normalize_brazilian_phone`):**
+   - Limpa caracteres especiais, parênteses e hifens.
+   - Trata DDDs válidos de todo o território brasileiro (11 a 99).
+   - Adiciona o 9º dígito automaticamente para celulares antigos de 8 dígitos.
+   - Diferencia celulares de telefones fixos comerciais (`is_mobile`).
+   - Normaliza para o padrão E.164 brasileiro (`55 + DDD + 9 dígitos` para celulares, `55 + DDD + 8 dígitos` para fixos).
+
+4. **Deduplicação e Conformidade LGPD:**
+   - Consulta o banco antes de inserir para evitar violação de unicidade (`Client.phone`).
+   - Verifica por número completo e sufixo de 8 dígitos.
+   - Se o lead for novo, insere na tabela `Client` com:
+     - `status = 'lead'` (primeira coluna do Funil Kanban).
+     - `lead_source = 'Google Maps'`.
+     - `opt_in = False` (marcado como outbound para conformidade com a LGPD).
+     - `badges = 'outbound_gmaps,job_<id>'`.
+     - `notes` preenchidas com dados ricos de contexto (categoria, nota de avaliação ⭐, contagem de reviews e website).
+
+### 12.2. Recomendações Práticas Contra Bloqueios de IP (Google Maps)
+
+O Google Maps aplica mecanismos de rate-limiting (CAPTCHAs e bloqueios temporários de IP) quando detecta volumes excessivos ou simultâneos de requisições:
+
+1. **Controle de Concorrência:**
+   - Mantenha a variável `CONCURRENCY=4` (padrão configurado no `docker-compose.yml`). Evite valores maiores que 8 em IPs residenciais ou VPS sem proxy.
+2. **Profundidade Recomendada (Depth):**
+   - Utilize **Profundidade 1 ou 2** (~20 a 40 empresas por busca). Essa profundidade é rápida (~40 a 60 segundos), possui baixíssimo risco de flag e traz os negócios mais relevantes e com melhores dados cadastrais.
+3. **Intervalo Entre Buscas:**
+   - Evite disparar múltiplas buscas seguidas simultaneamente no mesmo IP. Aguarde a finalização de uma busca antes de iniciar outra.
+4. **Uso de Proxies Rotativos (Opcional para Grande Escala):**
+   - Caso precise minerar milhares de contatos diariamente, configure proxies rotativos residenciais (ex: BrightData, Smartproxy, IPRoyal) no serviço `maps-scraper` via variável de ambiente ou arquivo de configuração do container:
+   ```yaml
+   environment:
+     - PROXY=http://usuario:senha@ip-do-proxy:porta
+   ```
+
+### 12.3. Testes Automatizados do Scraper
+
+```bash
+# Executar a suíte de testes de Prospecção e Normalização
+./venv/bin/python -m unittest tests/test_lead_scraper.py -v
+```
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp e Prospecção Ativa Google Maps.*
+
 
 

@@ -6,10 +6,12 @@ from collections import defaultdict
 from datetime import datetime
 
 import urllib.parse
-from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance
+from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance, ScrapingJob
 from app.utils.messaging import WhatsAppEngine
 from app.utils.waha import WahaAPI
 from app.utils.ai_handler import AIHandler
+from app.utils.maps_scraper import MapsScraperClient
+from app.tasks.lead_scraper import dispatch_scraping_job
 # ── XP Awards ────────────────────────────────────────────────────────────────
 XP_NOVO_CLIENTE  = 10
 XP_LEAD_PROPOSTA = 20
@@ -26,15 +28,23 @@ def award_xp(user, points, reason):
 @bp.route('/clients')
 @login_required
 def list_clients():
-    clients = Client.query.order_by(Client.updated_at.desc()).all()
-    return render_template('crm/list.html', title='Lista de Clientes', clients=clients)
+    badge = request.args.get('badge')
+    query = Client.query
+    if badge:
+        query = query.filter(Client.badges.contains(badge))
+    clients = query.order_by(Client.updated_at.desc()).all()
+    return render_template('crm/list.html', title='Lista de Clientes', clients=clients, active_badge=badge)
 
 
 # ── Kanban board ──────────────────────────────────────────────────────────────
 @bp.route('/kanban')
 @login_required
 def kanban():
-    all_clients = Client.query.all()
+    badge = request.args.get('badge')
+    query = Client.query
+    if badge:
+        query = query.filter(Client.badges.contains(badge))
+    all_clients = query.all()
     clients_by_status = defaultdict(list)
     for c in all_clients:
         clients_by_status[c.status].append(c)
@@ -43,7 +53,8 @@ def kanban():
     return render_template('crm/kanban.html', title='Funil de Vendas',
                            clients_by_status=clients_by_status,
                            total_clients=len(all_clients),
-                           settings=settings)
+                           settings=settings,
+                           active_badge=badge)
 
 
 # ── Move card via drag-and-drop (AJAX) ───────────────────────────────────────
@@ -84,6 +95,9 @@ def new_client():
     if request.method == 'POST':
         phone = request.form.get('phone')
         cpf = request.form.get('cpf') or None
+        segment = (request.form.get('segment') or '').strip() or None
+        instagram = (request.form.get('instagram') or '').strip() or None
+        website = (request.form.get('website') or '').strip() or None
         
         # Unique validations
         if Client.query.filter_by(phone=phone).first():
@@ -91,22 +105,28 @@ def new_client():
             return redirect(request.url)
             
         if cpf and Client.query.filter_by(cpf=cpf).first():
-            flash('⚠️ Este CPF já está cadastrado.', 'error')
+            flash('⚠️ Este CPF/CNPJ já está cadastrado.', 'error')
             return redirect(request.url)
 
         client = Client(
             # Essencial
             name=request.form.get('name'),
-            cpf=request.form.get('cpf') or None, # Salva None se vazio
-            phone=request.form.get('phone'),
-            email=request.form.get('email'),
-            cep=request.form.get('cep'),
-            address=request.form.get('address'),
+            cpf=cpf, # Salva None se vazio
+            phone=phone,
+            email=request.form.get('email') or None,
+            cep=request.form.get('cep') or None,
+            address=request.form.get('address') or None,
             birth_date=datetime.strptime(request.form.get('birth_date'), '%Y-%m-%d').date() if request.form.get('birth_date') else None,
             status=request.form.get('status', 'lead'),
             notes=request.form.get('notes'),
             assigned_to=current_user.id,
             
+            # Presença Digital e Segmento
+            segment=segment,
+            category=segment,
+            instagram=instagram,
+            website=website,
+
             # Estratégico
             gender=request.form.get('gender'),
             preferred_store_id=request.form.get('preferred_store_id') or None,
@@ -145,6 +165,9 @@ def edit_client(id):
     if request.method == 'POST':
         new_phone = request.form.get('phone')
         new_cpf = request.form.get('cpf') or None
+        new_segment = (request.form.get('segment') or '').strip() or None
+        new_instagram = (request.form.get('instagram') or '').strip() or None
+        new_website = (request.form.get('website') or '').strip() or None
 
         # Verify Uniqueness
         if new_phone != client.phone and Client.query.filter_by(phone=new_phone).first():
@@ -152,7 +175,7 @@ def edit_client(id):
             return redirect(request.url)
         
         if new_cpf and new_cpf != client.cpf and Client.query.filter_by(cpf=new_cpf).first():
-            flash('⚠️ Este CPF já está registrado em outro cliente.', 'error')
+            flash('⚠️ Este CPF/CNPJ já está registrado em outro cliente.', 'error')
             return redirect(request.url)
 
         old_status = client.status
@@ -163,8 +186,14 @@ def edit_client(id):
         client.cep   = request.form.get('cep')
         client.address = request.form.get('address')
         client.notes = request.form.get('notes')
+        client.segment = new_segment
+        client.category = new_segment
+        client.instagram = new_instagram
+        client.website = new_website
         if request.form.get('birth_date'):
             client.birth_date = datetime.strptime(request.form.get('birth_date'), '%Y-%m-%d').date()
+        else:
+            client.birth_date = None
         
         client.gender = request.form.get('gender')
         client.preferred_store_id = request.form.get('preferred_store_id') or None
@@ -266,15 +295,31 @@ def import_batch():
         return jsonify({'ok': False, 'error': 'Dados inválidos'}), 400
         
     count = 0
+    from app.utils.encoding import sanitize_encoding
+
     for row in data:
+        raw_name = sanitize_encoding(row.get('name'))
         phone = ''.join(filter(str.isdigit, str(row.get('phone', ''))))
-        if row.get('name') and phone:
+        if raw_name and phone:
             existing = Client.query.filter_by(phone=phone).first()
             if not existing:
+                segment_val = sanitize_encoding((row.get('segment') or row.get('category') or '').strip()) or None
+                website_val = (row.get('website') or '').strip() or None
+                instagram_val = (row.get('instagram') or '').strip() or None
+                address_val = sanitize_encoding(row.get('address')) or None
+                if website_val and 'instagram.com' in website_val.lower() and not instagram_val:
+                    instagram_val = website_val
+
                 db.session.add(Client(
-                    name=row.get('name'),
+                    name=raw_name,
                     phone=phone,
-                    email=row.get('email'),
+                    email=row.get('email') or None,
+                    cpf=row.get('cpf') or None,
+                    address=address_val,
+                    segment=segment_val,
+                    category=segment_val,
+                    website=website_val,
+                    instagram=instagram_val,
                     status='lead',
                     assigned_to=current_user.id
                 ))
@@ -486,3 +531,69 @@ def api_waha_reset_counters(id):
         'message': f'Contadores da instância "{instance.name}" zerados com sucesso.',
         'stats': instance.get_anti_ban_stats()
     })
+
+
+# ── Prospecção Ativa (Google Maps Scraper) ──────────────────────────────────
+@bp.route('/prospeccao')
+@login_required
+def prospeccao():
+    jobs = ScrapingJob.query.order_by(ScrapingJob.created_at.desc()).limit(100).all()
+    scraper_client = MapsScraperClient()
+    is_online = scraper_client.is_online()
+    return render_template(
+        'crm/prospeccao.html',
+        title='Prospecção Ativa de Leads',
+        jobs=jobs,
+        is_online=is_online
+    )
+
+@bp.route('/prospeccao/start', methods=['POST'])
+@login_required
+def prospeccao_start():
+    data = request.get_json(silent=True) or request.form.to_dict()
+    query = (data.get('query') or data.get('keyword') or '').strip()
+    depth = int(data.get('depth') or 1)
+    extract_emails = str(data.get('extract_emails', 'true')).lower() in ('true', '1', 'on', 'yes')
+
+    if not query:
+        if request.is_json:
+            return jsonify({'ok': False, 'error': 'Informe o termo de pesquisa.'}), 400
+        flash('⚠️ Informe o termo de pesquisa para a prospecção.', 'warning')
+        return redirect(url_for('crm.prospeccao'))
+
+    # Cria o registro do ScrapingJob
+    job = ScrapingJob(
+        query=query,
+        depth=depth,
+        extract_emails=extract_emails,
+        status='queued',
+        created_by_user_id=current_user.id
+    )
+    db.session.add(job)
+    db.session.commit()
+
+    # Dispara processamento em background (RQ ou thread com app context)
+    dispatch_scraping_job(job.id)
+
+    if request.is_json:
+        return jsonify({
+            'ok': True,
+            'message': 'Busca agendada com sucesso!',
+            'job': job.to_dict()
+        })
+
+    flash(f'🚀 Prospecção iniciada para "{query}". Os novos leads serão importados automaticamente.', 'success')
+    return redirect(url_for('crm.prospeccao'))
+
+@bp.route('/prospeccao/job/<int:id>/status', methods=['GET'])
+@login_required
+def prospeccao_job_status(id):
+    job = ScrapingJob.query.get_or_404(id)
+    return jsonify({'ok': True, 'job': job.to_dict()})
+
+@bp.route('/prospeccao/jobs/active', methods=['GET'])
+@login_required
+def prospeccao_active_jobs():
+    active_jobs = ScrapingJob.query.filter(ScrapingJob.status.in_(['queued', 'processing'])).all()
+    return jsonify({'ok': True, 'jobs': [j.to_dict() for j in active_jobs]})
+

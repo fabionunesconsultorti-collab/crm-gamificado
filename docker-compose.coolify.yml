@@ -14,6 +14,7 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - WAHA_API_URL=http://waha:3000
       - WAHA_API_KEY=${WAHA_API_KEY:-admin123}
+      - MAPS_SCRAPER_URL=http://maps-scraper:8080
     volumes:
       - crm_data:/app/data
     depends_on:
@@ -21,6 +22,7 @@ services:
       - redis
       - waha
       - ollama
+      - maps-scraper
     # No Coolify, aponte o domínio principal para a porta 5000 deste serviço
 
   # Banco de Dados PostgreSQL para persistência do WAHA e CRM Pro
@@ -76,10 +78,23 @@ services:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
 
+  # Servidor Maps Scraper (Prospecção Ativa no Coolify)
+  maps-scraper:
+    image: gosom/google-maps-scraper:latest
+    restart: always
+    volumes:
+      - scraper_data:/gmapsdata
+    command: -data-folder /gmapsdata -web
+    environment:
+      - PORT=8080
+      - CONCURRENCY=4
+
 volumes:
   crm_data:
   postgres_data:
   redis_data:
   waha_data:
   ollama_data:
+  scraper_data:
+
 

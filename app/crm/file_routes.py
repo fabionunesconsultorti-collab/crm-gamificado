@@ -8,11 +8,41 @@ from app.crm import bp
 from app.models import FileMappingTemplate
 
 def get_file_dataframe(file):
+    from app.utils.encoding import sanitize_encoding
+
     if file.filename.endswith('.csv'):
-        # Try different encodings or separators if needed
-        return pd.read_csv(file, dtype=str)
+        df = None
+        for enc in ('utf-8-sig', 'utf-8', 'latin1', 'cp1252'):
+            for sep in [None, ';', ',']:
+                try:
+                    file.seek(0)
+                    if sep:
+                        df = pd.read_csv(file, dtype=str, encoding=enc, sep=sep)
+                    else:
+                        df = pd.read_csv(file, dtype=str, encoding=enc, sep=None, engine='python')
+                    if df is not None and (len(df.columns) > 1 or len(df) > 0):
+                        break
+                except Exception:
+                    continue
+            if df is not None and len(df.columns) > 1:
+                break
+
+        if df is None:
+            file.seek(0)
+            df = pd.read_csv(file, dtype=str, encoding='latin1')
+
+        # Sanitiza colunas de texto para evitar mojibake
+        for col in df.select_dtypes(include='object').columns:
+            df[col] = df[col].apply(sanitize_encoding)
+        # Sanitiza também os nomes das colunas
+        df.columns = [sanitize_encoding(str(c)) for c in df.columns]
+        return df
     elif file.filename.endswith(('.xls', '.xlsx')):
-        return pd.read_excel(file, dtype=str)
+        df = pd.read_excel(file, dtype=str)
+        for col in df.select_dtypes(include='object').columns:
+            df[col] = df[col].apply(sanitize_encoding)
+        df.columns = [sanitize_encoding(str(c)) for c in df.columns]
+        return df
     else:
         raise ValueError("Formato de arquivo não suportado. Use .csv ou .xlsx")
 

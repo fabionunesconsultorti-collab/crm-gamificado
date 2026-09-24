@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .prospect-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    @media (min-width: 1024px) {
+        .prospect-grid {
+            grid-template-columns: 380px 1fr;
+        }
+    }
+
+    .badge-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        text-transform: capitalize;
+    }
+    .badge-status.queued {
+        background: rgba(234, 179, 8, 0.15);
+        color: #facc15;
+        border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    .badge-status.processing {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .badge-status.completed {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-status.failed {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .metric-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .pulsing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: currentColor;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(1.2); }
+    }
+
+    .tips-box {
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px dashed rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        padding: 0.85rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+    .tips-box ul {
+        margin: 0.5rem 0 0 1.2rem;
+        padding: 0;
+    }
+    .tips-box li {
+        margin-bottom: 0.25rem;
+    }
+
+    /* Live Progress Card Styles */
+    .live-progress-card {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.06));
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+    }
+    .live-progress-bar-bg {
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 9999px;
+        height: 12px;
+        overflow: hidden;
+        position: relative;
+    }
+    .live-progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1, #3b82f6, #10b981);
+        border-radius: 9999px;
+        transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+    }
+    .stepper-step {
+        opacity: 0.45;
+        transition: all 0.3s ease;
+    }
+    .stepper-step.active {
+        opacity: 1;
+        color: #818cf8;
+        font-weight: 600;
+        transform: scale(1.05);
+    }
+    .stepper-step.done {
+        opacity: 0.9;
+        color: #34d399;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header-container mb-4 d-flex justify-between align-center flex-wrap gap-2">
+    <div>
+        <h1 class="page-title d-flex align-center gap-2">
+            <i class="fa-solid fa-map-location-dot text-warning"></i> Prospecção Ativa (Google Maps)
+        </h1>
+        <p class="text-sm text-muted">
+            Gere leads qualificados B2B extraindo nomes, telefones, e-mails e endereços diretamente do Google Maps para o seu funil de vendas.
+        </p>
+    </div>
+    <div class="d-flex align-center gap-2">
+        {% if is_online %}
+            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <i class="fa-solid fa-circle-check"></i> Scraper Docker Online (Porta 8080)
+            </span>
+        {% else %}
+            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);" title="Certifique-se de que o container 'crm-maps-scraper-1' está ativo na porta 8080">
+                <i class="fa-solid fa-triangle-exclamation"></i> Scraper Docker Offline
+            </span>
+        {% endif %}
+        <a href="{{ url_for('crm.kanban') }}" class="btn-secondary text-sm">
+            <i class="fa-solid fa-filter"></i> Ver Funil Kanban
+        </a>
+    </div>
+</div>
+
+<div class="prospect-grid">
+    <!-- Card do Formulário de Nova Busca -->
+    <div class="card-glass p-4" style="height: fit-content;">
+        <h3 class="font-semibold text-base mb-3 d-flex align-center gap-2">
+            <i class="fa-solid fa-magnifying-glass-location text-primary"></i> Nova Busca de Leads
+        </h3>
+
+        <form id="prospectForm" method="POST" action="{{ url_for('crm.prospeccao_start') }}">
+            <div class="form-group mb-3">
+                <label for="query" class="text-xs font-semibold mb-1 d-block">
+                    Segmento & Localidade <span class="text-danger">*</span>
+                </label>
+                <input type="text" name="query" id="query" class="input-glass w-100" 
+                       placeholder="Ex: Academias em Sumaré SP" required autofocus>
+                <small class="text-xs text-muted mt-1 d-block">
+                    Dica: Seja específico (nicho + cidade/bairro). Ex: <em>"Oficinas mecânicas Americana SP"</em> ou <em>"Clínicas odontológicas Campinas"</em>.
+                </small>
+            </div>
+
+            <div class="form-group mb-3">
+                <label for="depth" class="text-xs font-semibold mb-1 d-block">
+                    Profundidade da Busca (Páginas)
+                </label>
+                <select name="depth" id="depth" class="input-glass w-100">
+                    <option value="1" selected>1 página (~15 a 20 empresas) - Rápido (Recomendado)</option>
+                    <option value="2">2 páginas (~30 a 40 empresas)</option>
+                    <option value="3">3 páginas (~50 a 60 empresas)</option>
+                    <option value="5">5 páginas (~80 a 100 empresas) - Busca Ampla</option>
+                </select>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="d-flex align-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" name="extract_emails" id="extract_emails" value="true" checked>
+                    <span>Extrair e-mails e contatos adicionais dos websites</span>
+                </label>
+            </div>
+
+            <button type="submit" id="btnSubmitProspect" class="btn-primary w-100 py-2 d-flex justify-center align-center gap-2">
+                <i class="fa-solid fa-rocket"></i> Iniciar Prospecção
+            </button>
+        </form>
+
+        <div class="tips-box mt-4">
+            <strong class="text-warning"><i class="fa-solid fa-shield-halved"></i> Boas Práticas Anti-Bloqueio:</strong>
+            <ul>
+                <li>Evite disparar várias buscas simultâneas para o mesmo IP.</li>
+                <li>Utilize profundidade 1 ou 2 para obter dados em menos de 1 minuto com segurança.</li>
+                <li>Os números são automaticamente convertidos para o formato nacional <code>+55 (DDD) 9XXXX-XXXX</code>.</li>
+                <li>Leads duplicados não sobrescrevem contatos já existentes na base.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Seção de Histórico e Monitoramento em Tempo Real -->
+    <div class="card-glass p-4">
+        <div class="d-flex justify-between align-center mb-3">
+            <h3 class="font-semibold text-base d-flex align-center gap-2">
+                <i class="fa-solid fa-list-check text-primary"></i> Histórico & Monitoramento de Prospecções
+            </h3>
+            <span class="text-xs text-muted" id="pollIndicator">
+                <i class="fa-solid fa-rotate fa-spin" style="display:none;" id="pollSpinner"></i> Atualização em tempo real ativa
+            </span>
+        </div>
+
+        <!-- PAINEL VISUAL DE PROGRESSÃO AO VIVO (Exibido para busca em andamento ou inspecionada) -->
+        <div id="liveProgressContainer" class="live-progress-card p-4 mb-4" style="display: none;">
+            <div class="d-flex justify-between align-center mb-2 flex-wrap gap-2">
+                <div class="d-flex align-center gap-2">
+                    <span class="pulsing-dot" id="liveDot" style="color: #6366f1;"></span>
+                    <strong class="text-sm font-semibold" id="liveJobTitle">Prospecção em Andamento</strong>
+                    <span class="badge text-xs" id="liveJobBadge" style="background: rgba(99, 102, 241, 0.25); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4);">
+                        <i class="fa-solid fa-satellite-dish fa-fade"></i> Minerando
+                    </span>
+                </div>
+                <div class="d-flex align-center gap-3">
+                    <span class="text-xs text-muted" id="liveJobElapsed">
+                        <i class="fa-regular fa-clock"></i> 0s decorridos
+                    </span>
+                    <span id="liveJobPercent" class="font-bold text-primary" style="font-size: 1.1rem; min-width: 45px; text-align: right;">
+                        0%
+                    </span>
+                    <button type="button" onclick="closeProgressCard()" title="Fechar painel" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.2rem; font-size: 0.9rem;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barra de Progresso Visual Fluida -->
+            <div class="live-progress-bar-bg mb-2">
+                <div id="liveProgressBar" class="live-progress-bar-fill" style="width: 0%;"></div>
+            </div>
+
+            <!-- Etapa Atual Detalhada -->
+            <div class="d-flex justify-between align-center text-xs flex-wrap gap-2 mt-2">
+                <div class="d-flex align-center gap-2" id="liveJobStepDesc">
+                    <i class="fa-solid fa-spinner fa-spin text-primary" id="liveStepIcon"></i>
+                    <span class="font-semibold text-light" id="liveStepText">Iniciando conexão com o Google Maps...</span>
+                </div>
+                <div class="text-muted" id="liveJobMeta">
+                    Termo: <strong class="text-light" id="liveJobQuery">-</strong>
+                </div>
+            </div>
+
+            <!-- Stepper Visual com Ícones das Fases -->
+            <div class="stepper-grid mt-3 pt-3 d-flex justify-between text-xs flex-wrap gap-2" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="stepper-step text-center flex-1" id="step-1">
+                    <i class="fa-solid fa-satellite d-block mb-1 text-base"></i>
+                    <span>1. Início</span>
+                </div>
+                <div class="stepper-step text-center flex-1" id="step-2">
+                    <i class="fa-solid fa-map-location-dot d-block mb-1 text-base"></i>
+                    <span>2. Google Maps</span>
+                </div>
+                <div class="stepper-step text-center flex-1" id="step-3">
+                    <i class="fa-solid fa-address-book d-block mb-1 text-base"></i>
+                    <span>3. Extração</span>
+                </div>
+                <div class="stepper-step text-center flex-1" id="step-4">
+                    <i class="fa-solid fa-broom-ball d-block mb-1 text-base"></i>
+                    <span>4. Higienização E.164</span>
+                </div>
+                <div class="stepper-step text-center flex-1" id="step-5">
+                    <i class="fa-solid fa-trophy d-block mb-1 text-base"></i>
+                    <span>5. Funil Kanban</span>
+                </div>
+            </div>
+
+            <!-- Botão de Ação Imediata ao Concluir -->
+            <div id="liveSuccessActions" class="mt-3 pt-2 d-flex justify-between align-center" style="display: none; border-top: 1px solid rgba(16, 185, 129, 0.3);">
+                <span class="text-xs text-success font-semibold" id="liveSuccessMsg">
+                    <i class="fa-solid fa-circle-check"></i> Prospecção finalizada com sucesso!
+                </span>
+                <div class="d-flex gap-2">
+                    <a href="#" id="liveBtnKanban" class="btn-primary text-xs py-1 px-3">
+                        <i class="fa-solid fa-filter"></i> Ver Leads no Funil
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABELA DE JOBS -->
+        <div class="table-responsive">
+            <table class="table-glass w-100" id="jobsTable">
+                <thead>
+                    <tr>
+                        <th>ID / Data</th>
+                        <th>Termo Pesquisado</th>
+                        <th style="min-width: 220px;">Progresso / Status</th>
+                        <th>Minerados / Novos</th>
+                        <th>Solicitante</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="jobsTbody">
+                    {% if jobs %}
+                        {% for job in jobs %}
+                        <tr id="job-row-{{ job.id }}" data-job-id="{{ job.id }}" data-status="{{ job.status }}" data-progress="{{ job.progress or 0 }}">
+                            <td>
+                                <strong class="text-xs">#{{ job.id }}</strong><br>
+                                <span class="text-xs text-muted">{{ job.created_at.strftime('%d/%m/%Y %H:%M') if job.created_at else '-' }}</span>
+                            </td>
+                            <td>
+                                <span class="font-semibold text-sm">{{ job.query_term }}</span><br>
+                                <span class="text-xs text-muted">
+                                    Profundidade: {{ job.depth }} | E-mails: {{ 'Sim' if job.extract_emails else 'Não' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div id="status-container-{{ job.id }}">
+                                    {% if job.status == 'processing' %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <div class="d-flex justify-between align-center">
+                                                <span class="badge-status processing" id="badge-{{ job.id }}">
+                                                    <i class="fa-solid fa-spinner fa-spin"></i> Minerando
+                                                </span>
+                                                <span class="text-xs font-semibold text-primary" id="table-percent-{{ job.id }}">{{ job.progress or 10 }}%</span>
+                                            </div>
+                                            <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 4px; overflow: hidden; width: 100%;">
+                                                <div id="table-bar-{{ job.id }}" style="width: {{ job.progress or 10 }}%; height: 100%; background: linear-gradient(90deg, #6366f1, #3b82f6); transition: width 0.3s ease;"></div>
+                                            </div>
+                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.7rem;">{{ job.current_step or 'Em andamento...' }}</span>
+                                        </div>
+                                    {% elif job.status == 'queued' %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge-status queued" id="badge-{{ job.id }}">
+                                                <span class="pulsing-dot"></span> Na Fila
+                                            </span>
+                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.7rem;">Aguardando início...</span>
+                                        </div>
+                                    {% elif job.status == 'completed' %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge-status completed" id="badge-{{ job.id }}">
+                                                <i class="fa-solid fa-check"></i> Concluído (100%)
+                                            </span>
+                                            <span class="text-xs text-muted" style="font-size: 0.7rem;">{{ job.current_step or 'Leads importados' }}</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge-status failed" id="badge-{{ job.id }}">
+                                                <i class="fa-solid fa-triangle-exclamation"></i> Falhou
+                                            </span>
+                                            <span class="text-xs text-muted" style="font-size: 0.7rem;">{{ job.error_message or 'Erro desconhecido' }}</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-center gap-1">
+                                    <span class="metric-pill" title="Total encontrado no Google Maps" id="metric-scraped-{{ job.id }}">
+                                        <i class="fa-solid fa-globe text-muted"></i> {{ job.total_scraped }}
+                                    </span>
+                                    <span>/</span>
+                                    <span class="metric-pill" style="color: #34d399;" title="Novos leads inseridos no CRM" id="metric-imported-{{ job.id }}">
+                                        <i class="fa-solid fa-user-plus"></i> +{{ job.total_imported }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-xs">{{ job.created_by.username if job.created_by else 'Sistema' }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-center gap-1" id="actions-{{ job.id }}">
+                                    {% if job.total_imported > 0 or job.status == 'completed' %}
+                                    <a href="{{ url_for('crm.kanban') }}?badge=job_{{ job.id }}" 
+                                       class="btn-secondary text-xs px-2 py-1" 
+                                       title="Ver leads no Funil Kanban">
+                                        <i class="fa-solid fa-filter text-warning"></i> Funil
+                                    </a>
+                                    <a href="{{ url_for('crm.list_clients') }}?badge=job_{{ job.id }}" 
+                                       class="btn-secondary text-xs px-2 py-1" 
+                                       title="Ver lista de clientes">
+                                        <i class="fa-solid fa-users text-primary"></i> Lista
+                                    </a>
+                                    {% else %}
+                                    <span class="text-xs text-muted">-</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr id="emptyRow">
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="fa-solid fa-folder-open text-lg mb-1 d-block"></i>
+                                Nenhuma prospecção realizada ainda. Digite um segmento e localidade acima para começar!
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Polling dinâmico para monitoramento da progressão em tempo real
+    const POLLING_INTERVAL = 2000;
+    let pollTimer = null;
+    let activeJobId = null;
+
+    async function checkActiveJobs() {
+        const spinner = document.getElementById('pollSpinner');
+        if (spinner) spinner.style.display = 'inline-block';
+
+        try {
+            const resp = await fetch("{{ url_for('crm.prospeccao_active_jobs') }}");
+            if (!resp.ok) return;
+
+            const data = await resp.json();
+            const activeJobs = data.jobs || [];
+
+            if (activeJobs.length > 0) {
+                // Seleciona o job ativo mais recente para alimentar o card de destaque
+                const currentJob = activeJobs[0];
+                activeJobId = currentJob.id;
+                renderLiveProgressCard(currentJob);
+
+                // Atualiza cada linha correspondente na tabela
+                activeJobs.forEach(job => {
+                    const row = document.getElementById(`job-row-${job.id}`);
+                    if (row) {
+                        updateTableRow(row, job);
+                    }
+                });
+            } else {
+                // Nenhum job ativo no momento
+                if (activeJobId) {
+                    // O job que estava ativo concluiu! Busca seu estado final
+                    const finishedJobId = activeJobId;
+                    activeJobId = null;
+                    fetchIndividualJob(finishedJobId);
+                } else {
+                    hideLiveProgressCard();
+                }
+            }
+        } catch (e) {
+            console.warn("Polling error:", e);
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+        }
+    }
+
+    function renderLiveProgressCard(job) {
+        const container = document.getElementById('liveProgressContainer');
+        if (!container) return;
+
+        container.style.display = 'block';
+
+        // Título e Meta
+        document.getElementById('liveJobTitle').textContent = `Minerando: "${job.query || job.query_term}"`;
+        document.getElementById('liveJobQuery').textContent = job.query || job.query_term;
+        document.getElementById('liveJobElapsed').innerHTML = `<i class="fa-regular fa-clock"></i> ${job.elapsed_seconds || 0}s decorridos`;
+        
+        // Progresso
+        const progress = Math.max(5, Math.min(100, job.progress || 10));
+        document.getElementById('liveJobPercent').textContent = `${progress}%`;
+        document.getElementById('liveProgressBar').style.width = `${progress}%`;
+        document.getElementById('liveStepText').textContent = job.current_step || 'Processando busca...';
+
+        // Atualização do Stepper
+        updateStepper(progress);
+
+        // Ações ao concluir
+        const actionsDiv = document.getElementById('liveSuccessActions');
+        if (job.status === 'completed') {
+            actionsDiv.style.display = 'flex';
+            document.getElementById('liveBtnKanban').href = `/crm/kanban?badge=job_${job.id}`;
+            document.getElementById('liveSuccessMsg').innerHTML = `<i class="fa-solid fa-circle-check"></i> Prospecção finalizada! ${job.total_imported} novos leads adicionados.`;
+            document.getElementById('liveJobBadge').className = 'badge text-xs bg-success text-white';
+            document.getElementById('liveJobBadge').innerHTML = '<i class="fa-solid fa-check"></i> Concluído';
+        } else {
+            actionsDiv.style.display = 'none';
+        }
+    }
+
+    function hideLiveProgressCard() {
+        const container = document.getElementById('liveProgressContainer');
+        if (container && container.style.display !== 'none' && !activeJobId) {
+            // Se não há jobs ativos e não foi marcado recentemente, esconde
+            container.style.display = 'none';
+        }
+    }
+
+    function updateStepper(progress) {
+        const s1 = document.getElementById('step-1');
+        const s2 = document.getElementById('step-2');
+        const s3 = document.getElementById('step-3');
+        const s4 = document.getElementById('step-4');
+        const s5 = document.getElementById('step-5');
+
+        if (!s1) return;
+
+        // Reset
+        [s1, s2, s3, s4, s5].forEach(s => { s.className = 'stepper-step text-center flex-1'; });
+
+        if (progress >= 10) s1.className += (progress > 20 ? ' done' : ' active');
+        if (progress >= 20) s2.className += (progress > 55 ? ' done' : ' active');
+        if (progress >= 55) s3.className += (progress > 80 ? ' done' : ' active');
+        if (progress >= 80) s4.className += (progress >= 95 ? ' done' : ' active');
+        if (progress >= 95) s5.className += (progress >= 100 ? ' done' : ' active');
+    }
+
+    async function fetchIndividualJob(jobId) {
+        try {
+            const resp = await fetch(`/crm/prospeccao/job/${jobId}/status`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.job) {
+                    const row = document.getElementById(`job-row-${jobId}`);
+                    if (row) {
+                        updateTableRow(row, data.job);
+                    }
+                    if (data.job.status === 'completed') {
+                        renderLiveProgressCard(data.job);
+                        // Suavemente oculta o banner de destaque após 10 segundos
+                        setTimeout(() => {
+                            const c = document.getElementById('liveProgressContainer');
+                            if (c && !activeJobId) c.style.display = 'none';
+                        }, 10000);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Error fetching individual job status:", e);
+        }
+    }
+
+    function updateTableRow(row, job) {
+        row.setAttribute('data-status', job.status);
+        row.setAttribute('data-progress', job.progress);
+
+        const statusContainer = document.getElementById(`status-container-${job.id}`);
+        if (statusContainer) {
+            if (job.status === 'processing') {
+                statusContainer.innerHTML = `
+                    <div class="d-flex flex-column gap-1">
+                        <div class="d-flex justify-between align-center">
+                            <span class="badge-status processing">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Minerando
+                            </span>
+                            <span class="text-xs font-semibold text-primary">${job.progress}%</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 4px; overflow: hidden; width: 100%;">
+                            <div style="width: ${job.progress}%; height: 100%; background: linear-gradient(90deg, #6366f1, #3b82f6); transition: width 0.3s ease;"></div>
+                        </div>
+                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.current_step || 'Em andamento...'}</span>
+                    </div>
+                `;
+            } else if (job.status === 'queued') {
+                statusContainer.innerHTML = `
+                    <div class="d-flex flex-column gap-1">
+                        <span class="badge-status queued">
+                            <span class="pulsing-dot"></span> Na Fila
+                        </span>
+                        <span class="text-xs text-muted" style="font-size: 0.7rem;">Aguardando início...</span>
+                    </div>
+                `;
+            } else if (job.status === 'completed') {
+                statusContainer.innerHTML = `
+                    <div class="d-flex flex-column gap-1">
+                        <span class="badge-status completed">
+                            <i class="fa-solid fa-check"></i> Concluído (100%)
+                        </span>
+                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.current_step || 'Leads importados'}</span>
+                    </div>
+                `;
+            } else {
+                statusContainer.innerHTML = `
+                    <div class="d-flex flex-column gap-1">
+                        <span class="badge-status failed">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Falhou
+                        </span>
+                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.error_message || 'Erro no processamento'}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Métricas
+        const scrapedPill = document.getElementById(`metric-scraped-${job.id}`);
+        if (scrapedPill) {
+            scrapedPill.innerHTML = `<i class="fa-solid fa-globe text-muted"></i> ${job.total_scraped || 0}`;
+        }
+        const importedPill = document.getElementById(`metric-imported-${job.id}`);
+        if (importedPill) {
+            importedPill.innerHTML = `<i class="fa-solid fa-user-plus"></i> +${job.total_imported || 0}`;
+        }
+
+        // Ações
+        const actionsTd = document.getElementById(`actions-${job.id}`);
+        if (actionsTd && (job.total_imported > 0 || job.status === 'completed')) {
+            actionsTd.innerHTML = `
+                <div class="d-flex align-center gap-1">
+                    <a href="/crm/kanban?badge=job_${job.id}" class="btn-secondary text-xs px-2 py-1" title="Ver leads no Funil Kanban">
+                        <i class="fa-solid fa-filter text-warning"></i> Funil
+                    </a>
+                    <a href="/crm/clients?badge=job_${job.id}" class="btn-secondary text-xs px-2 py-1" title="Ver lista de clientes">
+                        <i class="fa-solid fa-users text-primary"></i> Lista
+                    </a>
+                </div>
+            `;
+        }
+    }
+
+    // Inicia verificação na carga inicial
+    checkActiveJobs();
+
+    // Inicia o polling contínuo a cada 2 segundos
+    pollTimer = setInterval(checkActiveJobs, POLLING_INTERVAL);
+
+    // Tratamento de envio do formulário com feedback visual imediato
+    const prospectForm = document.getElementById('prospectForm');
+    const btnSubmit = document.getElementById('btnSubmitProspect');
+    if (prospectForm && btnSubmit) {
+        prospectForm.addEventListener('submit', function() {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Agendando Prospecção...';
+        });
+    }
+</script>
+{% endblock %}

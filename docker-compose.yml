@@ -62,3 +62,17 @@ services:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
 
+  # Scraper Google Maps para Prospecção Ativa (Lead Generation)
+  maps-scraper:
+    image: gosom/google-maps-scraper:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./scraper_data:/gmapsdata
+    command: -data-folder /gmapsdata -web
+    environment:
+      - PORT=8080
+      - CONCURRENCY=4
+
+

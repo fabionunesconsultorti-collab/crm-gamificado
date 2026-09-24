@@ -103,10 +103,27 @@
             {{ total_clients }} clientes no funil &mdash; Arraste para mover entre etapas
         </div>
     </div>
-    <a href="{{ url_for('crm.new_client') }}" class="btn-primary w-auto">
-        <i class="fa-solid fa-plus"></i> Novo Cliente
-    </a>
+    <div class="d-flex align-center gap-2">
+        {% if active_badge %}
+        <a href="{{ url_for('crm.kanban') }}" class="btn-secondary text-sm" style="color: #f87171;">
+            <i class="fa-solid fa-xmark"></i> Limpar Filtro ({{ active_badge }})
+        </a>
+        {% endif %}
+        <a href="{{ url_for('crm.new_client') }}" class="btn-primary w-auto">
+            <i class="fa-solid fa-plus"></i> Novo Cliente
+        </a>
+    </div>
 </div>
+
+{% if active_badge %}
+<div class="card-glass p-3 mb-3 d-flex justify-between align-center" style="border-left: 4px solid var(--primary-color);">
+    <div class="d-flex align-center gap-2 text-sm">
+        <i class="fa-solid fa-filter text-warning"></i>
+        <span>Exibindo leads filtrados pela tag: <strong>{{ active_badge }}</strong></span>
+    </div>
+    <a href="{{ url_for('crm.kanban') }}" class="text-xs text-muted">Remover filtro</a>
+</div>
+{% endif %}
 
 <div class="kanban-wrap" id="kanbanBoard">
 
@@ -132,31 +149,69 @@
         <div class="kanban-cards" data-status="{{ status }}" id="col-{{ status }}">
             {% for client in clients_by_status[status] %}
             <div class="kanban-card" draggable="true" data-id="{{ client.id }}">
-                <div class="d-flex justify-between align-start mb-1">
+                <div class="d-flex justify-between align-start mb-1 flex-wrap gap-1">
                     <div class="kanban-card-name">{{ client.name }}</div>
-                    {% if client.tier == 'vip' %}
-                    <span class="badge" style="background:#f59e0b;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">VIP</span>
-                    {% elif client.tier == 'ouro' %}
-                    <span class="badge" style="background:#eab308;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">Ouro</span>
-                    {% endif %}
+                    <div class="d-flex gap-1">
+                        {% if client.badges and 'outbound_gmaps' in client.badges %}
+                        <span class="badge" style="background:#0284c7;color:white;font-size:0.6rem;padding:0.1rem 0.35rem;" title="Lead gerado via Prospecção Google Maps">
+                            <i class="fa-solid fa-map-pin"></i> Maps
+                        </span>
+                        {% endif %}
+                        {% if client.tier == 'vip' %}
+                        <span class="badge" style="background:#f59e0b;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">VIP</span>
+                        {% elif client.tier == 'ouro' %}
+                        <span class="badge" style="background:#eab308;color:white;font-size:0.65rem;padding:0.15rem 0.4rem;">Ouro</span>
+                        {% endif %}
+                    </div>
                 </div>
+                {% if client.display_segment %}
+                <div class="text-xs mb-1 d-flex align-center gap-1 font-semibold" style="color: #94a3b8;" title="Segmento do Contato">
+                    <i class="fa-solid fa-briefcase text-warning" style="font-size: 0.65rem;"></i> {{ client.display_segment }}
+                </div>
+                {% endif %}
                 <div class="kanban-card-phone"><i class="fa-solid fa-phone kanban-icon-phone"></i> {{ client.phone }}</div>
                 {% if client.email %}
                 <div class="kanban-card-email"><i class="fa-solid fa-envelope kanban-icon-email"></i> {{ client.email }}</div>
+                {% endif %}
+                {% if client.instagram %}
+                <div class="kanban-card-email">
+                    <i class="fa-brands fa-instagram" style="color: #E1306C;"></i>
+                    <a href="{{ client.instagram_url }}" target="_blank" rel="noopener noreferrer" style="color: #cbd5e1; text-decoration: underline; text-decoration-color: rgba(225, 48, 108, 0.4);" title="Abrir Instagram">
+                        {{ client.instagram }}
+                    </a>
+                </div>
+                {% endif %}
+                {% if client.website %}
+                <div class="kanban-card-email">
+                    <i class="fa-solid fa-globe text-primary"></i>
+                    <a href="{{ client.website_url }}" target="_blank" rel="noopener noreferrer" style="color: #cbd5e1; text-decoration: underline; text-decoration-color: rgba(99, 102, 241, 0.4);" title="Abrir Website">
+                        {{ client.website | truncate(30) }}
+                    </a>
+                </div>
                 {% endif %}
                 {% if client.notes %}
                 <div class="kanban-card-notes">"{{ client.notes }}"</div>
                 {% endif %}
                 <div class="kanban-card-actions">
-                    <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn-solid primary flex-1 text-center">
-                        <i class="fa-solid fa-pen"></i> Editar
+                    <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn-solid primary flex-1 text-center" title="Editar Contato">
+                        <i class="fa-solid fa-pen"></i>
                     </a>
+                    {% if client.instagram %}
+                    <a href="{{ client.instagram_url }}" target="_blank" rel="noopener noreferrer" class="icon-btn-solid flex-1 text-center" style="background: rgba(225, 48, 108, 0.15); color: #E1306C; border-color: rgba(225, 48, 108, 0.3);" title="Abrir Instagram">
+                        <i class="fa-brands fa-instagram"></i>
+                    </a>
+                    {% endif %}
+                    {% if client.website %}
+                    <a href="{{ client.website_url }}" target="_blank" rel="noopener noreferrer" class="icon-btn-solid flex-1 text-center" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border-color: rgba(14, 165, 233, 0.3);" title="Abrir Website">
+                        <i class="fa-solid fa-globe"></i>
+                    </a>
+                    {% endif %}
                     <a href="{{ url_for('crm.message_client', id=client.id) }}"
                        class="icon-btn-solid success flex-1 text-center" title="Enviar Mensagem / WA">
                         <i class="fa-brands fa-whatsapp"></i>
                     </a>
                     <form action="{{ url_for('crm.delete_client', id=client.id) }}" method="post" class="flex-1 d-flex" onsubmit="return confirm('Excluir {{ client.name }}?')">
-                        <button class="icon-btn-solid danger w-100 justify-center">
+                        <button class="icon-btn-solid danger w-100 justify-center" title="Excluir">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </form>
