@@ -3,11 +3,12 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import db
 from app.admin import bp
-from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog, WahaInstance
+from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog, WahaInstance, KnowledgeDoc
 from app.utils.waha import WahaAPI
 from app.utils.exports import ReportGenerator
 from app.utils.ai_handler import AIHandler
 from app.utils.backup_manager import BackupManager
+from app.utils.rag_engine import RAGEngine
 import os
 import io
 from datetime import datetime
@@ -77,6 +78,9 @@ def settings():
             'whatsapp_bot_work_hours_enabled', 'whatsapp_bot_work_hours_start',
             'whatsapp_bot_work_hours_end', 'whatsapp_bot_out_of_hours_msg',
             'whatsapp_bot_ignore_groups', 'whatsapp_bot_ignore_broadcast',
+            # Parâmetros Avançados e RAG
+            'whatsapp_bot_temperature', 'whatsapp_bot_max_tokens',
+            'whatsapp_bot_rag_enabled', 'whatsapp_bot_rag_top_k',
             # Parâmetros de Backup e Restauração
             'backup_auto_enabled', 'backup_frequency', 'backup_time', 'backup_retention_days',
             'backup_destination', 'gdrive_enabled', 'gdrive_folder_id', 'gdrive_credentials_json'
@@ -685,3 +689,367 @@ def ai_models():
     url = request.args.get('url')
     result = AIHandler.get_available_models(url)
     return jsonify(result)
+
+
+# ── Base de Conhecimento RAG ──────────────────────────────────────────────────
+@bp.route('/knowledge', methods=['GET'])
+@login_required
+@admin_required
+def knowledge():
+    """Painel interativo para gerenciamento e treinamento da base de conhecimento do bot."""
+    docs = KnowledgeDoc.query.order_by(KnowledgeDoc.created_at.desc()).all()
+    
+    total_docs = len(docs)
+    active_docs = len([d for d in docs if d.is_active])
+    total_chunks = sum((d.chunks_count or 0) for d in docs if d.is_active)
+    
+    # Checagem rápida de status do ChromaDB e Ollama
+    chroma_ok = RAGEngine.get_collection() is not None
+    ollama_info = AIHandler.get_available_models()
+    
+    # Parâmetros atuais do bot
+    ai_cfg = AIHandler.get_config()
+
+    return render_template(
+        'admin/knowledge.html',
+        docs=docs,
+        total_docs=total_docs,
+        active_docs=active_docs,
+        total_chunks=total_chunks,
+        chroma_ok=chroma_ok,
+        ollama_info=ollama_info,
+        ai_cfg=ai_cfg
+    )
+
+
+@bp.route('/knowledge/faq', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_add_faq():
+    """Adiciona uma pergunta e resposta rápida na base de conhecimento e indexa no ChromaDB."""
+    question = request.form.get('question', '').strip()
+    answer = request.form.get('answer', '').strip()
+    category = request.form.get('category', 'faq').strip().lower()
+
+    if not question or not answer:
+        flash('⚠️ Preencha tanto a pergunta quanto a resposta oficial.', 'warning')
+        return redirect(url_for('admin.knowledge'))
+
+    title = f"FAQ: {question[:80]}"
+    full_content = f"Pergunta do Cliente: {question}\nResposta Oficial da Empresa: {answer}"
+
+    doc = KnowledgeDoc(
+        title=title,
+        category=category,
+        doc_type='faq',
+        content=full_content,
+        is_active=True
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    # Indexa no motor RAG
+    chunks_indexed = RAGEngine.index_document(
+        doc_id=doc.id,
+        title=doc.title,
+        content=doc.content,
+        category=doc.category
+    )
+    doc.chunks_count = chunks_indexed
+    db.session.commit()
+
+    flash(f'✅ FAQ "{question[:50]}..." adicionada e indexada ({chunks_indexed} vetores criados)!', 'success')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/doc', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_add_doc():
+    """Cadastra um documento de texto longo (política, tabela de preços, regras comerciais)."""
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    category = request.form.get('category', 'geral').strip().lower()
+
+    if not title or not content:
+        flash('⚠️ Preencha o título e o conteúdo completo do documento.', 'warning')
+        return redirect(url_for('admin.knowledge'))
+
+    doc = KnowledgeDoc(
+        title=title,
+        category=category,
+        doc_type='text',
+        content=content,
+        is_active=True
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    chunks_indexed = RAGEngine.index_document(
+        doc_id=doc.id,
+        title=doc.title,
+        content=doc.content,
+        category=doc.category
+    )
+    doc.chunks_count = chunks_indexed
+    db.session.commit()
+
+    flash(f'✅ Documento "{title}" cadastrado e indexado ({chunks_indexed} chunks gerados)!', 'success')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/upload', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_upload_file():
+    """Processa upload de arquivos PDF, TXT ou Markdown, fatiando e indexando no RAG."""
+    file = request.files.get('file')
+    category = request.form.get('category', 'documentos').strip().lower()
+    custom_title = request.form.get('title', '').strip()
+
+    if not file or not file.filename:
+        flash('⚠️ Selecione um arquivo válido para upload.', 'warning')
+        return redirect(url_for('admin.knowledge'))
+
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext not in ['.pdf', '.txt', '.md']:
+        flash('⚠️ Formato não suportado. Envie arquivos .pdf, .txt ou .md.', 'warning')
+        return redirect(url_for('admin.knowledge'))
+
+    title = custom_title or filename
+    content = ""
+
+    try:
+        if ext == '.pdf':
+            content = RAGEngine.extract_text_from_pdf(file.stream)
+            doc_type = 'pdf'
+        else:
+            content = file.stream.read().decode('utf-8', errors='ignore')
+            doc_type = 'text'
+
+        if not content or len(content.strip()) < 10:
+            flash('⚠️ Não foi possível extrair texto legível deste arquivo.', 'warning')
+            return redirect(url_for('admin.knowledge'))
+
+        doc = KnowledgeDoc(
+            title=title,
+            category=category,
+            doc_type=doc_type,
+            content=content.strip(),
+            is_active=True
+        )
+        db.session.add(doc)
+        db.session.commit()
+
+        chunks_indexed = RAGEngine.index_document(
+            doc_id=doc.id,
+            title=doc.title,
+            content=doc.content,
+            category=doc.category
+        )
+        doc.chunks_count = chunks_indexed
+        db.session.commit()
+
+        flash(f'✅ Arquivo "{filename}" processado com sucesso ({chunks_indexed} trechos indexados)!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Erro ao processar o arquivo: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/toggle/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_toggle(id):
+    """Ativa ou desativa temporariamente um documento na base de busca do bot."""
+    doc = KnowledgeDoc.query.get_or_404(id)
+    doc.is_active = not doc.is_active
+    
+    if not doc.is_active:
+        RAGEngine.remove_document(doc.id)
+    else:
+        chunks = RAGEngine.index_document(doc.id, doc.title, doc.content, doc.category)
+        doc.chunks_count = chunks
+
+    db.session.commit()
+    status_str = "ativado" if doc.is_active else "desativado"
+    flash(f'Documento "{doc.title}" {status_str} com sucesso.', 'info')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_delete(id):
+    """Exclui permanentemente um documento do banco e seus vetores do ChromaDB."""
+    doc = KnowledgeDoc.query.get_or_404(id)
+    title = doc.title
+    RAGEngine.remove_document(doc.id)
+    db.session.delete(doc)
+    db.session.commit()
+    flash(f'🗑️ Conhecimento "{title}" removido com sucesso.', 'info')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/reindex-all', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_reindex_all():
+    """Reindexa todos os documentos ativos no banco vetorial."""
+    docs = KnowledgeDoc.query.filter_by(is_active=True).all()
+    total_reindexed = 0
+    for doc in docs:
+        c = RAGEngine.index_document(doc.id, doc.title, doc.content, doc.category)
+        doc.chunks_count = c
+        total_reindexed += c
+    db.session.commit()
+    flash(f'🔄 Reindexação concluída: {len(docs)} documentos e {total_reindexed} chunks processados no ChromaDB.', 'success')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/test-search', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_test_search():
+    """Playground interativo: simula uma pergunta do cliente, busca no RAG e gera resposta com IA."""
+    data = request.json or {}
+    query = data.get('query', '').strip()
+    if not query:
+        return jsonify({'ok': False, 'error': 'Digite uma pergunta para testar.'}), 400
+
+    cfg = AIHandler.get_config()
+    top_k = int(data.get('top_k', cfg.get('rag_top_k', 3)))
+
+    import time
+    start_time = time.time()
+    snippets = RAGEngine.search_relevant_snippets(query, top_k=top_k)
+    search_duration = round((time.time() - start_time) * 1000, 2)
+
+    # Gera a resposta com a IA considerando o RAG
+    reply_start = time.time()
+    reply_text, ai_error = AIHandler.generate_chat_reply(
+        customer_message=query,
+        include_rag=True
+    )
+    reply_duration = round((time.time() - reply_start) * 1000, 2)
+
+    return jsonify({
+        'ok': True,
+        'query': query,
+        'snippets': snippets,
+        'snippets_found': len(snippets),
+        'search_duration_ms': search_duration,
+        'reply_text': reply_text,
+        'reply_duration_ms': reply_duration,
+        'ai_error': ai_error,
+        'model_used': cfg.get('ollama_model') if cfg['provider'] == 'ollama' else cfg['provider']
+    })
+
+
+# ══════════════════════════════════════════════════════════════════
+#  APARÊNCIA — Logo do cliente e tema visual
+# ══════════════════════════════════════════════════════════════════
+
+ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'svg', 'webp'}
+MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+def _get_uploads_dir():
+    """Retorna o caminho absoluto da pasta de uploads, criando-a se necessário."""
+    uploads = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads')
+    uploads = os.path.abspath(uploads)
+    os.makedirs(uploads, exist_ok=True)
+    return uploads
+
+
+@bp.route('/settings/upload-logo', methods=['POST'])
+@login_required
+@admin_required
+def upload_logo():
+    """Faz upload da logo do cliente e salva a URL na tabela Setting."""
+    if 'logo' not in request.files:
+        return jsonify({'success': False, 'error': 'Nenhum arquivo enviado.'}), 400
+
+    file = request.files['logo']
+    if not file or file.filename == '':
+        return jsonify({'success': False, 'error': 'Arquivo inválido.'}), 400
+
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in ALLOWED_LOGO_EXTENSIONS:
+        return jsonify({
+            'success': False,
+            'error': f'Formato "{ext}" não suportado. Use PNG, JPG, SVG ou WebP.'
+        }), 400
+
+    # Verifica tamanho lendo o stream
+    file.seek(0, 2)  # vai para o fim
+    size = file.tell()
+    file.seek(0)     # volta ao início
+    if size > MAX_LOGO_SIZE_BYTES:
+        return jsonify({'success': False, 'error': 'Arquivo muito grande. Máximo 2 MB.'}), 400
+
+    uploads_dir = _get_uploads_dir()
+    filename = f'company_logo.{ext}'
+    filepath = os.path.join(uploads_dir, filename)
+    file.save(filepath)
+
+    logo_url = f'/static/uploads/{filename}'
+    Setting.set_val('company_logo_url', logo_url, 'Logo da empresa exibida na sidebar')
+
+    return jsonify({'success': True, 'url': logo_url})
+
+
+@bp.route('/settings/remove-logo', methods=['POST'])
+@login_required
+@admin_required
+def remove_logo():
+    """Remove a logo do cliente (arquivo e registro no banco)."""
+    current_url = Setting.get_val('company_logo_url', '')
+    if current_url:
+        # Tenta remover o arquivo físico
+        uploads_dir = _get_uploads_dir()
+        filename = os.path.basename(current_url)
+        filepath = os.path.join(uploads_dir, filename)
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except OSError:
+            pass
+        Setting.set_val('company_logo_url', '', 'Logo da empresa exibida na sidebar')
+
+    return jsonify({'success': True})
+
+
+@bp.route('/settings/save-appearance', methods=['POST'])
+@login_required
+@admin_required
+def save_appearance():
+    """Salva configurações de aparência: tema, nome da empresa, tagline e tema customizado."""
+    import json
+    data = request.get_json(silent=True) or {}
+
+    allowed_keys = {
+        'theme_name':       'Tema visual ativo',
+        'company_name':     'Nome da empresa exibido na sidebar',
+        'company_tagline':  'Tagline exibida abaixo do logo/nome',
+        'sidebar_accent':   'Cor de destaque customizada (hex)',
+    }
+
+    saved = []
+    for key, description in allowed_keys.items():
+        if key in data:
+            Setting.set_val(key, str(data[key]).strip(), description)
+            saved.append(key)
+
+    if 'custom_theme_config' in data:
+        val = data['custom_theme_config']
+        if isinstance(val, dict):
+            val = json.dumps(val)
+        Setting.set_val('custom_theme_config', str(val).strip(), 'Configuração de cores do tema personalizado (JSON)')
+        saved.append('custom_theme_config')
+
+    return jsonify({'success': True, 'saved': saved})
+

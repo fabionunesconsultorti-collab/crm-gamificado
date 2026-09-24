@@ -238,10 +238,1117 @@
     <button class="tab-btn {% if active_tab == 'backup' %}active{% endif %}" onclick="switchTab('backup', this)">
         <i class="fa-solid fa-cloud-arrow-up text-primary"></i> Backup & Restauração
     </button>
+    <button class="tab-btn {% if active_tab == 'appearance' %}active{% endif %}" onclick="switchTab('appearance', this)">
+        <i class="fa-solid fa-palette" style="color:#a855f7"></i> Aparência
+    </button>
 </div>
 
 
+<!-- Tab: Aparência -->
+<div id="tab-appearance" class="tab-content {% if active_tab == 'appearance' %}active{% endif %}">
+<style>
+/* ── Appearance tab styles ── */
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+.theme-card {
+    border-radius: 12px;
+    border: 2px solid var(--glass-border);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    background: rgba(255,255,255,0.03);
+}
+.theme-card:hover { border-color: rgba(255,255,255,0.25); transform: translateY(-2px); }
+.theme-card.selected { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(99,102,241,0.25); }
+.theme-card.selected .theme-check { display: flex; }
+.theme-check {
+    display: none;
+    position: absolute; top: 8px; right: 8px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--primary-color); color: white;
+    align-items: center; justify-content: center;
+    font-size: 0.65rem;
+}
+.theme-swatch {
+    display: flex; gap: 4px; margin-bottom: 0.6rem; height: 30px; border-radius: 6px; overflow: hidden;
+}
+.theme-swatch-item { flex: 1; border-radius: 3px; }
+.theme-name { font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
+.theme-desc { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+.logo-upload-zone {
+    border: 2px dashed var(--glass-border);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.02);
+    position: relative;
+}
+.logo-upload-zone:hover, .logo-upload-zone.drag-over {
+    border-color: var(--primary-color);
+    background: rgba(99,102,241,0.06);
+}
+.logo-preview-wrap {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+}
+.logo-preview-img {
+    width: 56px; height: 56px; object-fit: contain;
+    border-radius: 8px; background: rgba(255,255,255,0.06);
+    border: 1px solid var(--glass-border); padding: 4px;
+}
+.appearance-section {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.appearance-section-title {
+    font-size: 0.78rem; font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 0.5rem;
+}
+
+/* ── Theme Editor Styles ── */
+.theme-editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+@media (max-width: 820px) {
+    .theme-editor-grid { grid-template-columns: 1fr; }
+}
+.theme-editor-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+.editor-color-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    gap: 0.75rem;
+    transition: border-color 0.2s;
+}
+.editor-color-row:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+}
+.editor-color-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.editor-color-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.1rem;
+}
+.editor-color-desc {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+.editor-color-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.color-picker-bubble {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--glass-border);
+    border-radius: 50%;
+    cursor: pointer;
+    background: none;
+    padding: 0;
+    overflow: hidden;
+    transition: transform 0.15s, border-color 0.15s;
+}
+.color-picker-bubble:hover {
+    transform: scale(1.1);
+    border-color: var(--primary-color);
+}
+.color-picker-bubble::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker-bubble::-webkit-color-swatch { border: none; border-radius: 50%; }
+.color-hex-input {
+    width: 82px !important;
+    padding: 0.35rem 0.5rem !important;
+    font-family: monospace;
+    font-size: 0.75rem !important;
+    text-align: center;
+    border-radius: 6px !important;
+}
+.btn-xs-theme {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-xs-theme:hover {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+.theme-editor-preview-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+.preview-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+.ui-mockup-frame {
+    display: flex;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    overflow: hidden;
+    height: 250px;
+    background: var(--bg-dark);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    transition: background 0.2s;
+}
+.ui-mock-sidebar {
+    width: 100px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    padding: 0.6rem 0.4rem;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s;
+}
+.mock-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+.mock-brand-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--primary-color);
+}
+.mock-brand-text {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-main);
+}
+.mock-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+.mock-nav-item {
+    font-size: 0.62rem;
+    padding: 0.3rem 0.4rem;
+    border-radius: 4px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.mock-nav-item.active {
+    background: var(--nav-active-bg, rgba(99,102,241,0.2));
+    color: var(--primary-color);
+    font-weight: 700;
+}
+.mock-user {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--glass-border);
+}
+.mock-avatar {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    font-size: 0.55rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+.mock-username {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.ui-mock-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    gap: 0.6rem;
+    overflow: hidden;
+}
+.mock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+.mock-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+.mock-btn-primary {
+    font-size: 0.62rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    font-weight: 600;
+    cursor: default;
+}
+.mock-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    flex: 1;
+}
+.mock-card {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s;
+}
+.mock-card-label {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+}
+.mock-card-val {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0.15rem 0;
+}
+.mock-badge {
+    align-self: flex-start;
+    font-size: 0.55rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.18);
+    color: var(--accent-color);
+    font-weight: 700;
+}
+.mock-input {
+    width: 100%;
+    margin-top: 0.3rem;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.55rem;
+    background: var(--input-bg, rgba(255,255,255,0.05));
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    color: var(--text-main);
+}
+</style>
+
+<div style="max-width:860px;">
+
+    <!-- Identidade da Empresa -->
+    <div class="appearance-section">
+        <div class="appearance-section-title">
+            <i class="fa-solid fa-building" style="color:var(--primary-color)"></i>
+            Identidade &amp; Logo da Empresa
+        </div>
+
+        <!-- Preview da logo atual -->
+        <div id="logo-current-wrap" style="display: {{ 'flex' if get_setting('company_logo_url') else 'none' }};" class="logo-preview-wrap">
+            <img id="logo-preview-img" src="{{ get_setting('company_logo_url', '') }}" alt="Logo" class="logo-preview-img">
+            <div style="flex:1">
+                <div class="font-semibold text-sm">Logo atual</div>
+                <div class="text-xs text-muted" id="logo-preview-filename">{{ get_setting('company_logo_url', '').split('/')[-1] }}</div>
+            </div>
+            <button type="button" class="btn-danger btn-xs" onclick="removeLogo()">
+                <i class="fa-solid fa-trash"></i> Remover
+            </button>
+        </div>
+
+        <!-- Zona de upload -->
+        <div class="logo-upload-zone" id="logoDropZone" onclick="document.getElementById('logoFileInput').click()">
+            <input type="file" id="logoFileInput" accept=".png,.jpg,.jpeg,.svg,.webp" style="display:none" onchange="handleLogoSelect(this)">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.8rem; color:var(--primary-color); margin-bottom:0.5rem;"></i>
+            <div class="font-semibold text-sm" style="margin-bottom:0.25rem;">Arraste a logo aqui ou clique para selecionar</div>
+            <div class="text-xs text-muted">PNG, JPG, SVG, WebP &bull; Máximo 2 MB</div>
+        </div>
+        <div id="logo-upload-feedback" class="text-xs mt-2" style="display:none;"></div>
+
+        <!-- Nome e tagline -->
+        <div class="grid grid-cols-2 gap-3 mt-3">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="input-company-name">Nome da Empresa</label>
+                <input type="text" id="input-company-name" class="input-glass"
+                    placeholder="Ex.: Minha Empresa"
+                    value="{{ get_setting('company_name', 'CRM PRO') }}">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="input-company-tagline">Tagline / Slogan</label>
+                <input type="text" id="input-company-tagline" class="input-glass"
+                    placeholder="Ex.: GESTÃO DE VENDAS"
+                    value="{{ get_setting('company_tagline', 'GESTÃO DE VENDAS') }}">
+            </div>
+        </div>
+        <button class="btn-primary btn-sm mt-3" onclick="saveIdentity()">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Identidade
+        </button>
+        <span id="identity-feedback" class="text-xs text-muted ms-2" style="display:none;"></span>
+    </div>
+
+    <!-- Seletor de Tema -->
+    <div class="appearance-section">
+        <div class="appearance-section-title">
+            <i class="fa-solid fa-swatchbook" style="color:#a855f7"></i>
+            Tema Visual da Interface
+        </div>
+        <p class="text-xs text-muted mb-3">O tema é aplicado imediatamente na interface para todos os usuários.</p>
+
+        <div class="theme-grid" id="themeGrid">
+            <!-- dark-indigo -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'dark-indigo' %}selected{% endif %}"
+                 onclick="applyTheme('dark-indigo', this)" data-theme-id="dark-indigo">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#0f172a"></div>
+                    <div class="theme-swatch-item" style="background:#1e293b"></div>
+                    <div class="theme-swatch-item" style="background:#6366f1"></div>
+                    <div class="theme-swatch-item" style="background:#10b981"></div>
+                </div>
+                <div class="theme-name">Dark Indigo</div>
+                <div class="theme-desc">Padrão &bull; Índigo/Roxo</div>
+            </div>
+            <!-- dark-emerald -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'dark-emerald' %}selected{% endif %}"
+                 onclick="applyTheme('dark-emerald', this)" data-theme-id="dark-emerald">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#050f09"></div>
+                    <div class="theme-swatch-item" style="background:#0d2616"></div>
+                    <div class="theme-swatch-item" style="background:#10b981"></div>
+                    <div class="theme-swatch-item" style="background:#818cf8"></div>
+                </div>
+                <div class="theme-name">Dark Emerald</div>
+                <div class="theme-desc">Verde Esmeralda</div>
+            </div>
+            <!-- dark-rose -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'dark-rose' %}selected{% endif %}"
+                 onclick="applyTheme('dark-rose', this)" data-theme-id="dark-rose">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#130611"></div>
+                    <div class="theme-swatch-item" style="background:#270a1e"></div>
+                    <div class="theme-swatch-item" style="background:#f43f5e"></div>
+                    <div class="theme-swatch-item" style="background:#fbbf24"></div>
+                </div>
+                <div class="theme-name">Dark Rose</div>
+                <div class="theme-desc">Rosa &bull; Carmesim</div>
+            </div>
+            <!-- dark-ocean -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'dark-ocean' %}selected{% endif %}"
+                 onclick="applyTheme('dark-ocean', this)" data-theme-id="dark-ocean">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#030d1a"></div>
+                    <div class="theme-swatch-item" style="background:#081e37"></div>
+                    <div class="theme-swatch-item" style="background:#0ea5e9"></div>
+                    <div class="theme-swatch-item" style="background:#a855f7"></div>
+                </div>
+                <div class="theme-name">Dark Ocean</div>
+                <div class="theme-desc">Azul Oceano</div>
+            </div>
+            <!-- dark-amber -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'dark-amber' %}selected{% endif %}"
+                 onclick="applyTheme('dark-amber', this)" data-theme-id="dark-amber">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#130d00"></div>
+                    <div class="theme-swatch-item" style="background:#261b05"></div>
+                    <div class="theme-swatch-item" style="background:#f59e0b"></div>
+                    <div class="theme-swatch-item" style="background:#10b981"></div>
+                </div>
+                <div class="theme-name">Dark Amber</div>
+                <div class="theme-desc">Âmbar Corporativo</div>
+            </div>
+            <!-- light -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'light' %}selected{% endif %}"
+                 onclick="applyTheme('light', this)" data-theme-id="light">
+                <span class="theme-check"><i class="fa-solid fa-check" style="color:#0f172a"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#f1f5f9"></div>
+                    <div class="theme-swatch-item" style="background:#ffffff"></div>
+                    <div class="theme-swatch-item" style="background:#4f46e5"></div>
+                    <div class="theme-swatch-item" style="background:#10b981"></div>
+                </div>
+                <div class="theme-name">Light</div>
+                <div class="theme-desc">Modo Claro Corporativo</div>
+            </div>
+            <!-- custom -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'custom' %}selected{% endif %}"
+                 onclick="applyTheme('custom', this)" data-theme-id="custom">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch" id="custom-theme-swatch">
+                    <div class="theme-swatch-item" id="swatch-sidebar-bg" style="background: {{ custom_theme_vars.sidebar_bg or '#0b0f19' }}"></div>
+                    <div class="theme-swatch-item" id="swatch-bg-dark" style="background: {{ custom_theme_vars.bg_dark or '#0f172a' }}"></div>
+                    <div class="theme-swatch-item" id="swatch-primary" style="background: {{ custom_theme_vars.primary_color or '#6366f1' }}"></div>
+                    <div class="theme-swatch-item" id="swatch-accent" style="background: {{ custom_theme_vars.accent_color or '#10b981' }}"></div>
+                </div>
+                <div class="theme-name">Personalizado</div>
+                <div class="theme-desc">Editor de Cores</div>
+            </div>
+        </div>
+
+        <div class="d-flex align-center gap-2 mt-3">
+            <span id="theme-feedback" class="text-xs text-muted"></span>
+        </div>
+    </div>
+
+    <!-- ── EDITOR DE TEMAS PERSONALIZADO ── -->
+    <div class="appearance-section" id="themeEditorSection">
+        <div class="d-flex align-center justify-between mb-3" style="flex-wrap:wrap; gap:0.75rem;">
+            <div>
+                <div class="appearance-section-title" style="margin-bottom:0.25rem;">
+                    <i class="fa-solid fa-palette text-primary"></i>
+                    Editor de Cores do Tema
+                </div>
+                <p class="text-xs text-muted m-0">Ajuste as cores ao vivo. As mudanças na barra lateral e na interface acontecem em tempo real.</p>
+            </div>
+            <div class="d-flex align-center gap-1" style="flex-wrap:wrap;">
+                <span class="text-xs text-muted me-1">Basear em:</span>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-indigo')">Indigo</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-emerald')">Emerald</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-rose')">Rose</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-ocean')">Ocean</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-amber')">Amber</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('light')">Light</button>
+            </div>
+        </div>
+
+        <div class="theme-editor-grid">
+            <!-- Coluna de controles de cores -->
+            <div class="theme-editor-controls">
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Barra Lateral (Sidebar)</label>
+                        <span class="editor-color-desc">Fundo do menu de navegação esquerdo</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-sidebar-bg" class="color-picker-bubble" oninput="onColorPickerChange('sidebar_bg', this.value)">
+                        <input type="text" id="hex-sidebar-bg" class="input-glass color-hex-input" onchange="onHexInputChange('sidebar_bg', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Cor Primária</label>
+                        <span class="editor-color-desc">Botões principais, links ativos e realces</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-primary-color" class="color-picker-bubble" oninput="onColorPickerChange('primary_color', this.value)">
+                        <input type="text" id="hex-primary-color" class="input-glass color-hex-input" onchange="onHexInputChange('primary_color', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Fundo da Página</label>
+                        <span class="editor-color-desc">Fundo geral do sistema</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-bg-dark" class="color-picker-bubble" oninput="onColorPickerChange('bg_dark', this.value)">
+                        <input type="text" id="hex-bg-dark" class="input-glass color-hex-input" onchange="onHexInputChange('bg_dark', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Fundo dos Cards</label>
+                        <span class="editor-color-desc">Tabelas, painéis e cartões</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-card-bg" class="color-picker-bubble" oninput="onColorPickerChange('card_bg', this.value)">
+                        <input type="text" id="hex-card-bg" class="input-glass color-hex-input" onchange="onHexInputChange('card_bg', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Cor de Destaque (Accent)</label>
+                        <span class="editor-color-desc">Badges, métricas positivas e tags</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-accent-color" class="color-picker-bubble" oninput="onColorPickerChange('accent_color', this.value)">
+                        <input type="text" id="hex-accent-color" class="input-glass color-hex-input" onchange="onHexInputChange('accent_color', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Texto Principal</label>
+                        <span class="editor-color-desc">Títulos e texto principal</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-text-main" class="color-picker-bubble" oninput="onColorPickerChange('text_main', this.value)">
+                        <input type="text" id="hex-text-main" class="input-glass color-hex-input" onchange="onHexInputChange('text_main', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Texto Secundário</label>
+                        <span class="editor-color-desc">Subtítulos, ícones e notas</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-text-muted" class="color-picker-bubble" oninput="onColorPickerChange('text_muted', this.value)">
+                        <input type="text" id="hex-text-muted" class="input-glass color-hex-input" onchange="onHexInputChange('text_muted', this.value)">
+                    </div>
+                </div>
+
+                <div class="editor-color-row">
+                    <div class="editor-color-info">
+                        <label class="editor-color-label">Bordas / Linhas</label>
+                        <span class="editor-color-desc">Linhas divisórias e contorno de cards</span>
+                    </div>
+                    <div class="editor-color-inputs">
+                        <input type="color" id="picker-glass-border" class="color-picker-bubble" oninput="onColorPickerChange('glass_border', this.value)">
+                        <input type="text" id="hex-glass-border" class="input-glass color-hex-input" onchange="onHexInputChange('glass_border', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Preview Box -->
+            <div class="theme-editor-preview-card">
+                <div class="preview-card-header">
+                    <span class="text-xs font-semibold uppercase" style="letter-spacing:0.08em; color:var(--text-muted)">
+                        <i class="fa-solid fa-eye text-primary"></i> Demonstração em Tempo Real
+                    </span>
+                    <span class="badge badge-success text-xs">Ao Vivo</span>
+                </div>
+                
+                <div class="ui-mockup-frame" id="mockupFrame">
+                    <!-- Mini Sidebar -->
+                    <div class="ui-mock-sidebar" id="mockSidebar">
+                        <div class="mock-brand">
+                            <div class="mock-brand-icon" id="mockBrandIcon"></div>
+                            <div class="mock-brand-text" id="mockBrandText">CRM PRO</div>
+                        </div>
+                        <div class="mock-nav">
+                            <div class="mock-nav-item active" id="mockNavActive">
+                                <i class="fa-solid fa-chart-pie" style="font-size:0.7rem;"></i> Dashboard
+                            </div>
+                            <div class="mock-nav-item" id="mockNavItem1">
+                                <i class="fa-solid fa-users" style="font-size:0.7rem;"></i> Clientes
+                            </div>
+                            <div class="mock-nav-item" id="mockNavItem2">
+                                <i class="fa-solid fa-filter" style="font-size:0.7rem;"></i> Funil
+                            </div>
+                        </div>
+                        <div class="mock-user">
+                            <div class="mock-avatar" id="mockAvatar">A</div>
+                            <div class="mock-username" id="mockUsername">admin</div>
+                        </div>
+                    </div>
+                    <!-- Mini Content Area -->
+                    <div class="ui-mock-main" id="mockMain">
+                        <div class="mock-header" id="mockHeader">
+                            <div class="mock-title" id="mockTitle">Dashboard Geral</div>
+                            <button type="button" class="mock-btn-primary" id="mockBtnPrimary">+ Novo</button>
+                        </div>
+                        <div class="mock-cards-grid">
+                            <div class="mock-card" id="mockCard1">
+                                <div class="mock-card-label" id="mockCardLabel">Vendas do Mês</div>
+                                <div class="mock-card-val" id="mockVal">R$ 48.900</div>
+                                <span class="mock-badge" id="mockBadge">+14.2%</span>
+                            </div>
+                            <div class="mock-card" id="mockCard2">
+                                <div class="mock-card-label" id="mockInputLabel">Campo de Entrada</div>
+                                <input type="text" class="mock-input" id="mockInput" value="Lead qualificado" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações do Editor -->
+        <div class="d-flex align-center gap-2 mt-4 pt-3 border-top" style="flex-wrap:wrap;">
+            <button type="button" class="btn-primary" id="btnSaveCustomTheme" onclick="saveCustomTheme()">
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Tema Personalizado
+            </button>
+            <button type="button" class="btn-secondary" onclick="resetCustomThemeToDefault()">
+                <i class="fa-solid fa-rotate-left"></i> Restaurar Padrão
+            </button>
+            <span id="custom-theme-feedback" class="text-sm font-semibold" style="display:none; margin-left:0.5rem;"></span>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    // ── Drag & Drop na zona de upload ─────────────────────────
+    const dz = document.getElementById('logoDropZone');
+    if (dz) {
+        dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+        dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault();
+            dz.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) uploadLogoFile(file);
+        });
+    }
+
+    window.handleLogoSelect = function(input) {
+        if (input.files && input.files[0]) uploadLogoFile(input.files[0]);
+    };
+
+    window.uploadLogoFile = function(file) {
+        const fb = document.getElementById('logo-upload-feedback');
+        fb.style.display = 'block';
+        fb.textContent = 'Enviando logo...';
+        fb.style.color = 'var(--text-muted)';
+
+        const fd = new FormData();
+        fd.append('logo', file);
+
+        fetch('{{ url_for("admin.upload_logo") }}', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    fb.textContent = 'Logo salva com sucesso!';
+                    fb.style.color = '#10b981';
+                    // Atualiza preview
+                    document.getElementById('logo-preview-img').src = data.url + '?t=' + Date.now();
+                    document.getElementById('logo-preview-filename').textContent = file.name;
+                    document.getElementById('logo-current-wrap').style.display = 'flex';
+                    // Atualiza sidebar ao vivo
+                    const sidebarImg = document.querySelector('.sidebar-logo-img');
+                    if (sidebarImg) sidebarImg.src = data.url + '?t=' + Date.now();
+                } else {
+                    fb.textContent = data.error || 'Erro ao enviar.';
+                    fb.style.color = '#ef4444';
+                }
+            })
+            .catch(() => { fb.textContent = 'Erro de rede.'; fb.style.color = '#ef4444'; });
+    };
+
+    window.removeLogo = function() {
+        if (!confirm('Remover a logo da empresa?')) return;
+        fetch('{{ url_for("admin.remove_logo") }}', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('logo-current-wrap').style.display = 'none';
+                    document.getElementById('logo-preview-img').src = '';
+                    document.getElementById('logo-upload-feedback').style.display = 'none';
+                    // Remove da sidebar ao vivo
+                    const sidebarLogo = document.querySelector('.sidebar-logo-wrap');
+                    if (sidebarLogo) sidebarLogo.innerHTML = '<h2 class="sidebar-brand"><span class="text-primary">CRM</span><span class="text-main"> PRO</span></h2><div class="sidebar-tagline">GESTÃO DE VENDAS</div>';
+                }
+            });
+    };
+
+    window.saveIdentity = function() {
+        const name    = document.getElementById('input-company-name').value.trim();
+        const tagline = document.getElementById('input-company-tagline').value.trim();
+        const fb      = document.getElementById('identity-feedback');
+
+        fetch('{{ url_for("admin.save_appearance") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company_name: name, company_tagline: tagline })
+        })
+        .then(r => r.json())
+        .then(data => {
+            fb.style.display = 'inline';
+            if (data.success) {
+                fb.textContent = '&#10003; Salvo! Recarregue a página para ver no sidebar.';
+                fb.style.color = '#10b981';
+                // Atualiza sidebar ao vivo
+                const brandName = document.querySelector('.sidebar-brand');
+                if (brandName) {
+                    const parts = name.split(' ');
+                    brandName.innerHTML = `<span class="text-primary">${parts[0] || 'CRM'}</span><span class="text-main"> ${parts.slice(1).join(' ') || 'PRO'}</span>`;
+                }
+                const taglineEl = document.querySelector('.sidebar-tagline');
+                if (taglineEl) taglineEl.textContent = tagline;
+            } else {
+                fb.textContent = 'Erro ao salvar.';
+                fb.style.color = '#ef4444';
+            }
+            setTimeout(() => { fb.style.display = 'none'; }, 4000);
+        });
+    };
+
+    // ── Presets Base para o Editor ─────────────────────────────
+    const basePresets = {
+        'dark-indigo': {
+            sidebar_bg: '#0b0f19',
+            primary_color: '#6366f1',
+            primary_hover: '#4f46e5',
+            bg_dark: '#0f172a',
+            card_bg: '#1e293b',
+            accent_color: '#10b981',
+            text_main: '#f8fafc',
+            text_muted: '#94a3b8',
+            glass_border: '#334155'
+        },
+        'dark-emerald': {
+            sidebar_bg: '#031008',
+            primary_color: '#10b981',
+            primary_hover: '#059669',
+            bg_dark: '#050f09',
+            card_bg: '#0d2616',
+            accent_color: '#818cf8',
+            text_main: '#ecfdf5',
+            text_muted: '#6ee7b7',
+            glass_border: '#064e3b'
+        },
+        'dark-rose': {
+            sidebar_bg: '#13050e',
+            primary_color: '#f43f5e',
+            primary_hover: '#e11d48',
+            bg_dark: '#130611',
+            card_bg: '#270a1e',
+            accent_color: '#fbbf24',
+            text_main: '#fff1f2',
+            text_muted: '#fda4af',
+            glass_border: '#4c0519'
+        },
+        'dark-ocean': {
+            sidebar_bg: '#020c18',
+            primary_color: '#0ea5e9',
+            primary_hover: '#0284c7',
+            bg_dark: '#030d1a',
+            card_bg: '#081e37',
+            accent_color: '#a855f7',
+            text_main: '#e0f2fe',
+            text_muted: '#7dd3fc',
+            glass_border: '#0c4a6e'
+        },
+        'dark-amber': {
+            sidebar_bg: '#120c02',
+            primary_color: '#f59e0b',
+            primary_hover: '#d97706',
+            bg_dark: '#130d00',
+            card_bg: '#261b05',
+            accent_color: '#10b981',
+            text_main: '#fffbeb',
+            text_muted: '#fcd34d',
+            glass_border: '#78350f'
+        },
+        'light': {
+            sidebar_bg: '#ffffff',
+            primary_color: '#4f46e5',
+            primary_hover: '#3730a3',
+            bg_dark: '#f1f5f9',
+            card_bg: '#ffffff',
+            accent_color: '#10b981',
+            text_main: '#0f172a',
+            text_muted: '#475569',
+            glass_border: '#cbd5e1'
+        }
+    };
+
+    // Estado do tema customizado (lido do Jinja ou defaults)
+    let customThemeState = Object.assign({}, basePresets['dark-indigo']);
+    try {
+        const savedCustom = JSON.parse('{{ custom_theme_json | safe }}');
+        if (savedCustom && typeof savedCustom === 'object') {
+            Object.assign(customThemeState, savedCustom);
+        }
+    } catch(e) {}
+
+    // Sincroniza inputs e atualiza o DOM e o mockup
+    function applyStateToInputs() {
+        for (const [key, val] of Object.entries(customThemeState)) {
+            const picker = document.getElementById('picker-' + key.replace(/_/g, '-'));
+            const hex = document.getElementById('hex-' + key.replace(/_/g, '-'));
+            if (hex) hex.value = val;
+            if (picker) {
+                if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                    picker.value = val;
+                }
+            }
+        }
+    }
+
+    function applyStateToLiveDOM() {
+        const root = document.documentElement;
+        if (customThemeState.primary_color) {
+            root.style.setProperty('--primary-color', customThemeState.primary_color);
+            root.style.setProperty('--nav-active-bg', customThemeState.primary_color + '2e');
+            root.style.setProperty('--nav-hover-bg', customThemeState.primary_color + '14');
+        }
+        if (customThemeState.sidebar_bg) {
+            root.style.setProperty('--sidebar-bg', customThemeState.sidebar_bg);
+        }
+        if (customThemeState.bg_dark) {
+            root.style.setProperty('--bg-dark', customThemeState.bg_dark);
+        }
+        if (customThemeState.card_bg) {
+            root.style.setProperty('--card-bg', customThemeState.card_bg);
+        }
+        if (customThemeState.accent_color) {
+            root.style.setProperty('--accent-color', customThemeState.accent_color);
+        }
+        if (customThemeState.text_main) {
+            root.style.setProperty('--text-main', customThemeState.text_main);
+        }
+        if (customThemeState.text_muted) {
+            root.style.setProperty('--text-muted', customThemeState.text_muted);
+        }
+        if (customThemeState.glass_border) {
+            root.style.setProperty('--glass-border', customThemeState.glass_border);
+        }
+
+        // Força a barra lateral real a usar a cor
+        const sidebarEl = document.querySelector('.sidebar');
+        if (sidebarEl && customThemeState.sidebar_bg) {
+            sidebarEl.style.backgroundColor = customThemeState.sidebar_bg;
+        }
+
+        // Atualiza a miniatura (swatch) do card Personalizado
+        const sSidebar = document.getElementById('swatch-sidebar-bg');
+        if (sSidebar) sSidebar.style.background = customThemeState.sidebar_bg;
+        const sDark = document.getElementById('swatch-bg-dark');
+        if (sDark) sDark.style.background = customThemeState.bg_dark;
+        const sPrimary = document.getElementById('swatch-primary');
+        if (sPrimary) sPrimary.style.background = customThemeState.primary_color;
+        const sAccent = document.getElementById('swatch-accent');
+        if (sAccent) sAccent.style.background = customThemeState.accent_color;
+
+        updateMockup();
+    }
+
+    function updateMockup() {
+        const mSidebar = document.getElementById('mockSidebar');
+        if (mSidebar) {
+            mSidebar.style.background = customThemeState.sidebar_bg;
+            mSidebar.style.borderColor = customThemeState.glass_border;
+        }
+        const mFrame = document.getElementById('mockupFrame');
+        if (mFrame) {
+            mFrame.style.background = customThemeState.bg_dark;
+            mFrame.style.borderColor = customThemeState.glass_border;
+        }
+        const mNavActive = document.getElementById('mockNavActive');
+        if (mNavActive) {
+            mNavActive.style.color = customThemeState.primary_color;
+            mNavActive.style.background = (customThemeState.primary_color && customThemeState.primary_color.length === 7 ? customThemeState.primary_color + '2e' : 'rgba(99,102,241,0.2)');
+        }
+        const mBtn = document.getElementById('mockBtnPrimary');
+        if (mBtn) {
+            mBtn.style.background = customThemeState.primary_color;
+        }
+        const mIcon = document.getElementById('mockBrandIcon');
+        if (mIcon) mIcon.style.background = customThemeState.primary_color;
+        const mAvatar = document.getElementById('mockAvatar');
+        if (mAvatar) mAvatar.style.background = customThemeState.primary_color;
+        const mCard1 = document.getElementById('mockCard1');
+        const mCard2 = document.getElementById('mockCard2');
+        if (mCard1) {
+            mCard1.style.background = customThemeState.card_bg;
+            mCard1.style.borderColor = customThemeState.glass_border;
+        }
+        if (mCard2) {
+            mCard2.style.background = customThemeState.card_bg;
+            mCard2.style.borderColor = customThemeState.glass_border;
+        }
+        const mBadge = document.getElementById('mockBadge');
+        if (mBadge) {
+            mBadge.style.color = customThemeState.accent_color;
+        }
+        const mTitle = document.getElementById('mockTitle');
+        const mVal = document.getElementById('mockVal');
+        const mBrandText = document.getElementById('mockBrandText');
+        const mUsername = document.getElementById('mockUsername');
+        [mTitle, mVal, mBrandText, mUsername].forEach(el => {
+            if (el) el.style.color = customThemeState.text_main;
+        });
+        const mLabels = [document.getElementById('mockCardLabel'), document.getElementById('mockInputLabel'), document.getElementById('mockNavItem1'), document.getElementById('mockNavItem2')];
+        mLabels.forEach(el => {
+            if (el) el.style.color = customThemeState.text_muted;
+        });
+    }
+
+    window.onColorPickerChange = function(key, val) {
+        customThemeState[key] = val;
+        const hex = document.getElementById('hex-' + key.replace(/_/g, '-'));
+        if (hex) hex.value = val;
+        switchToCustomThemeLive();
+    };
+
+    window.onHexInputChange = function(key, val) {
+        val = val.trim();
+        customThemeState[key] = val;
+        const picker = document.getElementById('picker-' + key.replace(/_/g, '-'));
+        if (picker && /^#[0-9A-Fa-f]{6}$/.test(val)) {
+            picker.value = val;
+        }
+        switchToCustomThemeLive();
+    };
+
+    window.loadBasePreset = function(presetId) {
+        if (!basePresets[presetId]) return;
+        Object.assign(customThemeState, basePresets[presetId]);
+        applyStateToInputs();
+        switchToCustomThemeLive();
+    };
+
+    function switchToCustomThemeLive() {
+        document.documentElement.setAttribute('data-theme', 'custom');
+        applyStateToLiveDOM();
+        document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+        const customCard = document.querySelector('.theme-card[data-theme-id="custom"]');
+        if (customCard) customCard.classList.add('selected');
+    }
+
+    window.saveCustomTheme = function() {
+        const btn = document.getElementById('btnSaveCustomTheme');
+        const fb = document.getElementById('custom-theme-feedback');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+        fb.style.display = 'none';
+
+        fetch('{{ url_for("admin.save_appearance") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                theme_name: 'custom',
+                custom_theme_config: customThemeState
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar Tema Personalizado';
+            fb.style.display = 'inline';
+            if (data.success) {
+                fb.innerHTML = '<span style="color:#10b981;">&#10003; Tema personalizado salvo e ativo no sistema!</span>';
+                document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+                const customCard = document.querySelector('.theme-card[data-theme-id="custom"]');
+                if (customCard) customCard.classList.add('selected');
+            } else {
+                fb.innerHTML = '<span style="color:#ef4444;">Erro ao salvar tema.</span>';
+            }
+            setTimeout(() => { fb.style.display = 'none'; }, 4000);
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar Tema Personalizado';
+            fb.style.display = 'inline';
+            fb.innerHTML = '<span style="color:#ef4444;">Erro de rede ao salvar.</span>';
+            setTimeout(() => { fb.style.display = 'none'; }, 4000);
+        });
+    };
+
+    window.resetCustomThemeToDefault = function() {
+        if (!confirm('Deseja restaurar as cores do tema personalizado para o padrão Indigo?')) return;
+        Object.assign(customThemeState, basePresets['dark-indigo']);
+        applyStateToInputs();
+        switchToCustomThemeLive();
+        saveCustomTheme();
+    };
+
+    // Atualizado applyTheme para limpar estilos inline ao escolher preset
+    window.applyTheme = function(themeId, cardEl) {
+        document.documentElement.setAttribute('data-theme', themeId);
+        document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
+        if (cardEl) cardEl.classList.add('selected');
+
+        const sidebarEl = document.querySelector('.sidebar');
+        if (themeId === 'custom') {
+            applyStateToLiveDOM();
+        } else {
+            // Limpa propriedades inline do root e da sidebar para que o CSS do tema prevaleça 100%
+            const root = document.documentElement;
+            const vars = ['--primary-color', '--primary-hover', '--bg-dark', '--card-bg', '--text-main', '--text-muted', '--glass-border', '--accent-color', '--sidebar-bg', '--nav-active-bg', '--nav-hover-bg'];
+            vars.forEach(v => root.style.removeProperty(v));
+            if (sidebarEl) sidebarEl.style.backgroundColor = '';
+        }
+
+        const fb = document.getElementById('theme-feedback');
+        fb.textContent = 'Salvando tema...';
+
+        fetch('{{ url_for("admin.save_appearance") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme_name: themeId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                fb.textContent = '\u2713 Tema "' + themeId + '" aplicado e salvo!';
+                fb.style.color = '#10b981';
+            } else {
+                fb.textContent = 'Erro ao salvar tema.';
+                fb.style.color = '#ef4444';
+            }
+            setTimeout(() => { fb.textContent = ''; }, 4000);
+        })
+        .catch(() => { fb.textContent = 'Erro de rede.'; fb.style.color = '#ef4444'; });
+    };
+
+    // Inicialização ao carregar a página
+    applyStateToInputs();
+    updateMockup();
+    if (document.documentElement.getAttribute('data-theme') === 'custom') {
+        applyStateToLiveDOM();
+    }
+}());
+</script>
+</div>
+
 <!-- Tab: Templates -->
+
 <div id="tab-templates" class="tab-content {% if active_tab == 'templates' %}active{% endif %}">
     <div class="header-glass max-w-lg">
         <form action="{{ url_for('admin.settings', tab='templates') }}" method="post" class="w-100">
@@ -761,6 +1868,89 @@
                             <small class="text-xs text-muted mt-1 d-block">
                                 Disparada de forma segura caso o Ollama não responda dentro do limite de tolerância.
                             </small>
+                        </div>
+                    </div>
+
+                    <!-- 2.1 Base de Conhecimento RAG & Parâmetros Cognitivos -->
+                    <div class="bot-card-glass" style="border-color: rgba(56, 189, 248, 0.3);">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                                    <i class="fa-solid fa-brain"></i>
+                                </span>
+                                2.1 Base de Conhecimento (RAG) & Hiperparâmetros
+                            </h4>
+                            <a href="{{ url_for('admin.knowledge') }}" class="btn-primary text-xs px-2 py-1 d-inline-flex align-center gap-1" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); text-decoration: none; border-radius: 6px;">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Gerenciar Documentos
+                            </a>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Aumenta a precisão das respostas alimentando a IA com tabelas de preço, regras e FAQs indexados via busca vetorial (ChromaDB + Ollama nomic-embed-text).
+                        </p>
+
+                        <div class="grid-2 gap-3 mb-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_rag_enabled" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Busca Semântica RAG
+                                </label>
+                                <select name="whatsapp_bot_rag_enabled" id="whatsapp_bot_rag_enabled" class="input-glass w-100 font-semibold" style="font-size: 0.85rem;">
+                                    <option value="true" {% if settings.get('whatsapp_bot_rag_enabled', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        🟢 Ativado (Recuperar contexto da Base de Conhecimento)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_bot_rag_enabled')|lower in ['false', '0'] %}selected{% endif %}>
+                                        ⚪ Desativado (Apenas conhecimento geral do modelo)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_rag_top_k" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Trechos a Recuperar (Top K)
+                                </label>
+                                <select name="whatsapp_bot_rag_top_k" id="whatsapp_bot_rag_top_k" class="input-glass w-100 text-xs">
+                                    <option value="1" {% if settings.get('whatsapp_bot_rag_top_k') == '1' %}selected{% endif %}>1 trecho mais relevante</option>
+                                    <option value="2" {% if settings.get('whatsapp_bot_rag_top_k') == '2' %}selected{% endif %}>2 trechos (Econômico)</option>
+                                    <option value="3" {% if settings.get('whatsapp_bot_rag_top_k', '3') == '3' %}selected{% endif %}>3 trechos (Recomendado)</option>
+                                    <option value="4" {% if settings.get('whatsapp_bot_rag_top_k') == '4' %}selected{% endif %}>4 trechos (Avançado)</option>
+                                    <option value="5" {% if settings.get('whatsapp_bot_rag_top_k') == '5' %}selected{% endif %}>5 trechos (Contexto Máximo)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Temperatura e Tokens -->
+                        <div class="grid-2 gap-3">
+                            <div class="form-group mb-0">
+                                <div class="d-flex justify-between align-center mb-1">
+                                    <label for="whatsapp_bot_temperature" class="text-xs font-semibold text-gray-300 mb-0">
+                                        Temperatura / Precisão:
+                                    </label>
+                                    <span id="display_temp" class="badge text-xs font-bold" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">
+                                        {{ settings.get('whatsapp_bot_temperature', '0.3') }}
+                                    </span>
+                                </div>
+                                <input type="range" name="whatsapp_bot_temperature" id="whatsapp_bot_temperature"
+                                       min="0.1" max="0.8" step="0.05"
+                                       value="{{ settings.get('whatsapp_bot_temperature', '0.3') }}"
+                                       class="w-100" style="accent-color: #38bdf8;"
+                                       oninput="document.getElementById('display_temp').textContent = this.value">
+                                <div class="d-flex justify-between text-xs text-muted" style="font-size: 0.68rem;">
+                                    <span>0.1 (Factual)</span>
+                                    <span>0.3 (Ideal)</span>
+                                    <span>0.8 (Criativo)</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_max_tokens" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Tamanho Máximo da Resposta
+                                </label>
+                                <select name="whatsapp_bot_max_tokens" id="whatsapp_bot_max_tokens" class="input-glass w-100 text-xs">
+                                    <option value="140" {% if settings.get('whatsapp_bot_max_tokens') == '140' %}selected{% endif %}>~140 tokens (Ultra conciso / 1 frase)</option>
+                                    <option value="200" {% if settings.get('whatsapp_bot_max_tokens', '200') == '200' %}selected{% endif %}>~200 tokens (Ideal WhatsApp / 2 a 3 frases)</option>
+                                    <option value="300" {% if settings.get('whatsapp_bot_max_tokens') == '300' %}selected{% endif %}>~300 tokens (Detalhado)</option>
+                                    <option value="450" {% if settings.get('whatsapp_bot_max_tokens') == '450' %}selected{% endif %}>~450 tokens (Explicativo amplo)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

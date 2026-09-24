@@ -1,11 +1,29 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="{{ active_theme }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - CRM Pro</title>
     <meta name="description" content="CRM Pro — Sistema de Gestão de Clientes e Funil de Vendas">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
+    <style id="custom-theme-vars-style">
+    {% if custom_theme_vars %}
+    [data-theme="custom"], html[data-theme="custom"] {
+        {% if custom_theme_vars.primary_color %}--primary-color: {{ custom_theme_vars.primary_color }};{% endif %}
+        {% if custom_theme_vars.primary_hover %}--primary-hover: {{ custom_theme_vars.primary_hover }};{% endif %}
+        {% if custom_theme_vars.sidebar_bg %}--sidebar-bg: {{ custom_theme_vars.sidebar_bg }} !important;{% endif %}
+        {% if custom_theme_vars.bg_dark %}--bg-dark: {{ custom_theme_vars.bg_dark }};{% endif %}
+        {% if custom_theme_vars.card_bg %}--card-bg: {{ custom_theme_vars.card_bg }};{% endif %}
+        {% if custom_theme_vars.accent_color %}--accent-color: {{ custom_theme_vars.accent_color }};{% endif %}
+        {% if custom_theme_vars.text_main %}--text-main: {{ custom_theme_vars.text_main }};{% endif %}
+        {% if custom_theme_vars.text_muted %}--text-muted: {{ custom_theme_vars.text_muted }};{% endif %}
+        {% if custom_theme_vars.glass_border %}--glass-border: {{ custom_theme_vars.glass_border }};{% endif %}
+        {% if custom_theme_vars.nav_active_bg %}--nav-active-bg: {{ custom_theme_vars.nav_active_bg }};{% endif %}
+        {% if custom_theme_vars.nav_hover_bg %}--nav-hover-bg: {{ custom_theme_vars.nav_hover_bg }};{% endif %}
+    }
+    {% endif %}
+    </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     {% block extra_css %}{% endblock %}
@@ -16,13 +34,25 @@
     <!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h2 class="sidebar-brand">
-                <span class="text-primary">CRM</span>
-                <span class="text-main"> PRO</span>
-            </h2>
-            <div class="sidebar-tagline">
-                GESTÃO DE VENDAS
+            {%- set _logo_url    = get_setting('company_logo_url', '') -%}
+            {%- set _co_name     = get_setting('company_name', 'CRM PRO') -%}
+            {%- set _co_tagline  = get_setting('company_tagline', 'GESTÃO DE VENDAS') -%}
+            {% if _logo_url %}
+            <div class="sidebar-logo-wrap">
+                <img src="{{ _logo_url }}" alt="{{ _co_name }}" class="sidebar-logo-img">
+                <div class="sidebar-logo-text">
+                    <div class="sidebar-brand text-main">{{ _co_name }}</div>
+                    <div class="sidebar-tagline">{{ _co_tagline }}</div>
+                </div>
             </div>
+            {% else %}
+            {%- set _parts = _co_name.split() -%}
+            <h2 class="sidebar-brand">
+                <span class="text-primary">{{ _parts[0] if _parts else 'CRM' }}</span>
+                <span class="text-main"> {{ _parts[1:] | join(' ') if _parts | length > 1 else 'PRO' }}</span>
+            </h2>
+            <div class="sidebar-tagline">{{ _co_tagline }}</div>
+            {% endif %}
         </div>
 
         <nav class="sidebar-nav">
@@ -84,6 +114,11 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ url_for('admin.knowledge') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.knowledge' }}">
+                        <i class="fa-solid fa-brain nav-icon text-info"></i> Base de Conhecimento
+                    </a>
+                </li>
+                <li>
                     <a href="{{ url_for('admin.bot_live') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.bot_live' }}">
                         <i class="fa-solid fa-network-wired nav-icon text-success"></i> Fluxo IA do Bot
                     </a>
@@ -105,7 +140,7 @@
                     {{ current_user.username[0] | upper }}
                 </div>
                 <div>
-                    <div class="font-semibold text-sm">{{ current_user.username }}</div>
+                    <div class="font-semibold text-sm text-main">{{ current_user.username }}</div>
                     <div class="text-xs text-muted">
                         {{ current_user.role | capitalize }} &middot;
                         <span class="text-warning font-bold">{{ current_user.performance_points }} XP</span>

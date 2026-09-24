@@ -55,6 +55,11 @@ redis_data/
 ollama_data/
 scraper_data/
 backups/
+chroma_data/
 *.json.gz
 
 
+uploads/
+# Logos e uploads de clientes
+app/static/uploads/*
+!app/static/uploads/.gitkeep

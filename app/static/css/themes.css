@@ -1,0 +1,211 @@
+/*
+ * ─────────────────────────────────────────────────────────────────
+ *  CRM Pro — Sistema de Temas Visuais
+ *  Arquivo: themes.css
+ *  Aplicação: <html data-theme="nome-do-tema">
+ *  Temas disponíveis: dark-indigo | dark-emerald | dark-rose |
+ *                     dark-ocean  | dark-amber   | light | custom
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+/* ================================================================
+   TEMA: Dark Indigo (padrão — azul/índigo/violeta)
+   ================================================================ */
+:root,
+[data-theme="dark-indigo"] {
+    --primary-color:   #6366f1;
+    --primary-hover:   #4f46e5;
+    --bg-dark:         #0f172a;
+    --card-bg:         rgba(30, 41, 59, 0.85);
+    --text-main:       #f8fafc;
+    --text-muted:      #94a3b8;
+    --glass-border:    rgba(255, 255, 255, 0.08);
+    --accent-color:    #10b981;
+    --sidebar-bg:      #0b0f19;
+    --bg-gradient-1:   rgba(99,102,241,0.07);
+    --bg-gradient-2:   rgba(16,185,129,0.05);
+    --input-bg:        rgba(255, 255, 255, 0.05);
+    --input-border:    rgba(255, 255, 255, 0.08);
+    --table-hover:     rgba(255,255,255,0.03);
+    --nav-active-bg:   rgba(99,102,241,0.22);
+    --nav-hover-bg:    rgba(99,102,241,0.08);
+}
+
+/* ================================================================
+   TEMA: Dark Emerald (verde esmeralda)
+   ================================================================ */
+[data-theme="dark-emerald"] {
+    --primary-color:   #10b981;
+    --primary-hover:   #059669;
+    --bg-dark:         #050f09;
+    --card-bg:         rgba(13, 38, 22, 0.85);
+    --text-main:       #ecfdf5;
+    --text-muted:      #6ee7b7;
+    --glass-border:    rgba(16, 185, 129, 0.14);
+    --accent-color:    #818cf8;
+    --sidebar-bg:      #031008;
+    --bg-gradient-1:   rgba(16,185,129,0.08);
+    --bg-gradient-2:   rgba(129,140,248,0.04);
+    --input-bg:        rgba(16, 185, 129, 0.06);
+    --input-border:    rgba(16, 185, 129, 0.15);
+    --table-hover:     rgba(16,185,129,0.04);
+    --nav-active-bg:   rgba(16,185,129,0.22);
+    --nav-hover-bg:    rgba(16,185,129,0.08);
+}
+
+/* ================================================================
+   TEMA: Dark Rose (rosa/carmesim)
+   ================================================================ */
+[data-theme="dark-rose"] {
+    --primary-color:   #f43f5e;
+    --primary-hover:   #e11d48;
+    --bg-dark:         #130611;
+    --card-bg:         rgba(39, 10, 30, 0.85);
+    --text-main:       #fff1f2;
+    --text-muted:      #fda4af;
+    --glass-border:    rgba(244, 63, 94, 0.14);
+    --accent-color:    #fbbf24;
+    --sidebar-bg:      #13050e;
+    --bg-gradient-1:   rgba(244,63,94,0.08);
+    --bg-gradient-2:   rgba(251,191,36,0.04);
+    --input-bg:        rgba(244, 63, 94, 0.06);
+    --input-border:    rgba(244, 63, 94, 0.15);
+    --table-hover:     rgba(244,63,94,0.04);
+    --nav-active-bg:   rgba(244,63,94,0.22);
+    --nav-hover-bg:    rgba(244,63,94,0.08);
+}
+
+/* ================================================================
+   TEMA: Dark Ocean (azul oceano/ciano)
+   ================================================================ */
+[data-theme="dark-ocean"] {
+    --primary-color:   #0ea5e9;
+    --primary-hover:   #0284c7;
+    --bg-dark:         #030d1a;
+    --card-bg:         rgba(8, 30, 55, 0.85);
+    --text-main:       #e0f2fe;
+    --text-muted:      #7dd3fc;
+    --glass-border:    rgba(14, 165, 233, 0.14);
+    --accent-color:    #a855f7;
+    --sidebar-bg:      #020c18;
+    --bg-gradient-1:   rgba(14,165,233,0.08);
+    --bg-gradient-2:   rgba(168,85,247,0.04);
+    --input-bg:        rgba(14, 165, 233, 0.06);
+    --input-border:    rgba(14, 165, 233, 0.15);
+    --table-hover:     rgba(14,165,233,0.04);
+    --nav-active-bg:   rgba(14,165,233,0.22);
+    --nav-hover-bg:    rgba(14,165,233,0.08);
+}
+
+/* ================================================================
+   TEMA: Dark Amber (âmbar corporativo/dourado)
+   ================================================================ */
+[data-theme="dark-amber"] {
+    --primary-color:   #f59e0b;
+    --primary-hover:   #d97706;
+    --bg-dark:         #130d00;
+    --card-bg:         rgba(38, 27, 5, 0.85);
+    --text-main:       #fffbeb;
+    --text-muted:      #fcd34d;
+    --glass-border:    rgba(245, 158, 11, 0.14);
+    --accent-color:    #10b981;
+    --sidebar-bg:      #120c02;
+    --bg-gradient-1:   rgba(245,158,11,0.08);
+    --bg-gradient-2:   rgba(16,185,129,0.04);
+    --input-bg:        rgba(245, 158, 11, 0.06);
+    --input-border:    rgba(245, 158, 11, 0.15);
+    --table-hover:     rgba(245,158,11,0.04);
+    --nav-active-bg:   rgba(245,158,11,0.22);
+    --nav-hover-bg:    rgba(245,158,11,0.08);
+}
+
+/* ================================================================
+   TEMA: Light Corporate (modo claro corporativo)
+   ================================================================ */
+[data-theme="light"] {
+    --primary-color:   #4f46e5;
+    --primary-hover:   #3730a3;
+    --bg-dark:         #f1f5f9;
+    --card-bg:         rgba(255, 255, 255, 0.9);
+    --text-main:       #0f172a;
+    --text-muted:      #475569;
+    --glass-border:    rgba(0, 0, 0, 0.1);
+    --accent-color:    #10b981;
+    --sidebar-bg:      #ffffff;
+    --bg-gradient-1:   rgba(99,102,241,0.04);
+    --bg-gradient-2:   rgba(16,185,129,0.02);
+    --input-bg:        rgba(0, 0, 0, 0.04);
+    --input-border:    rgba(0, 0, 0, 0.12);
+    --table-hover:     rgba(0,0,0,0.025);
+    --nav-active-bg:   rgba(79, 70, 229, 0.12);
+    --nav-hover-bg:    rgba(0, 0, 0, 0.04);
+}
+
+/* ================================================================
+   TEMA: Custom (fallback base para tema personalizado)
+   ================================================================ */
+[data-theme="custom"] {
+    --primary-color:   #6366f1;
+    --primary-hover:   #4f46e5;
+    --bg-dark:         #0f172a;
+    --card-bg:         rgba(30, 41, 59, 0.85);
+    --text-main:       #f8fafc;
+    --text-muted:      #94a3b8;
+    --glass-border:    rgba(255, 255, 255, 0.08);
+    --accent-color:    #10b981;
+    --sidebar-bg:      #0b0f19;
+    --bg-gradient-1:   rgba(99,102,241,0.07);
+    --bg-gradient-2:   rgba(16,185,129,0.05);
+    --input-bg:        rgba(255, 255, 255, 0.05);
+    --input-border:    rgba(255, 255, 255, 0.08);
+    --table-hover:     rgba(255,255,255,0.03);
+    --nav-active-bg:   rgba(99,102,241,0.22);
+    --nav-hover-bg:    rgba(99,102,241,0.08);
+}
+
+/* ================================================================
+   Aplicação das variáveis de tema nos elementos globais
+   ================================================================ */
+
+/* Body usa as variáveis de gradiente do tema */
+body {
+    background-image:
+        radial-gradient(ellipse at 20% 50%, var(--bg-gradient-1) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, var(--bg-gradient-2) 0%, transparent 60%);
+}
+
+/* Sidebar com aplicação forçada da variável de fundo */
+.sidebar {
+    background: var(--sidebar-bg) !important;
+    border-right-color: var(--glass-border);
+}
+.sidebar-header {
+    border-bottom-color: var(--glass-border);
+}
+.sidebar-footer {
+    border-top-color: var(--glass-border);
+}
+
+/* Inputs usam variáveis de tema */
+.input-glass {
+    background: var(--input-bg);
+    border-color: var(--input-border);
+}
+
+/* Table hover via variáveis */
+.table-glass tbody tr:hover { background: var(--table-hover); }
+
+/* Modo light: ajustes de contraste específicos */
+[data-theme="light"] .sidebar           { background: #ffffff !important; box-shadow: 2px 0 16px rgba(0,0,0,0.04); }
+[data-theme="light"] .sidebar-brand     { color: #0f172a; }
+[data-theme="light"] .sidebar-tagline   { color: #64748b; }
+[data-theme="light"] .nav-link          { color: #475569; }
+[data-theme="light"] .nav-link:hover    { background: rgba(0,0,0,0.05); color: #0f172a; }
+[data-theme="light"] .nav-link.active   { background: rgba(79,70,229,0.12); color: #4f46e5; font-weight: 600; }
+[data-theme="light"] .nav-section-title { color: #64748b; font-weight: 600; }
+[data-theme="light"] .input-glass       { color: #0f172a; }
+[data-theme="light"] .input-glass::placeholder { color: rgba(71,85,105,0.6); }
+[data-theme="light"] .sidebar-toggle    { color: #0f172a; border-color: rgba(0,0,0,0.12); }
+[data-theme="light"] .card-title        { color: #475569; }
+[data-theme="light"] .flash-msg         { color: #1e1b4b; }
+[data-theme="light"] .header-glass      { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }

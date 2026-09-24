@@ -64,6 +64,35 @@ def create_app(config_class=Config):
         except Exception as e:
             app.logger.warning(f"Erro ao agendar verificação do webhook WAHA: {e}")
 
+    # ── Context processors: injeta helpers em todos os templates ──
+    @app.context_processor
+    def inject_ui_settings():
+        """Injeta get_setting(), active_theme e custom_theme_vars em todos os templates."""
+        from app.models import Setting
+        import json
+        def get_setting(key, default=''):
+            try:
+                return Setting.get_val(key, default)
+            except Exception:
+                return default
+        try:
+            active_theme = Setting.get_val('theme_name', 'dark-indigo') or 'dark-indigo'
+        except Exception:
+            active_theme = 'dark-indigo'
+
+        custom_theme_json = get_setting('custom_theme_config', '{}')
+        try:
+            custom_theme_vars = json.loads(custom_theme_json) if custom_theme_json else {}
+        except Exception:
+            custom_theme_vars = {}
+
+        return dict(
+            get_setting=get_setting,
+            active_theme=active_theme,
+            custom_theme_vars=custom_theme_vars,
+            custom_theme_json=custom_theme_json or '{}'
+        )
+
     return app
 
 from app import models

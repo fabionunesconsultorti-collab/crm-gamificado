@@ -99,17 +99,19 @@ def _do_process_whatsapp_message(payload, event=None, instance_id=None):
         logger.warning(f"[Task WhatsApp] Mensagem sem campo 'from'. Ignorando: ID={msg_id}")
         return {"status": "ignored", "reason": "missing_from", "message_id": msg_id}
 
-    clean_digits = _clean_phone_number(from_raw)
+    from app.utils.lead_enricher import LeadEnricher
+    clean_digits = LeadEnricher.clean_digits(from_raw)
     
-    # 2. Localização do cliente no banco de dados (por sufixo de 8 ou 9 dígitos)
-    client = None
-    if len(clean_digits) >= 8:
-        phone_suffix = clean_digits[-8:]
-        client = Client.query.filter(Client.phone.contains(phone_suffix)).first()
-        if client:
-            logger.info(f"[Task WhatsApp] Cliente identificado: ID={client.id}, Nome='{client.name}', Telefone='{client.phone}'")
-        else:
-            logger.info(f"[Task WhatsApp] Telefone {clean_digits} não cadastrado na base de clientes.")
+    # 2. Localização do cliente no banco de dados com desduplicação avançada
+    client = LeadEnricher.find_client_by_phone(clean_digits or from_raw)
+    if client:
+        logger.info(f"[Task WhatsApp] Cliente identificado: ID={client.id}, Nome='{client.name}', Telefone='{client.phone}'")
+        # Enriquecimento com dados da mensagem
+        extracted = LeadEnricher.extract_entities_from_text(body.strip())
+        if extracted:
+            LeadEnricher.enrich_client_record(client, extracted, source_message=body.strip())
+    else:
+        logger.info(f"[Task WhatsApp] Telefone {clean_digits} não cadastrado na base de clientes.")
 
     # 3. Geração de resposta via Inteligência Artificial
     ai_start = time.time()
@@ -282,36 +284,82 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
             pass
 
 
-        # 6. Localização ou Auto-Cadastro do Cliente no CRM
-        client = None
-        client_info = None
-        if len(clean_digits) >= 8:
-            phone_suffix = clean_digits[-8:]
-            client = Client.query.filter(Client.phone.contains(phone_suffix)).first()
-            if not client:
-                auto_create = Setting.get('whatsapp_bot_auto_create_lead')
-                if auto_create is None or str(auto_create).lower() in ['true', '1', 'yes']:
-                    try:
-                        client = Client(
-                            name=f"Lead WA {clean_digits[-4:]}",
-                            phone=clean_digits,
-                            status='lead',
-                            notes="Lead criado automaticamente via Bot WhatsApp."
-                        )
-                        db.session.add(client)
-                        db.session.commit()
-                        logger.info(f"[Task WhatsApp Batch] Novo Lead auto-cadastrado no CRM: ID={client.id}, Fone={clean_digits}")
-                    except Exception as e:
-                        db.session.rollback()
-                        logger.warning(f"[Task WhatsApp Batch] Não foi possível auto-cadastrar lead: {e}")
+        # 6. Localização ou Auto-Cadastro do Cliente no CRM com Enriquecimento Progressivo
+        from app.utils.lead_enricher import LeadEnricher
 
-            if client:
-                client_info = {
-                    'name': client.name,
-                    'status': client.status,
-                    'assigned_user': client.assigned_user.username if getattr(client, 'assigned_user', None) else None,
-                    'segment': getattr(client, 'segment', None)
-                }
+        # Identifica PushName válido capturado nos eventos do WAHA
+        push_name_candidate = None
+        for m in reversed(messages):
+            pname = m.get('push_name')
+            if pname:
+                cleaned_pname = LeadEnricher.extract_clean_push_name(pname)
+                if cleaned_pname:
+                    push_name_candidate = cleaned_pname
+                    break
+
+        client = LeadEnricher.find_client_by_phone(clean_digits or chat_id)
+        if not client:
+            auto_create = Setting.get('whatsapp_bot_auto_create_lead')
+            if auto_create is None or str(auto_create).lower() in ['true', '1', 'yes']:
+                try:
+                    display_phone = LeadEnricher.format_phone_display(clean_digits)
+                    initial_name = push_name_candidate or f"Lead WA {clean_digits[-4:] if len(clean_digits) >= 4 else clean_digits}"
+                    client = Client(
+                        name=initial_name,
+                        phone=display_phone,
+                        status='lead',
+                        notes="Lead criado automaticamente via Bot WhatsApp."
+                    )
+                    db.session.add(client)
+                    db.session.commit()
+                    logger.info(f"[Task WhatsApp Batch] Novo Lead auto-cadastrado no CRM: ID={client.id}, Nome='{client.name}', Fone='{display_phone}'")
+                except Exception as e:
+                    db.session.rollback()
+                    logger.warning(f"[Task WhatsApp Batch] Não foi possível auto-cadastrar lead: {e}")
+
+        client_info = None
+        if client:
+            # Se o lead ainda estava com nome genérico e capturamos um PushName válido, atualiza o nome
+            if (not client.name or client.name.startswith("Lead WA")) and push_name_candidate:
+                client.name = push_name_candidate
+                try:
+                    db.session.commit()
+                    logger.info(f"[Task WhatsApp Batch] Nome do Lead ID={client.id} atualizado com PushName: '{client.name}'")
+                except Exception:
+                    db.session.rollback()
+
+            # Extração de entidades a partir das mensagens acumuladas
+            last_assistant_msg = ""
+            try:
+                chat_history_preview = ConversationMemory.get_context_messages(chat_id)
+                for msg_item in reversed(chat_history_preview or []):
+                    if msg_item.get('role') == 'assistant':
+                        last_assistant_msg = msg_item.get('content', '')
+                        break
+            except Exception:
+                pass
+
+            extracted_entities = LeadEnricher.extract_entities_from_text(
+                aggregated_text,
+                last_assistant_message=last_assistant_msg
+            )
+            if extracted_entities:
+                updated = LeadEnricher.enrich_client_record(client, extracted_entities, source_message=aggregated_text)
+                if updated:
+                    logger.info(f"[Task WhatsApp Batch] Cadastro do Lead ID={client.id} enriquecido com dados: {extracted_entities}")
+
+            # Gera checklist de dados faltantes para orientar o diálogo da IA
+            qualif_prompt = LeadEnricher.build_qualification_prompt_context(client)
+
+            client_info = {
+                'name': client.name,
+                'phone': client.phone,
+                'email': getattr(client, 'email', None),
+                'status': client.status,
+                'assigned_user': client.assigned_user.username if getattr(client, 'assigned_user', None) else None,
+                'segment': getattr(client, 'segment', None),
+                'qualification_prompt': qualif_prompt
+            }
 
         # 7. Regra de Transbordo para Atendente Humano
         triggers_raw = Setting.get('whatsapp_bot_handover_trigger') or 'humano, atendente, falar com pessoa, falar com alguem, suporte humano'

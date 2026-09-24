@@ -94,13 +94,23 @@ def add_to_buffer(chat_id: str, message_payload: dict, instance_id: str = None) 
     buffer_key = f"{REDIS_PREFIX_BUFFER}:{chat_id}"
     timer_key = f"{REDIS_PREFIX_TIMER}:{chat_id}"
 
+    # Captura nome do perfil (PushName) enviado pelo WhatsApp se disponível
+    raw_push = (
+        message_payload.get('pushName') or 
+        (message_payload.get('_data', {}).get('notifyName') if isinstance(message_payload.get('_data'), dict) else None) or
+        message_payload.get('notifyName') or
+        (message_payload.get('sender', {}).get('pushname') if isinstance(message_payload.get('sender'), dict) else None) or
+        (message_payload.get('sender', {}).get('name') if isinstance(message_payload.get('sender'), dict) else None)
+    )
+
     # Prepara o item serializado com timestamp de recepção
     item = {
         "id": message_payload.get('id') or message_payload.get('message_id') or str(uuid.uuid4()),
         "body": message_payload.get('body', '').strip(),
         "from": message_payload.get('from', chat_id),
         "timestamp": message_payload.get('timestamp') or datetime.now(timezone.utc).isoformat(),
-        "instance_id": instance_id or message_payload.get('instance_id')
+        "instance_id": instance_id or message_payload.get('instance_id'),
+        "push_name": raw_push.strip() if raw_push and isinstance(raw_push, str) else None
     }
 
     # Gera token único para esta versão do batch

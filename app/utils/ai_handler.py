@@ -49,6 +49,24 @@ class AIHandler:
     def get_config():
         settings_raw = Setting.query.all()
         config = {s.key: s.value for s in settings_raw}
+        
+        try:
+            temp_val = float(config.get('whatsapp_bot_temperature', '0.3'))
+        except (ValueError, TypeError):
+            temp_val = 0.3
+
+        try:
+            tokens_val = int(config.get('whatsapp_bot_max_tokens', '200'))
+        except (ValueError, TypeError):
+            tokens_val = 200
+
+        try:
+            rag_k = int(config.get('whatsapp_bot_rag_top_k', '3'))
+        except (ValueError, TypeError):
+            rag_k = 3
+
+        rag_on = str(config.get('whatsapp_bot_rag_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
+
         return {
             'api_key': config.get('ai_api_key', ''),
             'provider': config.get('ai_provider', 'ollama'),
@@ -62,7 +80,15 @@ class AIHandler:
                 "3. Retorne estritamente o texto reescrito pronto para envio, sem explicações, introduções ou aspas."
             ),
             'ollama_url': (config.get('ai_ollama_url') or os.environ.get('OLLAMA_URL', 'http://localhost:11434')).rstrip('/'),
-            'ollama_model': config.get('ai_ollama_model', 'qwen2.5:1.5b')
+            'ollama_model': config.get('ai_ollama_model', 'qwen2.5:1.5b'),
+            # Parâmetros e RAG do Bot de Atendimento
+            'bot_persona_name': config.get('whatsapp_bot_persona_name', 'Sofia'),
+            'bot_company_name': config.get('whatsapp_bot_company_name', 'CRM Pro'),
+            'bot_system_prompt': config.get('whatsapp_bot_system_prompt', ''),
+            'bot_temperature': temp_val,
+            'bot_max_tokens': tokens_val,
+            'rag_enabled': rag_on,
+            'rag_top_k': rag_k
         }
 
     @staticmethod
@@ -157,27 +183,61 @@ class AIHandler:
             return text, f"Erro na IA ({cfg['provider']}): {error_msg[:100]}"
 
     @staticmethod
-    def generate_chat_reply(customer_message, chat_history=None, client_info=None):
+    def generate_chat_reply(customer_message, chat_history=None, client_info=None, include_rag=True):
         """
-        Gera respostas inteligentes e contextualizadas para o WhatsApp utilizando histórico
-        conversacional (multi-turno) e dados cadastrais do cliente no CRM.
+        Gera respostas inteligentes e contextualizadas para o WhatsApp utilizando:
+        1. Diretrizes comportamentais e persona configuradas no sistema;
+        2. Base de Conhecimento RAG (busca semântica de regras, preços, catálogos e FAQs);
+        3. Histórico conversacional multi-turno;
+        4. Dados cadastrais do cliente no CRM.
         """
         cfg = AIHandler.get_config()
         if cfg['provider'] != 'ollama' and not cfg['api_key']:
             return "Olá! Recebemos sua mensagem e entraremos em contato em breve.", "API Key não configurada."
 
-        base_prompt = (
-            "Você é um assistente de atendimento educado, atencioso e prestativo de uma empresa comercial no WhatsApp. "
-            "Responda de forma clara, natural, profissional e amigável em português do Brasil. "
-            "Mantenha respostas concisas e legíveis em tela de celular (evite blocos excessivamente longos). "
-            "Busque sempre sanar as dúvidas do cliente ou indicar que um consultor da equipe entrará em contato quando necessário."
-        )
+        persona_name = cfg['bot_persona_name'] or "Sofia"
+        company_name = cfg['bot_company_name'] or "nossa empresa"
 
-        # Enriquecimento com dados do CRM se disponíveis
+        # Prompt base ou personalizado pelo usuário
+        if cfg['bot_system_prompt'] and cfg['bot_system_prompt'].strip():
+            base_prompt = cfg['bot_system_prompt'].strip()
+        else:
+            base_prompt = (
+                f"Você é a {persona_name}, assistente virtual de atendimento da empresa {company_name} no WhatsApp. "
+                "Responda de forma clara, natural, profissional e amigável em português do Brasil. "
+                "Mantenha respostas concisas e legíveis em tela de celular (1 a 3 parágrafos curtos). "
+                "Seu objetivo é sanar dúvidas sobre nossos serviços e qualificar o contato para um consultor especialista."
+            )
+
+        prompt_sections = [base_prompt]
+
+        # 1. Recuperação Semântica via RAG
+        rag_context = ""
+        rag_snippets_count = 0
+        if include_rag and cfg['rag_enabled']:
+            try:
+                from app.utils.rag_engine import RAGEngine
+                rag_context = RAGEngine.get_formatted_context(customer_message, top_k=cfg['rag_top_k'])
+                if rag_context:
+                    rag_snippets_count = rag_context.count('\n- [') + (1 if rag_context.startswith('- [') else 0)
+                    prompt_sections.append(
+                        "\n--- INFORMAÇÕES OFICIAIS DO NEGÓCIO (BASE DE CONHECIMENTO) ---\n"
+                        f"{rag_context}\n"
+                        "IMPORTANTE: Se a dúvida do cliente estiver relacionada às informações oficiais acima, "
+                        "baseie estritamente sua resposta nelas com precisão. Não invente preços, regras ou condições inexistentes."
+                    )
+            except Exception as e:
+                print(f"[AIHandler] Aviso ao recuperar contexto RAG: {e}")
+
+        # 2. Enriquecimento com dados do CRM se disponíveis
         context_lines = []
         if client_info and isinstance(client_info, dict):
             if client_info.get('name'):
                 context_lines.append(f"Nome do cliente: {client_info['name']}")
+            if client_info.get('phone'):
+                context_lines.append(f"Telefone: {client_info['phone']}")
+            if client_info.get('email'):
+                context_lines.append(f"E-mail: {client_info['email']}")
             if client_info.get('status'):
                 context_lines.append(f"Etapa no CRM: {client_info['status']}")
             if client_info.get('segment'):
@@ -186,16 +246,20 @@ class AIHandler:
                 context_lines.append(f"Consultor responsável: {client_info['assigned_user']}")
 
         if context_lines:
-            system_prompt = (
-                f"{base_prompt}\n\nContexto do contato no CRM:\n"
+            prompt_sections.append(
+                "\n--- CONTEXTO DO CLIENTE NO CRM ---\n"
                 + "\n".join(f"- {line}" for line in context_lines)
                 + "\nUse essas informações para personalizar o atendimento com empatia e naturalidade."
             )
-        else:
-            system_prompt = base_prompt
+
+        # 3. Qualificação Cadastral Ativa (Preenchimento progressivo de dados faltantes)
+        if client_info and isinstance(client_info, dict) and client_info.get('qualification_prompt'):
+            prompt_sections.append(str(client_info['qualification_prompt']).strip())
+
+        final_system_prompt = "\n\n".join(prompt_sections)
 
         # Construção da lista estruturada de mensagens (Chat Multi-turno)
-        messages = [{"role": "system", "content": system_prompt}]
+        messages = [{"role": "system", "content": final_system_prompt}]
         if chat_history and isinstance(chat_history, list):
             for turn in chat_history:
                 if isinstance(turn, dict) and turn.get('role') in ['user', 'assistant'] and turn.get('content'):
@@ -203,6 +267,9 @@ class AIHandler:
 
         # Adiciona a mensagem unificada atual do cliente
         messages.append({"role": "user", "content": customer_message.strip()})
+
+        bot_temp = cfg['bot_temperature']
+        bot_tokens = cfg['bot_max_tokens']
 
         try:
             # Provedor 1: OLLAMA (Local Docker)
@@ -213,11 +280,11 @@ class AIHandler:
                     "messages": messages,
                     "stream": False,
                     "options": {
-                        "temperature": 0.7,
-                        "num_predict": 160
+                        "temperature": bot_temp,
+                        "num_predict": bot_tokens
                     }
                 }
-                resp = requests.post(url, json=payload, timeout=60)
+                resp = requests.post(url, json=payload, timeout=90)
                 if resp.status_code == 200:
                     content = resp.json().get("message", {}).get("content", "")
                     cleaned = AIHandler.clean_text(content)
@@ -253,7 +320,7 @@ class AIHandler:
                     prefix = "Cliente" if msg['role'] == 'user' else "Assistente"
                     conversation_text += f"{prefix}: {msg['content']}\n"
 
-                full_prompt = f"{system_prompt}\n\nHistórico da conversa:\n{conversation_text}\nAssistente:"
+                full_prompt = f"{final_system_prompt}\n\nHistórico da conversa:\n{conversation_text}\nAssistente:"
                 response = client.models.generate_content(
                     model='gemini-2.0-flash',
                     contents=full_prompt

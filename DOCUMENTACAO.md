@@ -898,7 +898,57 @@ sequenceDiagram
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo e Captura Ativa de Mensagens do WhatsApp.*
+---
+
+## 16. Enriquecimento Contínuo de Leads e Precisão Cadastral via WhatsApp
+
+O CRM conta com o módulo [`app/utils/lead_enricher.py`](file:///home/fabio/Projetos/CRM/app/utils/lead_enricher.py) (`LeadEnricher`), responsável por garantir máxima precisão cadastral e preenchimento progressivo de leads durante as interações com o bot autônomo.
+
+```mermaid
+flowchart TD
+    Msg[Mensagem Recebida no WhatsApp] --> ExtractData[Captura de PushName e Telefone Limpo]
+    ExtractData --> FindClient{Cliente Existe no CRM?}
+    FindClient -- Não --> AutoCreate[Auto-Cadastro com Telefone Formatado (DD) 9XXXX-XXXX e PushName Higienizado]
+    FindClient -- Sim --> Enrich[Extração Heurística de Entidades do Texto]
+    AutoCreate --> Enrich
+    Enrich --> CheckData{Faltam Dados Essenciais?\nNome, E-mail, Segmento}
+    CheckData -- Sim --> PromptQualif[Injeta Checklist de Qualificação no Prompt da IA\n'1 Pergunta por Turno']
+    CheckData -- Não --> PromptRegular[Prompt Regular de Vendas e Negociação]
+    PromptQualif --> Ollama[Geração de Resposta Consultiva com Pergunta Suave]
+    PromptRegular --> Ollama
+    Ollama --> Send[Envio via WAHA e Atualização Cumulativa sem Perda de Dados]
+```
+
+### 16.1. Componentes de Precisão Cadastral:
+1. **Normalização e Desduplicação de Telefones (`find_client_by_phone`):**
+   - Extrai dígitos limpos sem sufixos (`@c.us`, `@s.whatsapp.net`, `:1`).
+   - Busca em múltiplas camadas para compatibilidade com leads importados por planilhas ou cadastrados manualmente:
+     - Igualdade exata (formato mascarado ou dígitos limpos).
+     - Sufixo de 9 dígitos (DDD móvel).
+     - Sufixo de 8 dígitos com desempate por DDD.
+   - Formatação visual padronizada no padrão brasileiro: `(DD) 9XXXX-XXXX` ou `(DD) XXXX-XXXX`.
+2. **Higienização de PushName (`extract_clean_push_name`):**
+   - Remove emojis, decorações, símbolos e caracteres invisíveis.
+   - Remove sufixos comuns do WhatsApp (ex: `"Carlos | Vendas"` vira `"Carlos"`).
+   - Valida se é um nome real e legível antes de registrar no banco.
+3. **Extração Contextual de Entidades (`extract_entities_from_text`):**
+   - E-mails válidos (`RFC 5322`).
+   - CPFs e CNPJs com formatação ou numéricos.
+   - Nomes declarados espontaneamente ("meu nome é...", "sou a...") ou em resposta direta à pergunta do bot ("qual o seu nome?").
+   - Segmento de mercado e área de atuação ("trabalho com...", "sou do ramo de...").
+4. **Preenchimento Cumulativo e Inviolabilidade dos Dados (`enrich_client_record`):**
+   - **Regra de Ouro:** NUNCA apaga ou substitui dados preexistentes.
+   - Se um dado novo é fornecido (ex: e-mail), é gravado no campo correspondente.
+   - Anotações (`notes`) preservam o histórico anterior e recebem carimbo de data/hora com o que foi coletado (`[DD/MM/YYYY HH:MM] Bot Coletou: ...`).
+   - Leads com nome real e dados de contato são promovidos automaticamente para o status `'contato'`.
+5. **Diálogo Consultivo de Qualificação Progressiva (`build_qualification_prompt_context`):**
+   - O System Prompt da IA recebe um checklist transparente do que já foi preenchido e qual é o próximo dado faltante.
+   - A IA é orientada a primeiro responder à dúvida do cliente e, ao final, fazer **uma única pergunta natural** para obter o dado faltante sem parecer um formulário rígido.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp e Enriquecimento Progressivo de Leads.*
+
 
 
 

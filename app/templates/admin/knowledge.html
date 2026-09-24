@@ -1,0 +1,584 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .knowledge-hero {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(168, 85, 247, 0.12) 50%, rgba(16, 185, 129, 0.1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(16px);
+        border-radius: 16px;
+        padding: 1.75rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    .k-stat-card {
+        background: rgba(15, 23, 42, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .k-stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    .k-stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+
+    .nav-tabs-glass {
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+    }
+    .nav-tab-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        padding: 0.75rem 1.25rem;
+        border-radius: 8px 8px 0 0;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s ease;
+        border-bottom: 2px solid transparent;
+    }
+    .nav-tab-btn:hover {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.04);
+    }
+    .nav-tab-btn.active {
+        color: #38bdf8;
+        border-bottom-color: #38bdf8;
+        background: rgba(56, 189, 248, 0.08);
+    }
+
+    .tab-content-panel {
+        display: none;
+        animation: fadeIn 0.25s ease-in-out;
+    }
+    .tab-content-panel.active {
+        display: block;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-glass {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 1.5rem;
+        backdrop-filter: blur(12px);
+    }
+
+    .input-glass {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+        border-radius: 8px;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+    }
+    .input-glass:focus {
+        border-color: #38bdf8;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+
+    .btn-gradient-blue {
+        background: linear-gradient(135deg, #2563eb 0%, #38bdf8 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 0.65rem 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+    .btn-gradient-blue:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+    }
+
+    .snippet-box {
+        background: rgba(0, 0, 0, 0.4);
+        border-left: 3px solid #38bdf8;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .badge-doc-type {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+    }
+    .badge-faq { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-pdf { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-text { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+</style>
+
+<div class="container-fluid py-4">
+    <!-- Header / Hero da Base de Conhecimento -->
+    <div class="knowledge-hero">
+        <div class="d-flex flex-wrap justify-between align-center gap-3">
+            <div>
+                <div class="d-flex align-center gap-2 mb-1">
+                    <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-weight: 700;">
+                        <i class="fa-solid fa-brain"></i> RAG COGNITIVO
+                    </span>
+                    <span class="text-xs text-muted">Inteligência Semântica do Negócio</span>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-1">Base de Conhecimento & Treinamento do Bot</h2>
+                <p class="text-sm text-muted mb-0" style="max-width: 720px;">
+                    Ensine regras de atendimento, tabelas de preço, catálogos de serviços e políticas da sua empresa para o assistente virtual via busca vetorial. Respostas exatas e sem alucinações.
+                </p>
+            </div>
+            <div class="d-flex align-center gap-2">
+                <form action="{{ url_for('admin.knowledge_reindex_all') }}" method="POST" onsubmit="return confirm('Deseja recalcular os vetores de todos os documentos ativos?');">
+                    <button type="submit" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="border-radius: 8px;">
+                        <i class="fa-solid fa-arrows-rotate"></i> Reindexar Tudo
+                    </button>
+                </form>
+                <a href="{{ url_for('admin.settings') }}?tab=whatsapp" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="border-radius: 8px;">
+                    <i class="fa-solid fa-sliders"></i> Ajustar Persona
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Métricas e Status -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <!-- Card 1: Status Vetorial -->
+        <div class="k-stat-card">
+            <div class="k-stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <i class="fa-solid fa-database"></i>
+            </div>
+            <div>
+                <div class="text-xs text-muted">Banco Vetorial</div>
+                <div class="text-lg font-bold text-white">
+                    {% if chroma_ok %}
+                        <span class="text-success"><i class="fa-solid fa-circle-check text-xs"></i> ChromaDB Ativo</span>
+                    {% else %}
+                        <span class="text-danger"><i class="fa-solid fa-triangle-exclamation text-xs"></i> Indisponível</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-muted">Persistência local sqlite</div>
+            </div>
+        </div>
+
+        <!-- Card 2: Modelo de Embedding -->
+        <div class="k-stat-card">
+            <div class="k-stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div>
+                <div class="text-xs text-muted">Modelo de Embeddings</div>
+                <div class="text-base font-bold text-white">nomic-embed-text</div>
+                <div class="text-xs text-muted">Ollama Local (768 dimensões)</div>
+            </div>
+        </div>
+
+        <!-- Card 3: Documentos Ativos -->
+        <div class="k-stat-card">
+            <div class="k-stat-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                <i class="fa-solid fa-book-bookmark"></i>
+            </div>
+            <div>
+                <div class="text-xs text-muted">Documentos / Tópicos</div>
+                <div class="text-2xl font-bold text-white">{{ active_docs }} <span class="text-sm text-muted font-normal">/ {{ total_docs }}</span></div>
+                <div class="text-xs text-muted">{{ active_docs }} documentos ativos no bot</div>
+            </div>
+        </div>
+
+        <!-- Card 4: Total de Chunks -->
+        <div class="k-stat-card">
+            <div class="k-stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <i class="fa-solid fa-cubes-stacked"></i>
+            </div>
+            <div>
+                <div class="text-xs text-muted">Fragmentos Vetoriais</div>
+                <div class="text-2xl font-bold text-white">{{ total_chunks }}</div>
+                <div class="text-xs text-muted">Chunks indexados no RAG</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegação de Abas do Módulo de Conhecimento -->
+    <div class="nav-tabs-glass">
+        <button type="button" class="nav-tab-btn active" onclick="switchTab('tab-faq', this)">
+            <i class="fa-solid fa-circle-question"></i> 1. FAQ Rápido (Perguntas & Respostas)
+        </button>
+        <button type="button" class="nav-tab-btn" onclick="switchTab('tab-doc', this)">
+            <i class="fa-solid fa-file-lines"></i> 2. Documentos & Políticas
+        </button>
+        <button type="button" class="nav-tab-btn" onclick="switchTab('tab-upload', this)">
+            <i class="fa-solid fa-cloud-arrow-up"></i> 3. Upload de Arquivos (PDF / TXT)
+        </button>
+        <button type="button" class="nav-tab-btn" onclick="switchTab('tab-simulator', this)">
+            <i class="fa-solid fa-flask text-warning"></i> 4. Simulador & Teste Semântico
+        </button>
+    </div>
+
+    <!-- ABA 1: FAQ RÁPIDO -->
+    <div id="tab-faq" class="tab-content-panel active mb-4">
+        <div class="card-glass">
+            <div class="d-flex align-center justify-between mb-3">
+                <div>
+                    <h4 class="text-lg font-bold text-white mb-1">Adicionar Pergunta e Resposta Frequente</h4>
+                    <p class="text-xs text-muted mb-0">Cadastre respostas prontas para perguntas recorrentes de clientes sobre produtos, funcionamento, prazos ou preços.</p>
+                </div>
+                <span class="badge badge-faq">Formato Recomendado</span>
+            </div>
+
+            <form action="{{ url_for('admin.knowledge_add_faq') }}" method="POST">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div class="md:col-span-2">
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Pergunta do Cliente / Dúvida Comum</label>
+                        <input type="text" name="question" class="input-glass w-100" placeholder="Ex: Qual o horário de atendimento no sábado?" required>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Categoria</label>
+                        <select name="category" class="input-glass w-100">
+                            <option value="duvidas">Dúvidas Frequentes</option>
+                            <option value="precos">Preços & Pagamentos</option>
+                            <option value="servicos">Serviços & Catálogo</option>
+                            <option value="suporte">Prazos & Suporte</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="text-xs font-semibold text-muted mb-1 d-block">Resposta Oficial da Empresa (Como a IA deve responder)</label>
+                    <textarea name="answer" rows="3" class="input-glass w-100" placeholder="Ex: Aos sábados atendemos das 08h às 12h para consultas agendadas e plantão de suporte." required></textarea>
+                </div>
+
+                <div class="d-flex justify-end">
+                    <button type="submit" class="btn-gradient-blue">
+                        <i class="fa-solid fa-plus"></i> Salvar e Indexar no RAG
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ABA 2: DOCUMENTOS E POLÍTICAS -->
+    <div id="tab-doc" class="tab-content-panel mb-4">
+        <div class="card-glass">
+            <div class="mb-3">
+                <h4 class="text-lg font-bold text-white mb-1">Cadastrar Documento de Texto / Tabela Comercial</h4>
+                <p class="text-xs text-muted mb-0">Cole regulamentos, catálogo de produtos, tabela de preços completa ou políticas de garantia.</p>
+            </div>
+
+            <form action="{{ url_for('admin.knowledge_add_doc') }}" method="POST">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div class="md:col-span-2">
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Título do Documento</label>
+                        <input type="text" name="title" class="input-glass w-100" placeholder="Ex: Tabela de Preços e Planos 2026" required>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Categoria</label>
+                        <select name="category" class="input-glass w-100">
+                            <option value="precos">Tabela de Preços</option>
+                            <option value="servicos">Catálogo de Serviços</option>
+                            <option value="institucional">Institucional & Quem Somos</option>
+                            <option value="termos">Políticas & Garantia</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="text-xs font-semibold text-muted mb-1 d-block">Conteúdo Completo (Texto Livre / Markdown)</label>
+                    <textarea name="content" rows="6" class="input-glass w-100" placeholder="Cole aqui o texto completo. O motor RAG irá fatiar automaticamente em trechos semânticos com sobreposição de contexto..." required></textarea>
+                </div>
+
+                <div class="d-flex justify-end">
+                    <button type="submit" class="btn-gradient-blue">
+                        <i class="fa-solid fa-vector-square"></i> Fatiar e Indexar Documento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ABA 3: UPLOAD DE ARQUIVOS (PDF/TXT) -->
+    <div id="tab-upload" class="tab-content-panel mb-4">
+        <div class="card-glass">
+            <div class="mb-3">
+                <h4 class="text-lg font-bold text-white mb-1">Upload de Manuais e Catálogos (PDF, TXT ou MD)</h4>
+                <p class="text-xs text-muted mb-0">O sistema lê o arquivo, extrai todo o texto legível e calcula os vetores no Ollama em segundo plano.</p>
+            </div>
+
+            <form action="{{ url_for('admin.knowledge_upload_file') }}" method="POST" enctype="multipart/form-data">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div>
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Título Opcional (Se vazio usa o nome do arquivo)</label>
+                        <input type="text" name="title" class="input-glass w-100" placeholder="Ex: Manual do Usuário 2026">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Categoria</label>
+                        <select name="category" class="input-glass w-100">
+                            <option value="manuais">Manuais & Catálogos</option>
+                            <option value="precos">Tabela de Preços</option>
+                            <option value="contratos">Contratos & Políticas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-muted mb-1 d-block">Arquivo (.pdf, .txt, .md)</label>
+                        <input type="file" name="file" accept=".pdf,.txt,.md" class="input-glass w-100" required>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-end">
+                    <button type="submit" class="btn-gradient-blue">
+                        <i class="fa-solid fa-file-import"></i> Processar e Indexar Arquivo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ABA 4: SIMULADOR E PLAYGROUND -->
+    <div id="tab-simulator" class="tab-content-panel mb-4">
+        <div class="card-glass" style="border-color: rgba(245, 158, 11, 0.3);">
+            <div class="mb-3">
+                <h4 class="text-lg font-bold text-white mb-1 d-flex align-center gap-2">
+                    <i class="fa-solid fa-flask text-warning"></i> Simulador de Atendimento com RAG
+                </h4>
+                <p class="text-xs text-muted mb-0">Faça uma pergunta como se fosse um cliente do WhatsApp para testar quais trechos do seu negócio o bot recupera e o que ele responderia.</p>
+            </div>
+
+            <div class="d-flex gap-2 mb-3">
+                <input type="text" id="sim-query" class="input-glass flex-grow" placeholder="Ex: Quanto custa a mensalidade e vocês atendem de sábado?" onkeydown="if(event.key === 'Enter') runSimulation()">
+                <button type="button" class="btn-gradient-blue" onclick="runSimulation()" id="sim-btn">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Testar com IA
+                </button>
+            </div>
+
+            <!-- Área de Resultados da Simulação -->
+            <div id="sim-results" style="display: none;">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Coluna 1: Trechos RAG Encontrados -->
+                    <div>
+                        <div class="d-flex align-center justify-between mb-2">
+                            <span class="text-xs font-bold text-uppercase text-muted">
+                                <i class="fa-solid fa-magnifying-glass text-info"></i> Trechos Recuperados no ChromaDB (<span id="sim-count">0</span>)
+                            </span>
+                            <span class="text-xs text-muted" id="sim-search-time">0ms</span>
+                        </div>
+                        <div id="sim-snippets-container" style="max-height: 280px; overflow-y: auto;">
+                            <!-- Snippets injetados via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Coluna 2: Resposta Gerada pelo Bot -->
+                    <div>
+                        <div class="d-flex align-center justify-between mb-2">
+                            <span class="text-xs font-bold text-uppercase text-muted">
+                                <i class="fa-solid fa-robot text-success"></i> Resposta Sugerida pelo Bot
+                            </span>
+                            <span class="text-xs text-muted" id="sim-reply-time">0ms</span>
+                        </div>
+                        <div class="card-glass" style="background: rgba(0, 0, 0, 0.4); min-height: 120px; border-left: 3px solid #10b981;">
+                            <div class="text-sm text-white" id="sim-reply-text" style="white-space: pre-wrap; line-height: 1.5;"></div>
+                        </div>
+                        <div class="text-xs text-muted mt-2 d-flex justify-between">
+                            <span>Modelo de inferência: <strong id="sim-model">-</strong></span>
+                            <span class="text-success"><i class="fa-solid fa-shield-halved"></i> Contexto Oficial Aplicado</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LISTA DE DOCUMENTOS CADASTRADOS -->
+    <div class="card-glass">
+        <div class="d-flex flex-wrap align-center justify-between gap-3 mb-3">
+            <div>
+                <h4 class="text-lg font-bold text-white mb-1">Base de Conhecimento Indexada</h4>
+                <p class="text-xs text-muted mb-0">Total de {{ docs|length }} registros cadastrados. Desative ou remova tópicos conforme suas regras mudem.</p>
+            </div>
+        </div>
+
+        {% if docs %}
+        <div class="table-responsive">
+            <table class="table-glass w-100">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Tipo</th>
+                        <th>Título / Pergunta</th>
+                        <th>Categoria</th>
+                        <th style="width: 100px;">Chunks RAG</th>
+                        <th style="width: 140px;">Data</th>
+                        <th style="width: 110px;">Status</th>
+                        <th style="width: 90px;" class="text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in docs %}
+                    <tr>
+                        <td>
+                            {% if doc.doc_type == 'faq' %}
+                                <span class="badge-doc-type badge-faq">FAQ</span>
+                            {% elif doc.doc_type == 'pdf' %}
+                                <span class="badge-doc-type badge-pdf">PDF</span>
+                            {% else %}
+                                <span class="badge-doc-type badge-text">TXT</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="font-semibold text-white text-sm">{{ doc.title }}</div>
+                            <div class="text-xs text-muted text-truncate" style="max-width: 480px;">
+                                {{ doc.content[:140] }}...
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge badge-secondary text-xs">{{ doc.category }}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-info text-xs font-bold">{{ doc.chunks_count or 0 }} chunks</span>
+                        </td>
+                        <td class="text-xs text-muted">
+                            {{ doc.created_at.strftime('%d/%m/%Y %H:%M') if doc.created_at else '-' }}
+                        </td>
+                        <td>
+                            <form action="{{ url_for('admin.knowledge_toggle', id=doc.id) }}" method="POST" style="display: inline;">
+                                {% if doc.is_active %}
+                                    <button type="submit" class="badge badge-success text-xs" style="border:none; cursor: pointer;" title="Clique para desativar">
+                                        <i class="fa-solid fa-check"></i> Ativo
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="badge badge-secondary text-xs" style="border:none; cursor: pointer;" title="Clique para ativar">
+                                        <i class="fa-solid fa-pause"></i> Inativo
+                                    </button>
+                                {% endif %}
+                            </form>
+                        </td>
+                        <td class="text-right">
+                            <form action="{{ url_for('admin.knowledge_delete', id=doc.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Excluir este conhecimento e seus vetores do ChromaDB?');">
+                                <button type="submit" class="btn-icon text-danger" title="Excluir">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="avatar avatar-lg mx-auto mb-3" style="background: rgba(56, 189, 248, 0.1); color: #38bdf8;">
+                <i class="fa-solid fa-book-open text-2xl"></i>
+            </div>
+            <h4 class="text-base font-bold text-white mb-1">Nenhum documento cadastrado na Base de Conhecimento</h4>
+            <p class="text-xs text-muted mb-3" style="max-width: 440px; margin: 0 auto;">
+                Cadastre o primeiro FAQ ou envie a tabela de preços do seu negócio acima para que o bot aprenda a responder com precisão.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-content-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+    
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+}
+
+async function runSimulation() {
+    const queryInput = document.getElementById('sim-query');
+    const query = queryInput.value.trim();
+    if (!query) {
+        alert('Digite uma pergunta para simular.');
+        return;
+    }
+
+    const btn = document.getElementById('sim-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+    btn.disabled = true;
+
+    const resultsArea = document.getElementById('sim-results');
+    const snippetsContainer = document.getElementById('sim-snippets-container');
+    const replyText = document.getElementById('sim-reply-text');
+    const simCount = document.getElementById('sim-count');
+    const simSearchTime = document.getElementById('sim-search-time');
+    const simReplyTime = document.getElementById('sim-reply-time');
+    const simModel = document.getElementById('sim-model');
+
+    try {
+        const resp = await fetch("{{ url_for('admin.knowledge_test_search') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: query })
+        });
+        const data = await resp.json();
+
+        if (data.ok) {
+            resultsArea.style.display = 'block';
+            simCount.textContent = data.snippets_found;
+            simSearchTime.textContent = `${data.search_duration_ms}ms`;
+            simReplyTime.textContent = `${data.reply_duration_ms}ms`;
+            simModel.textContent = data.model_used || 'Ollama';
+            replyText.textContent = data.reply_text || 'Sem resposta gerada.';
+
+            snippetsContainer.innerHTML = '';
+            if (data.snippets && data.snippets.length > 0) {
+                data.snippets.forEach(s => {
+                    const box = document.createElement('div');
+                    box.className = 'snippet-box';
+                    box.innerHTML = `
+                        <div class="d-flex justify-between align-center mb-1">
+                            <strong class="text-white text-xs">${s.title}</strong>
+                            <span class="badge badge-info" style="font-size: 0.65rem;">Relevância: ${(s.score * 100).toFixed(0)}%</span>
+                        </div>
+                        <div class="text-xs text-muted" style="white-space: pre-wrap;">${s.text}</div>
+                    `;
+                    snippetsContainer.appendChild(box);
+                });
+            } else {
+                snippetsContainer.innerHTML = '<div class="text-xs text-muted p-3 text-center">Nenhum trecho com similaridade suficiente foi encontrado no ChromaDB para esta pergunta. O bot usará seu conhecimento geral ou fallback.</div>';
+            }
+        } else {
+            alert(data.error || 'Erro ao processar simulação.');
+        }
+    } catch (e) {
+        alert('Erro de conexão com o servidor: ' + e);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

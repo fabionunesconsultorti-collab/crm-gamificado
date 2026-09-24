@@ -417,3 +417,33 @@ class ScrapingJob(db.Model):
         return f'<ScrapingJob {self.id}: {self.query_term} [{self.status}]>'
 
 
+class KnowledgeDoc(db.Model):
+    __tablename__ = 'knowledge_doc'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(64), default='geral')  # 'faq', 'precos', 'servicos', 'institucional'
+    doc_type = db.Column(db.String(32), default='text')   # 'text', 'faq', 'pdf', 'url'
+    content = db.Column(db.Text, nullable=False)
+    chunks_count = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'category': self.category,
+            'doc_type': self.doc_type,
+            'content': self.content,
+            'chunks_count': self.chunks_count,
+            'is_active': self.is_active,
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else '',
+            'updated_at': self.updated_at.strftime('%d/%m/%Y %H:%M') if self.updated_at else ''
+        }
+
+    def __repr__(self):
+        return f'<KnowledgeDoc {self.id}: {self.title} [{self.category}]>'
+
+
