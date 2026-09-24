@@ -65,31 +65,29 @@ def whatsapp_webhook():
             logger.info(f"[Webhook WhatsApp] Mensagem duplicada ignorada: ID={msg_id}")
             return jsonify({"status": "ignored", "reason": "duplicate_message", "message_id": msg_id}), 200
 
-        # Enfileiramento na fila assíncrona do RQ
+        # Envio para o buffer de agregação temporal (Debounce) via Redis
         try:
-            queue = get_queue('whatsapp_messages')
-            job = queue.enqueue(
-                process_whatsapp_message,
-                payload=payload,
-                event=event,
-                instance_id=data.get('instance_id') or payload.get('instance_id'),
-                job_timeout='2m',
-                result_ttl=3600
-            )
-            logger.info(f"[Webhook WhatsApp] Mensagem enfileirada com sucesso: Job={job.id}, ID={msg_id}")
+            from app.tasks.buffer import add_to_buffer
+            instance_id = data.get('instance_id') or payload.get('instance_id')
+            batch_token, delay = add_to_buffer(chat_id=from_raw, message_payload=payload, instance_id=instance_id)
+
+            logger.info(f"[Webhook WhatsApp] Mensagem recebida e retida no buffer: Chat={from_raw}, MsgID={msg_id}, Token={batch_token}, Delay={delay}s")
             return jsonify({
-                "status": "queued",
-                "job_id": job.id,
-                "message_id": msg_id
+                "status": "buffered",
+                "chat_id": from_raw,
+                "message_id": msg_id,
+                "batch_token": batch_token,
+                "delay_seconds": delay
             }), 200
         except Exception as e:
-            logger.error(f"[Webhook WhatsApp] Erro ao enfileirar no Redis/RQ: {e}", exc_info=True)
-            # Se o Redis falhar por algum motivo imprevisto, retorna 200 para evitar que o WAHA fique reenviando em loop
+            logger.error(f"[Webhook WhatsApp] Erro ao adicionar ao buffer no Redis: {e}", exc_info=True)
+            # Retorna 200 para evitar que o WAHA fique reenviando em loop em caso de erro transitório
             return jsonify({
-                "status": "error_queuing",
+                "status": "error_buffering",
                 "error": str(e),
                 "message_id": msg_id
             }), 200
+
 
     return jsonify({"status": "received", "event": event}), 200
 

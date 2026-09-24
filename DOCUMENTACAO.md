@@ -715,7 +715,142 @@ O Google Maps aplica mecanismos de rate-limiting (CAPTCHAs e bloqueios temporár
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp e Prospecção Ativa Google Maps.*
+## 13. Módulo de Resposta Automática Inteligente (Ollama + WAHA + Buffer Redis)
+
+Para evitar respostas afobadas, repetitivas e desconexas quando o lead envia várias mensagens curtas em sequência (ex: *"Oi"*, *"Gostaria de saber o valor"*, *"Vocês atendem em Curitiba?"*), o CRM Pro conta com uma **arquitetura de debounce temporal e memória conversacional no Redis**.
+
+```
+Cliente WhatsApp ──> WAHA Webhook ──> Buffer Redis (RPUSH + Expire)
+                                           │
+                             (Aguarda janela de silêncio: ex. 12s)
+                                           │
+                                           ▼
+                                 RQ Worker Desperta
+                                           │
+       ┌───────────────────────────────────┴───────────────────────────────────┐
+       ▼                                   ▼                                   ▼
+WAHA: Presença                Redis: Histórico Multi-turno          Ollama: /api/chat
+(sendSeen + startTyping)      (Carrega turnos passados)             (Contexto Completo)
+       │                                   │                                   │
+       └───────────────────────────────────┬───────────────────────────────────┘
+                                           ▼
+                               WAHA: sendText (Resposta Unificada)
+                                           ▼
+                           Redis: Grava Turno na Memória (TTL 4h)
+                           Postgres: Persiste MessageLog
+```
+
+### 13.1. Chaves Utilizadas no Redis
+
+| Chave | Tipo | Finalidade | TTL |
+| :--- | :--- | :--- | :--- |
+| `crm:wa:buffer:{chat_id}` | `List` | Mensagens pendentes recebidas dentro da janela atual. | 1 hora |
+| `crm:wa:timer:{chat_id}` | `String` | Token único da janela ativa (`batch_token`). Se novas mensagens chegarem, o token é atualizado e o job anterior é descartado. | 5 minutos |
+| `crm:wa:lock:{chat_id}` | `String` | Mutex lock atômico distribuído (`SET NX EX 45`) para evitar concorrência entre workers. | 45 segundos |
+| `crm:wa:history:{chat_id}` | `List` | Histórico dos últimos $N$ turnos de diálogo (`user` e `assistant`) formatados para o Ollama. | 4 horas (configurável) |
+| `crm:wa:processed:{msg_id}` | `String` | Deduplicação atômica de mensagens repetidas do WAHA. | 10 minutos |
+
+### 13.2. Parâmetros Configuráveis no Painel Administrativo
+
+No menu **Admin -> Configurações -> Inteligência Artificial**:
+- **Janela de Silêncio / Debounce (`whatsapp_debounce_delay`)**: Tempo em segundos que o sistema aguarda após a última mensagem antes de iniciar a resposta (Padrão: `12s`).
+- **Turnos de Memória no Contexto (`whatsapp_history_turns`)**: Quantidade máxima de interações anteriores enviadas ao Ollama (Padrão: `8`).
+- **Retenção da Memória no Redis (`whatsapp_history_ttl_hours`)**: Tempo em horas até que a conversa expire e inicie uma nova sessão (Padrão: `4h`).
+- **Simular "Digitando..." (`whatsapp_simulate_typing`)**: Ativa status de digitação nativo no WhatsApp enquanto o Ollama processa a resposta.
+
+### 13.3. Testes Automatizados do Módulo
+
+```bash
+# Executar a suíte de testes de Buffer, Debounce e Memória Conversacional
+./venv/bin/python -m unittest tests/test_whatsapp_buffer.py -v
+
+# Executar a suíte de testes de Webhook Assíncrono
+./venv/bin/python -m unittest tests/test_async_webhook.py -v
+
+# Executar a suíte de testes da Tela em Tempo Real e Simulador
+./venv/bin/python -m unittest tests/test_bot_live.py -v
+```
+
+### 13.4. Interface Visual do Fluxo em Tempo Real & Simulador Live Sandbox
+
+Acesse pelo menu lateral **Administração -> Fluxo IA do Bot** (`/admin/bot/live`):
+1. **Grafo de 6 Etapas Animadas:**
+   - **Etapa 1:** Webhook WAHA (Recepção instantânea).
+   - **Etapa 2:** Buffer & Debounce Redis (Agrupando frases picadas e reiniciando o timer).
+   - **Etapa 3:** Montagem de Contexto (Histórico multi-turno + dados cadastrais do Lead no CRM).
+   - **Etapa 4:** Presença WAHA (Confirmação de leitura e simulação de *digitando...*).
+   - **Etapa 5:** Inferência Ollama (Geração local do texto com o modelo configurado).
+   - **Etapa 6:** Envio WhatsApp & Gravação de Memória (Despacho final e auditoria MessageLog).
+2. **Simulador WhatsApp Integrado:**
+   - Permite enviar mensagens de teste direto na tela sem necessidade de celular.
+   - Botão **"Simular Rajada Rápida (3 msgs)"** para demonstrar o agrupamento temporal no Redis e contagem regressiva ao vivo.
+### 13.5. Painel Ergonômico de Configurações do Bot (`/admin/settings?tab=bot`)
+
+A aba **Bot de Resposta Automática** foi totalmente reprojetada com layout fluido e responsivo de **duas colunas amplas**, eliminando restrições de espaço e oferecendo controles modernos:
+
+- **Hero Banner Interativo:** Status em tempo real do robô (Ativo/Pausado), resumo operacional e atalho direto para o *Fluxo em Tempo Real*.
+- **Coluna 1 (Diretrizes Cognitivas & Atendimento):**
+  - **Persona & Identidade da Marca:** Nome do assistente e nome da empresa.
+  - **Prompt Mestre (System Prompt):** Editor espaçoso com botões rápidos para inserção de variáveis (`[NOME]`, `[ETAPA]`, `[SEGMENTO]`, `[VENDEDOR]`, `[EMPRESA]`, `[PERSONA]`), botão *Aprimorar Prompt com IA* e mensagem de segurança/fallback.
+  - **Transbordo para Atendente Humano:** Palavras-chave gatilho e mensagem de transbordo.
+  - **Horário Comercial & Expediente:** Restrição por faixa horária de expediente com mensagem de ausência personalizada.
+- **Coluna 2 (Mecanismos Técnicos, Buffer Redis & Automação):**
+  - **Operação & Escopo:** Ativação global, filtro de grupos e filtro de transmissões/status.
+  - **Buffer Temporal & Debounce (Redis):** Slider interativo de silêncio com marcações visuais de recomendação (3s, 12s-15s, 60s) e badge de tempo em segundos dinâmico.
+  - **Memória Conversacional Multi-Turno:** Controle de turnos e retenção TTL em horas no Redis.
+  - **Presença & Humanização:** Confirmação de leitura (Check azul) e simulação de *digitando...* no WAHA.
+  - **Integração com CRM:** Auto-cadastro de novos leads e injeção do histórico/etapa do funil no contexto da IA.
+- **Barra de Ação Flutuante:** Botão de salvamento persistente acessível em qualquer rolagem.
+- **Diagnóstico do Redis:** Ferramenta dedicada para limpeza segura de cache de teste, sem afetar dados reais de clientes e leads.
+
+---
+
+## 14. Central de Backup, Restauração e Integração com Nuvem (Google Drive)
+
+Para garantir a **preservação perpétua e consistência absoluta dos dados de clientes, leads, mensagens e configurações**, o CRM Pro inclui um subsistema completo de backup e recuperação de desastres.
+
+### 14.1. Isolamento de Banco e Proteção Contra Perda de Dados
+- **Isolamento de Testes Unitários:** Todos os testes automatizados executam exclusivamente em instâncias voláteis de SQLite em memória (`TestConfig` com `sqlite:///:memory:`). O banco de dados PostgreSQL principal de produção/desenvolvimento (`crm_db`) está **100% blindado contra operações de `db.drop_all()` ou deleções acidentais**.
+- **Transações Atômicas de Restauração:** O processo de restauração roda sob transações seguras do SQLAlchemy com rollback automático em caso de falha.
+- **Ajuste Automático de Sequences:** Após qualquer importação, as sequências de auto-incremento do PostgreSQL são sincronizadas automaticamente com o maior ID existente (`SELECT setval(...)`), garantindo que novas inserções não sofram colisões de chave primária.
+
+### 14.2. Recursos da Aba "Backup & Restauração" (`/admin/settings?tab=backup`)
+
+1. **Backup Manual Completo em 1 Clique:**
+   - Exporta todas as 10 tabelas do sistema (`User`, `Store`, `WahaInstance`, `Setting`, `MessageTemplate`, `FileMappingTemplate`, `Client`, `ScrapingJob`, `MessageLog`, `SystemLog`).
+   - Salva em arquivo padronizado compactado com GZIP (`backup_crm_YYYY-MM-DD_HH-MM-SS.json.gz`) no diretório seguro `backups/`.
+   - Opção para enviar simultaneamente ao Google Drive.
+
+2. **Restauração de Dados com Validação de Integridade:**
+   - Suporte a upload direto de arquivos `.json.gz` e `.json`.
+   - Opção de restauração imediata a partir de qualquer backup local armazenado no servidor com um clique.
+
+3. **Gerenciador de Backups Locais no Servidor:**
+   - Lista detalhada de todos os backups salvos em disco com data, tamanho formatado e opções de:
+     - 📥 **Download:** Baixar o arquivo de backup para o computador do usuário.
+     - ⏱️ **Restaurar:** Reverter o banco para o estado daquele backup específico.
+     - 🗑️ **Excluir:** Remover backups desnecessários para liberar espaço.
+
+4. **Agendamento Automático (Rotina Programada):**
+   - **Frequência:** Diária ou Semanal (aos domingos).
+   - **Horário Programável:** Execução no horário de menor movimento (padrão `03:00` da madrugada).
+   - **Política de Retenção:** Limpeza automática de arquivos locais com mais de $N$ dias (padrão `7` dias).
+   - **Thread Daemon:** Execução autônoma contínua em segundo plano via `app.tasks.backup_scheduler`.
+
+5. **Sincronização em Nuvem com Google Drive (Google Drive API v3):**
+   - Conexão corporativa nativa via **Service Account (Conta de Serviço)**.
+   - Parâmetros configuráveis pelo painel:
+     - Ativação geral (`gdrive_enabled`).
+     - ID da Pasta de destino (`gdrive_folder_id`).
+     - Chave JSON da Service Account (`gdrive_credentials_json`).
+   - Botão interativo **"Testar Conexão com Google Drive"** com diagnóstico em tempo real.
+   - Registro de telemetria da última sincronização (`gdrive_last_status`).
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot e Central de Backup Completo com Google Drive.*
+
+
 
 
 

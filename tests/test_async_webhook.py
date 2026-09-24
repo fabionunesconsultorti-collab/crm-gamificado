@@ -5,20 +5,20 @@ from app.models import Client, MessageLog
 from app.tasks.whatsapp import process_whatsapp_message
 from app.tasks.queue import is_duplicate_message
 
+from config import TestConfig
+
 class TestAsyncWhatsAppWebhook(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = create_app()
-        cls.app.config['TESTING'] = True
-        cls.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        cls.app = create_app(TestConfig)
         cls.client = cls.app.test_client()
         with cls.app.app_context():
             db.create_all()
 
     @classmethod
     def tearDownClass(cls):
-        with cls.app.app_context():
-            db.drop_all()
+        pass
+
 
     def setUp(self):
         with self.app.app_context():
@@ -26,15 +26,11 @@ class TestAsyncWhatsAppWebhook(unittest.TestCase):
             db.session.query(Client).delete()
             db.session.commit()
 
-    @patch('app.api.routes.get_queue')
+    @patch('app.tasks.buffer.add_to_buffer')
     @patch('app.api.routes.is_duplicate_message')
-    def test_webhook_enqueues_valid_message(self, mock_is_dup, mock_get_queue):
+    def test_webhook_enqueues_valid_message(self, mock_is_dup, mock_add_buffer):
         mock_is_dup.return_value = False
-        mock_job = MagicMock()
-        mock_job.id = 'test-job-1234'
-        mock_queue = MagicMock()
-        mock_queue.enqueue.return_value = mock_job
-        mock_get_queue.return_value = mock_queue
+        mock_add_buffer.return_value = ('test-token-1234', 12)
 
         payload = {
             "event": "message",
@@ -49,9 +45,10 @@ class TestAsyncWhatsAppWebhook(unittest.TestCase):
         response = self.client.post('/api/webhook/whatsapp', json=payload)
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
-        self.assertEqual(data.get('status'), 'queued')
-        self.assertEqual(data.get('job_id'), 'test-job-1234')
-        mock_queue.enqueue.assert_called_once()
+        self.assertEqual(data.get('status'), 'buffered')
+        self.assertEqual(data.get('batch_token'), 'test-token-1234')
+        mock_add_buffer.assert_called_once()
+
 
     @patch('app.api.routes.get_queue')
     @patch('app.api.routes.is_duplicate_message')

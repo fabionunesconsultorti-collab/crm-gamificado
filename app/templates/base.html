@@ -84,11 +84,17 @@
                     </a>
                 </li>
                 <li>
+                    <a href="{{ url_for('admin.bot_live') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.bot_live' }}">
+                        <i class="fa-solid fa-network-wired nav-icon text-success"></i> Fluxo IA do Bot
+                    </a>
+                </li>
+                <li>
                     <a href="{{ url_for('admin.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}">
                         <i class="fa-solid fa-gear nav-icon"></i> Configurações
                     </a>
                 </li>
             </ul>
+
             {% endif %}
         </nav>
 

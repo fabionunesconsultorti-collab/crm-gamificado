@@ -42,6 +42,13 @@ def create_app(config_class=Config):
     from app.api import bp as api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
+    if not app.config.get('TESTING'):
+        try:
+            from app.tasks.backup_scheduler import start_backup_scheduler
+            start_backup_scheduler(app)
+        except Exception as e:
+            app.logger.warning(f"Não foi possível iniciar o agendador de backup: {e}")
+
     return app
 
 from app import models

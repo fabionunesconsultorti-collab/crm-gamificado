@@ -78,6 +78,141 @@
         from { opacity: 0; transform: translateY(5px); }
         to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Bot Settings Layout Styling */
+    .bot-settings-container {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .bot-hero-card {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 50%, rgba(168, 85, 247, 0.08) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(16px);
+        border-radius: 14px;
+        padding: 1.5rem 1.75rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    .bot-grid-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+        gap: 1.5rem;
+        align-items: start;
+    }
+    @media (max-width: 1120px) {
+        .bot-grid-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+    .bot-card-glass {
+        background: rgba(22, 27, 34, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.4rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(12px);
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .bot-card-glass:hover {
+        border-color: rgba(255, 255, 255, 0.16);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+    }
+    .bot-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .bot-card-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 0;
+    }
+    .bot-icon-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+    .bot-card-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+        line-height: 1.45;
+    }
+    .bot-var-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        padding: 0.25rem 0.55rem;
+        font-size: 0.73rem;
+        font-family: monospace;
+        color: #93c5fd;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .bot-var-pill:hover {
+        background: rgba(59, 130, 246, 0.25);
+        border-color: #3b82f6;
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+    .bot-slider-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        padding: 1.1rem;
+    }
+    .bot-save-bar {
+        position: sticky;
+        bottom: 1.25rem;
+        z-index: 30;
+        background: rgba(15, 23, 42, 0.92);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .btn-save-bot {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem 1.75rem;
+        font-weight: 700;
+        font-size: 0.92rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+        transition: all 0.2s ease;
+    }
+    .btn-save-bot:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        filter: brightness(1.08);
+    }
 </style>
 
 <div class="header-glass mb-4 justify-between">
@@ -94,10 +229,17 @@
     <button class="tab-btn {% if active_tab == 'ai' %}active{% endif %}" onclick="switchTab('ai', this)">
         <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial
     </button>
+    <button class="tab-btn {% if active_tab == 'bot' %}active{% endif %}" onclick="switchTab('bot', this)">
+        <i class="fa-solid fa-robot text-success"></i> Bot de Resposta Automática
+    </button>
     <button class="tab-btn {% if active_tab == 'stores' %}active{% endif %}" onclick="switchTab('stores', this)">
         <i class="fa-solid fa-store text-info"></i> Lojas & Filiais
     </button>
+    <button class="tab-btn {% if active_tab == 'backup' %}active{% endif %}" onclick="switchTab('backup', this)">
+        <i class="fa-solid fa-cloud-arrow-up text-primary"></i> Backup & Restauração
+    </button>
 </div>
+
 
 <!-- Tab: Templates -->
 <div id="tab-templates" class="tab-content {% if active_tab == 'templates' %}active{% endif %}">
@@ -489,18 +631,513 @@
                 <small class="text-sm text-muted">Para DeepSeek: <a href="https://platform.deepseek.com/" target="_blank" class="text-primary">platform.deepseek.com</a> | Para Gemini: <a href="https://aistudio.google.com/" target="_blank" class="text-primary">aistudio.google.com</a></small>
             </div>
 
-            <div class="form-group">
-                <label for="ai_system_prompt">Tom de Voz & Instruções da IA</label>
-                <textarea name="ai_system_prompt" id="ai_system_prompt" class="input-glass" rows="4" 
-                          placeholder="Instruções para a IA reescrever a mensagem...">{{ settings.get('ai_system_prompt', 'Você é um assistente de vendas pacífico, amigável e vendedor. Reescreva a mensagem a seguir de forma natural e ligeiramente diferente, mantendo o sentido original. IMPORTANTE: Não altere nem remova as palavras dentro de colchetes, como [NOME], [DATA], [STATUS], [HORA], [VENDEDOR].') }}</textarea>
-            </div>
-
             <button type="submit" class="btn-primary mt-3">
                 <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações de IA
             </button>
         </form>
     </div>
 </div>
+
+<!-- Tab: Bot de Resposta Automática -->
+<div id="tab-bot" class="tab-content {% if active_tab == 'bot' %}active{% endif %}">
+    <div class="bot-settings-container">
+
+        <!-- Hero Banner: Identificação do Bot & Acesso Rápido -->
+        <div class="bot-hero-card">
+            <div class="d-flex align-center justify-between flex-wrap gap-3">
+                <div style="max-width: 750px;">
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                            <i class="fa-solid fa-microchip"></i> Motor Autônomo WAHA + Ollama + Redis
+                        </span>
+                        {% if settings.get('whatsapp_bot_enabled', 'true')|lower in ['true', '1'] %}
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                                <i class="fa-solid fa-circle-dot fa-fade"></i> Bot Online & Operante
+                            </span>
+                        {% else %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                                <i class="fa-solid fa-pause"></i> Bot em Pausa
+                            </span>
+                        {% endif %}
+                    </div>
+                    <h3 class="m-0 text-white font-bold" style="font-size: 1.35rem; letter-spacing: -0.02em;">
+                        Configuração do Atendimento Autônomo com IA
+                    </h3>
+                    <p class="text-xs text-muted mt-2 mb-0" style="line-height: 1.5; color: #94a3b8;">
+                        Personalize a persona da inteligência artificial, regras de transbordo, horários comerciais, buffer anti-spam de mensagens picadas e a retenção de memória contextual das conversas.
+                    </p>
+                </div>
+
+                <div class="d-flex align-center gap-3">
+                    <a href="{{ url_for('admin.bot_live') }}" class="btn-primary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border:none; text-decoration: none; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); border-radius: 8px; font-weight: 600;">
+                        <i class="fa-solid fa-network-wired"></i> Abrir Fluxo em Tempo Real
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulário Principal de Configuração -->
+        <form action="{{ url_for('admin.settings', tab='bot') }}" method="post" id="form-bot-settings" class="w-100">
+            <div class="bot-grid-layout">
+
+                <!-- ==================== COLUNA ESQUERDA: DIRETRIZES COGNITIVAS & ATENDIMENTO ==================== -->
+                <div class="d-flex flex-col">
+
+                    <!-- 1. Identidade & Tom de Voz -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                                    <i class="fa-solid fa-user-tie"></i>
+                                </span>
+                                1. Persona & Identidade da Marca
+                            </h4>
+                            <span class="text-xs text-muted">Apresentação</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Defina o nome pelo qual o assistente se apresentará e a razão social ou nome fantasia da empresa informado aos clientes.
+                        </p>
+
+                        <div class="grid-2 gap-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_persona_name" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    <i class="fa-solid fa-signature text-muted me-1"></i> Nome do Atendente Virtual
+                                </label>
+                                <input type="text" name="whatsapp_bot_persona_name" id="whatsapp_bot_persona_name" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_bot_persona_name', 'Sofia') }}" placeholder="ex: Sofia, Atendente Virtual">
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_company_name" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    <i class="fa-solid fa-building text-muted me-1"></i> Nome da Empresa / Loja
+                                </label>
+                                <input type="text" name="whatsapp_bot_company_name" id="whatsapp_bot_company_name" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_bot_company_name', 'CRM Pro') }}" placeholder="ex: Minha Empresa">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. System Prompt & Instruções Mestras -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                                    <i class="fa-solid fa-brain"></i>
+                                </span>
+                                2. Prompt Mestre de Atendimento (System Prompt)
+                            </h4>
+                            <button type="button" class="btn-ai-improve text-xs" onclick="improveTextWithAI('whatsapp_bot_system_prompt', this)" title="Refinar instruções usando IA">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Aprimorar Prompt
+                            </button>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Instrução fundamental injetada em todas as requisições ao Ollama. Clique nas variáveis abaixo para inseri-las diretamente no prompt:
+                        </p>
+
+                        <!-- Pílulas de Injeção Rápida de Variáveis -->
+                        <div class="d-flex align-center flex-wrap gap-2 mb-3">
+                            <span class="text-xs text-muted font-semibold me-1"><i class="fa-solid fa-tags"></i> Inserir:</span>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[NOME]')" title="Nome do contato cadastrado">[NOME]</button>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[ETAPA]')" title="Etapa do lead no funil de vendas">[ETAPA]</button>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[SEGMENTO]')" title="Segmento ou nicho do lead">[SEGMENTO]</button>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[VENDEDOR]')" title="Consultor responsável">[VENDEDOR]</button>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[EMPRESA]')" title="Nome da Empresa">[EMPRESA]</button>
+                            <button type="button" class="bot-var-pill" onclick="insertPromptVar('[PERSONA]')" title="Nome do Atendente">[PERSONA]</button>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <textarea name="whatsapp_bot_system_prompt" id="whatsapp_bot_system_prompt" class="input-glass w-100" rows="8"
+                                      style="font-family: inherit; font-size: 0.84rem; line-height: 1.5; resize: vertical;"
+                                      placeholder="Instruções completas para a conduta do assistente...">{{ settings.get('whatsapp_bot_system_prompt', 'Você é um assistente comercial educado, atencioso e prestativo. Responda de forma clara, natural, profissional e amigável em português do Brasil. Mantenha respostas curtas e fáceis de ler no celular (1 a 3 parágrafos curtos). Seu objetivo é tirar dúvidas sobre nossos serviços, qualificar o interesse do lead e propor que um consultor da equipe entre em contato para prosseguir com a proposta.') }}</textarea>
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label for="whatsapp_bot_fallback_msg" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                <i class="fa-solid fa-shield-halved text-muted me-1"></i> Mensagem de Fallback / Contingência
+                            </label>
+                            <input type="text" name="whatsapp_bot_fallback_msg" id="whatsapp_bot_fallback_msg" class="input-glass w-100 text-xs"
+                                   value="{{ settings.get('whatsapp_bot_fallback_msg', 'Olá! Recebemos sua mensagem e nossa equipe retornará em instantes.') }}"
+                                   placeholder="Mensagem disparada caso o Ollama esteja offline ou sofra timeout">
+                            <small class="text-xs text-muted mt-1 d-block">
+                                Disparada de forma segura caso o Ollama não responda dentro do limite de tolerância.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- 3. Transbordo para Humano -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                                    <i class="fa-solid fa-headset"></i>
+                                </span>
+                                3. Transbordo para Atendente Humano
+                            </h4>
+                            <span class="badge bg-danger text-xs px-2 py-1">Segurança</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Quando o cliente requisitar falar com uma pessoa real, o robô suspende as respostas e transfere o atendimento.
+                        </p>
+
+                        <div class="form-group mb-3">
+                            <label for="whatsapp_bot_handover_trigger" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Palavras-Chave Gatilho (separadas por vírgula)
+                            </label>
+                            <input type="text" name="whatsapp_bot_handover_trigger" id="whatsapp_bot_handover_trigger" class="input-glass w-100"
+                                   value="{{ settings.get('whatsapp_bot_handover_trigger', 'humano, atendente, falar com pessoa, falar com alguem, atendente humano, suporte humano, cancelar') }}"
+                                   placeholder="humano, atendente, suporte">
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label for="whatsapp_bot_handover_msg" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Mensagem de Notificação de Transferência
+                            </label>
+                            <textarea name="whatsapp_bot_handover_msg" id="whatsapp_bot_handover_msg" class="input-glass w-100" rows="2"
+                                      placeholder="Mensagem ao transferir...">{{ settings.get('whatsapp_bot_handover_msg', 'Com certeza! Estou direcionando seu atendimento para um de nossos consultores humanos. Em instantes alguém da equipe responderá aqui.') }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- 4. Horário de Atendimento & Expediente -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                                    <i class="fa-solid fa-clock"></i>
+                                </span>
+                                4. Horário Comercial & Expediente
+                            </h4>
+                            <div style="min-width: 150px;">
+                                <select name="whatsapp_bot_work_hours_enabled" id="whatsapp_bot_work_hours_enabled" class="input-glass text-xs py-1 px-2">
+                                    <option value="false" {% if settings.get('whatsapp_bot_work_hours_enabled')|lower in ['false', '0', ''] %}selected{% endif %}>
+                                        🌐 24 Horas (Sempre Ativo)
+                                    </option>
+                                    <option value="true" {% if settings.get('whatsapp_bot_work_hours_enabled')|lower in ['true', '1'] %}selected{% endif %}>
+                                        ⏰ Restringir por Horário
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Fora da janela de atendimento estipulada, o robô envia um aviso automático de expediente e evita chamadas ao Ollama.
+                        </p>
+
+                        <div class="grid-2 gap-3 mb-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_work_hours_start" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Início do Expediente
+                                </label>
+                                <input type="time" name="whatsapp_bot_work_hours_start" id="whatsapp_bot_work_hours_start" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_bot_work_hours_start', '08:00') }}">
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_work_hours_end" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Término do Expediente
+                                </label>
+                                <input type="time" name="whatsapp_bot_work_hours_end" id="whatsapp_bot_work_hours_end" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_bot_work_hours_end', '18:00') }}">
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label for="whatsapp_bot_out_of_hours_msg" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Mensagem Fora do Horário Comercial
+                            </label>
+                            <textarea name="whatsapp_bot_out_of_hours_msg" id="whatsapp_bot_out_of_hours_msg" class="input-glass w-100" rows="2"
+                                      placeholder="Nosso expediente encerrou...">{{ settings.get('whatsapp_bot_out_of_hours_msg', 'Olá! No momento estamos fora do nosso horário de atendimento (Seg à Sex, 08h às 18h). Deixe sua mensagem que responderemos assim que retornarmos!') }}</textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <!-- ==================== COLUNA DIREITA: MECANISMOS DE BUFFER, REDIS & AUTOMAÇÃO ==================== -->
+                <div class="d-flex flex-col">
+
+                    <!-- 5. Operação Geral & Escopo -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                                    <i class="fa-solid fa-power-off"></i>
+                                </span>
+                                5. Status do Bot & Escopo Operacional
+                            </h4>
+                            <span class="text-xs text-muted">Controle Mestre</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Ative ou silencie globalmente as respostas automatizadas e filtre os tipos de chats que devem ser atendidos.
+                        </p>
+
+                        <div class="form-group mb-3">
+                            <label for="whatsapp_bot_enabled" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Ativação Global das Respostas
+                            </label>
+                            <select name="whatsapp_bot_enabled" id="whatsapp_bot_enabled" class="input-glass w-100 font-semibold" style="font-size: 0.88rem;">
+                                <option value="true" {% if settings.get('whatsapp_bot_enabled', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                    🟢 Ativado (Responder automaticamente mensagens elegíveis)
+                                </option>
+                                <option value="false" {% if settings.get('whatsapp_bot_enabled')|lower in ['false', '0'] %}selected{% endif %}>
+                                    🔴 Desativado / Pausado (Somente recebe mensagens sem responder)
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="grid-2 gap-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_ignore_groups" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Filtro de Grupos
+                                </label>
+                                <select name="whatsapp_bot_ignore_groups" id="whatsapp_bot_ignore_groups" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_bot_ignore_groups', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        🛡️ Ignorar Grupos (Apenas chats privados)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_bot_ignore_groups')|lower in ['false', '0'] %}selected{% endif %}>
+                                        👥 Responder também em Grupos
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_ignore_broadcast" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Filtro de Status / Transmissões
+                                </label>
+                                <select name="whatsapp_bot_ignore_broadcast" id="whatsapp_bot_ignore_broadcast" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_bot_ignore_broadcast', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        🛡️ Ignorar Status & Broadcasts
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_bot_ignore_broadcast')|lower in ['false', '0'] %}selected{% endif %}>
+                                        📢 Processar transmissões
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Buffer Temporal & Debounce (Redis) -->
+                    <div class="bot-card-glass" style="border-color: rgba(56, 189, 248, 0.25);">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                                    <i class="fa-solid fa-stopwatch"></i>
+                                </span>
+                                6. Buffer Temporal & Debounce (Anti-Spam)
+                            </h4>
+                            <span class="badge text-xs px-2 py-1" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
+                                Redis Queue
+                            </span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Evita que o bot responda frase por frase. Quando o cliente digita frases picadas em sequência, o sistema aguarda uma pausa no envio para compor um único pensamento coeso.
+                        </p>
+
+                        <div class="bot-slider-box mb-2">
+                            <div class="d-flex align-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-gray-300">
+                                    Janela de Silêncio / Aguardo:
+                                </span>
+                                <span id="val_debounce" class="badge font-bold px-2 py-1 text-sm" style="background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); color: white; min-width: 48px; text-align: center;">
+                                    {{ settings.get('whatsapp_debounce_delay', '12') }}s
+                                </span>
+                            </div>
+
+                            <input type="range" min="3" max="60" step="1" name="whatsapp_debounce_delay" id="whatsapp_debounce_delay" class="w-100 cursor-pointer"
+                                   value="{{ settings.get('whatsapp_debounce_delay', '12') }}"
+                                   oninput="document.getElementById('val_debounce').innerText = this.value + 's'">
+
+                            <div class="d-flex justify-between text-xs text-muted mt-2" style="font-size: 0.73rem;">
+                                <span><strong>3s:</strong> Ultra rápido</span>
+                                <span style="color: #38bdf8;"><strong>12s - 15s:</strong> Padrão Recomendado</span>
+                                <span><strong>60s:</strong> Conversas densas</span>
+                            </div>
+                        </div>
+
+                        <div class="p-2 px-3 rounded-md mt-2" style="background: rgba(56, 189, 248, 0.05); border: 1px dashed rgba(56, 189, 248, 0.2); font-size: 0.74rem; color: #94a3b8;">
+                            <i class="fa-solid fa-lightbulb text-warning me-1"></i>
+                            <strong>Como funciona:</strong> Cada nova mensagem do lead renova o cronômetro. Somente após {{ settings.get('whatsapp_debounce_delay', '12') }}s de silêncio contínuo o lote é entregue ao Ollama para responder.
+                        </div>
+                    </div>
+
+                    <!-- 7. Memória Conversacional Multi-Turno -->
+                    <div class="bot-card-glass" style="border-color: rgba(168, 85, 247, 0.25);">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                                    <i class="fa-solid fa-comments"></i>
+                                </span>
+                                7. Memória Conversacional Multi-Turno (Redis)
+                            </h4>
+                            <span class="badge text-xs px-2 py-1" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);">
+                                Context Window
+                            </span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Permite ao Ollama lembrar do histórico da conversa para responder perguntas complementares sem perder o fio da meada.
+                        </p>
+
+                        <div class="grid-2 gap-3 mb-2">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_history_turns" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Turnos no Histórico
+                                </label>
+                                <input type="number" min="2" max="30" name="whatsapp_history_turns" id="whatsapp_history_turns" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_history_turns', '8') }}">
+                                <small class="text-xs text-muted mt-1 d-block">Ex: 8 mensagens (4 do lead e 4 da IA).</small>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_history_ttl_hours" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Tempo de Retenção (Horas)
+                                </label>
+                                <input type="number" min="1" max="72" name="whatsapp_history_ttl_hours" id="whatsapp_history_ttl_hours" class="input-glass w-100"
+                                       value="{{ settings.get('whatsapp_history_ttl_hours', '4') }}">
+                                <small class="text-xs text-muted mt-1 d-block">Após esse tempo inativo, inicia nova conversa.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 8. Presença & Humanização (WAHA) -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                                    <i class="fa-solid fa-fingerprint"></i>
+                                </span>
+                                8. Humanização & Presença no WhatsApp
+                            </h4>
+                            <span class="text-xs text-muted">Comportamento WAHA</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Simule estados reais de presença no WhatsApp para transmitir naturalidade ao cliente durante a geração da resposta.
+                        </p>
+
+                        <div class="grid-2 gap-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_simulate_typing" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Simular "Digitando..."
+                                </label>
+                                <select name="whatsapp_simulate_typing" id="whatsapp_simulate_typing" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_simulate_typing', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        ✍️ Ativado (Mostra digitando durante inferência)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_simulate_typing')|lower in ['false', '0'] %}selected{% endif %}>
+                                        ⚡ Desativado (Envio imediato)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_send_seen" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Confirmação de Leitura (Check Azul)
+                                </label>
+                                <select name="whatsapp_send_seen" id="whatsapp_send_seen" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_send_seen', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        ✔️ Ativado (Marca a mensagem como lida)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_send_seen')|lower in ['false', '0'] %}selected{% endif %}>
+                                        ⚪ Desativado (Mantém status inalterado)
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 9. Integração com Leads & CRM -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(249, 115, 22, 0.15); color: #fb923c;">
+                                    <i class="fa-solid fa-address-card"></i>
+                                </span>
+                                9. Integração com Funil de Vendas do CRM
+                            </h4>
+                            <span class="text-xs text-muted">Pipeline Comercial</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Automatize o cadastro de novas oportunidades e forneça à IA os dados cadastrais do cliente para um atendimento ultra-personalizado.
+                        </p>
+
+                        <div class="grid-2 gap-3">
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_auto_create_lead" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Auto-Cadastrar Novo Lead
+                                </label>
+                                <select name="whatsapp_bot_auto_create_lead" id="whatsapp_bot_auto_create_lead" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_bot_auto_create_lead', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        ➕ Sim (Criar lead no funil se número for novo)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_bot_auto_create_lead')|lower in ['false', '0'] %}selected{% endif %}>
+                                        ⛔ Não (Apenas responder sem cadastrar lead)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="whatsapp_bot_inject_client_data" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Injetar Dados do CRM na IA
+                                </label>
+                                <select name="whatsapp_bot_inject_client_data" id="whatsapp_bot_inject_client_data" class="input-glass w-100 text-xs">
+                                    <option value="true" {% if settings.get('whatsapp_bot_inject_client_data', 'true')|lower in ['true', '1'] %}selected{% endif %}>
+                                        🎯 Sim (Enviar Nome, Etapa, Segmento à IA)
+                                    </option>
+                                    <option value="false" {% if settings.get('whatsapp_bot_inject_client_data')|lower in ['false', '0'] %}selected{% endif %}>
+                                        🚫 Não (Usar apenas mensagens brutas)
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Barra de Ação Flutuante / Salvar Configurações -->
+            <div class="bot-save-bar">
+                <div class="d-flex align-center gap-2 text-xs" style="color: #94a3b8;">
+                    <i class="fa-solid fa-circle-check text-success"></i>
+                    <span>Todas as alterações são aplicadas instantaneamente ao motor de atendimento.</span>
+                </div>
+                <div class="d-flex align-center gap-3">
+                    <a href="{{ url_for('admin.bot_live') }}" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="text-decoration: none; border-radius: 8px;">
+                        <i class="fa-solid fa-play text-info"></i> Abrir Fluxo em Tempo Real
+                    </a>
+                    <button type="submit" class="btn-save-bot">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar Todas as Configurações do Bot
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Formulário Separado para Limpeza de Memória (Redis) -->
+        <div class="bot-card-glass mt-4" style="background: rgba(239, 68, 68, 0.04); border: 1px dashed rgba(239, 68, 68, 0.35);">
+            <div class="bot-card-header" style="border-bottom: 1px solid rgba(239, 68, 68, 0.15);">
+                <h4 class="bot-card-title text-danger">
+                    <span class="bot-icon-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                        <i class="fa-solid fa-broom"></i>
+                    </span>
+                    Ferramenta de Diagnóstico & Limpeza de Memória (Redis)
+                </h4>
+                <span class="badge bg-danger text-xs px-2 py-1">Ambiente de Testes</span>
+            </div>
+            <p class="bot-card-subtitle" style="color: #cbd5e1;">
+                Permite redefinir o histórico conversacional temporário armazenado na memória RAM do Redis para simular novos diálogos do zero com a IA.
+                <strong class="text-warning d-block mt-1"><i class="fa-solid fa-lock"></i> Seus dados reais de Clientes, Leads e Histórico de Mensagens no banco de dados permanecem 100% seguros e intactos.</strong>
+            </p>
+
+            <form action="{{ url_for('admin.clear_bot_memory') }}" method="post" class="d-flex gap-3 align-center flex-wrap" onsubmit="return confirm('Deseja realmente limpar a memória temporária do chat no Redis? Os dados de clientes e leads no banco de dados não serão afetados.')">
+                <div style="flex: 1; min-width: 280px; max-width: 480px;">
+                    <input type="text" name="chat_id" class="input-glass w-100 text-xs p-2" placeholder="Número com DDD (ex: 5511999999999) ou deixe vazio para limpar todos">
+                </div>
+                <button type="submit" class="btn-secondary text-xs text-danger p-2 px-3 d-inline-flex align-center gap-2" style="border-color: rgba(239, 68, 68, 0.4); border-radius: 8px; font-weight: 600;">
+                    <i class="fa-solid fa-trash-can"></i> Limpar Memória do Redis
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+
 
 <!-- Tab: Lojas -->
 <div id="tab-stores" class="tab-content {% if active_tab == 'stores' %}active{% endif %}">
@@ -557,6 +1194,372 @@
                 <i class="fa-solid fa-plus"></i> Adicionar Loja
             </button>
         </form>
+    </div>
+</div>
+
+<!-- Tab: Backup & Restauração -->
+<div id="tab-backup" class="tab-content {% if active_tab == 'backup' %}active{% endif %}">
+    <div class="bot-settings-container">
+
+        <!-- Hero Banner: Central de Backup & Segurança -->
+        <div class="bot-hero-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 50%, rgba(168, 85, 247, 0.08) 100%);">
+            <div class="d-flex align-center justify-between flex-wrap gap-3">
+                <div style="max-width: 750px;">
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                            <i class="fa-solid fa-shield-halved"></i> Garantia de Integridade & Recuperação de Desastres
+                        </span>
+                        {% if settings.get('backup_auto_enabled')|lower in ['true', '1'] %}
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                                <i class="fa-solid fa-clock"></i> Backup Automático Ativo ({{ settings.get('backup_time', '03:00') }})
+                            </span>
+                        {% else %}
+                            <span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid #64748b; font-size: 0.72rem; padding: 0.25rem 0.6rem;">
+                                <i class="fa-solid fa-pause"></i> Rotina Automática Pausada
+                            </span>
+                        {% endif %}
+                    </div>
+                    <h3 class="m-0 text-white font-bold" style="font-size: 1.35rem; letter-spacing: -0.02em;">
+                        Central de Backup, Restauração e Nuvem (Google Drive)
+                    </h3>
+                    <p class="text-xs text-muted mt-2 mb-0" style="line-height: 1.5; color: #94a3b8;">
+                        Proteja a totalidade dos dados da sua empresa (Clientes, Mensagens, Funis de Vendas, Configurações e Logs). Crie cópias manuais instantâneas, restaure versões anteriores ou automatize o envio programado para o seu Google Drive.
+                    </p>
+                </div>
+
+                <div class="d-flex flex-col align-end gap-1">
+                    <span class="text-xs text-muted">Último backup realizado:</span>
+                    <strong class="text-xs text-success" style="font-size: 0.82rem;">
+                        <i class="fa-solid fa-calendar-check me-1"></i> {{ settings.get('backup_last_run', 'Nenhum backup registrado') }}
+                    </strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="bot-grid-layout">
+
+            <!-- ==================== COLUNA ESQUERDA: BACKUP IMEDIATO, RESTAURAÇÃO & ARQUIVOS LOCAIS ==================== -->
+            <div class="d-flex flex-col">
+
+                <!-- 1. Criar Backup Manual Imediato -->
+                <div class="bot-card-glass">
+                    <div class="bot-card-header">
+                        <h4 class="bot-card-title text-white">
+                            <span class="bot-icon-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                                <i class="fa-solid fa-download"></i>
+                            </span>
+                            1. Criar Cópia de Segurança Imediata (Backup Manual)
+                        </h4>
+                        <span class="badge bg-success text-xs px-2 py-1">1-Clique</span>
+                    </div>
+                    <p class="bot-card-subtitle">
+                        Gera um pacote completo e compactado com todas as 10 tabelas do sistema (Clientes, Mensagens, Usuários, etc). O arquivo é salvo localmente na pasta segura do servidor.
+                    </p>
+
+                    <form action="{{ url_for('admin.backup_create') }}" method="post" class="d-flex flex-col gap-3">
+                        <div class="d-flex align-center gap-2 p-2 px-3 rounded-md" style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+                            <label class="d-flex align-center gap-2 cursor-pointer text-xs text-gray-200">
+                                <input type="checkbox" name="upload_gdrive" value="true"
+                                       {% if settings.get('gdrive_enabled')|lower in ['true', '1'] %}checked{% endif %}>
+                                <span><strong>Enviar também para o Google Drive</strong> ao concluir a geração</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn-save-bot w-100 justify-center text-center" style="justify-content: center;">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Gerar e Salvar Backup Completo Agora
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 2. Restauração de Base de Dados -->
+                <div class="bot-card-glass" style="border-color: rgba(239, 68, 68, 0.25);">
+                    <div class="bot-card-header" style="border-bottom: 1px solid rgba(239, 68, 68, 0.15);">
+                        <h4 class="bot-card-title text-danger">
+                            <span class="bot-icon-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </span>
+                            2. Restaurar Base de Dados a Partir de Arquivo
+                        </h4>
+                        <span class="badge bg-danger text-xs px-2 py-1">Atenção</span>
+                    </div>
+                    <p class="bot-card-subtitle">
+                        Faça upload de um arquivo de backup compactado (<code>.json.gz</code> ou <code>.json</code>) gerado pelo sistema para sincronizar e restabelecer os dados no PostgreSQL.
+                    </p>
+
+                    <form action="{{ url_for('admin.backup_restore') }}" method="post" enctype="multipart/form-data" class="d-flex flex-col gap-3"
+                          onsubmit="return confirm('ATENÇÃO: A restauração atualizará os registros do banco de dados com base no arquivo de backup selecionado. Deseja prosseguir com a restauração?');">
+                        <div class="form-group mb-0">
+                            <label for="backup_file" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Selecione o arquivo de backup (.json.gz ou .json):
+                            </label>
+                            <input type="file" name="backup_file" id="backup_file" class="input-glass w-100 text-xs p-2" accept=".json,.gz" required>
+                        </div>
+
+                        <div class="p-2 px-3 rounded-md" style="background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.3); font-size: 0.74rem; color: #fca5a5;">
+                            <i class="fa-solid fa-shield-virus me-1"></i>
+                            <strong>Proteção Atômica:</strong> A restauração é executada dentro de uma transação protegida. Caso qualquer dado seja inválido, o sistema executa rollback total automático.
+                        </div>
+
+                        <button type="submit" class="btn-secondary text-xs text-danger p-2 px-4 d-inline-flex align-center justify-center gap-2" style="border-color: rgba(239, 68, 68, 0.4); border-radius: 8px; font-weight: 700;">
+                            <i class="fa-solid fa-upload"></i> Enviar Arquivo e Restaurar Base de Dados
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 3. Backups Armazenados Localmente no Servidor -->
+                <div class="bot-card-glass">
+                    <div class="bot-card-header">
+                        <h4 class="bot-card-title text-white">
+                            <span class="bot-icon-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                                <i class="fa-solid fa-folder-tree"></i>
+                            </span>
+                            3. Backups Disponíveis no Servidor (Pasta Local)
+                        </h4>
+                        <span class="badge text-xs px-2 py-1" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">
+                            {{ backups|length }} Cópias Salvas
+                        </span>
+                    </div>
+
+                    {% if backups %}
+                    <div style="overflow-x: auto;">
+                        <table class="w-100 text-xs" style="border-collapse: collapse; min-width: 500px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); text-align: left;">
+                                    <th class="p-2">Arquivo / Data</th>
+                                    <th class="p-2">Tamanho</th>
+                                    <th class="p-2 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for b in backups %}
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                    <td class="p-2">
+                                        <div class="font-semibold text-white d-flex align-center gap-1">
+                                            <i class="fa-solid fa-file-zipper text-primary"></i> {{ b.filename }}
+                                        </div>
+                                        <span class="text-xs text-muted" style="font-size: 0.7rem;">Criado em: {{ b.created_at }}</span>
+                                    </td>
+                                    <td class="p-2">
+                                        <span class="badge bg-secondary text-xs">{{ b.size_display }}</span>
+                                    </td>
+                                    <td class="p-2 text-right">
+                                        <div class="d-inline-flex align-center gap-1">
+                                            <!-- Download -->
+                                            <a href="{{ url_for('admin.backup_download', filename=b.filename) }}" class="btn-secondary text-xs p-1 px-2" title="Baixar para o computador" style="border-radius: 6px;">
+                                                <i class="fa-solid fa-download text-primary"></i>
+                                            </a>
+
+                                            <!-- Restaurar a partir deste backup local -->
+                                            <form action="{{ url_for('admin.backup_restore') }}" method="post" style="display:inline;"
+                                                  onsubmit="return confirm('Deseja realmente restaurar a base de dados a partir do arquivo {{ b.filename }}?');">
+                                                <input type="hidden" name="local_filename" value="{{ b.filename }}">
+                                                <button type="submit" class="btn-secondary text-xs p-1 px-2 text-warning" title="Restaurar a partir deste arquivo" style="border-radius: 6px;">
+                                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                                </button>
+                                            </form>
+
+                                            <!-- Excluir arquivo local -->
+                                            <form action="{{ url_for('admin.backup_delete', filename=b.filename) }}" method="post" style="display:inline;"
+                                                  onsubmit="return confirm('Tem certeza que deseja excluir o arquivo de backup {{ b.filename }} do servidor?');">
+                                                <button type="submit" class="btn-secondary text-xs p-1 px-2 text-danger" title="Excluir backup" style="border-radius: 6px;">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted text-xs">
+                        <i class="fa-solid fa-box-open mb-2 text-lg d-block"></i>
+                        Nenhum arquivo de backup encontrado na pasta local do servidor. Clique no botão acima para gerar a primeira cópia!
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+
+
+            <!-- ==================== COLUNA DIREITA: AGENDAMENTO AUTOMÁTICO & GOOGLE DRIVE ==================== -->
+            <div class="d-flex flex-col">
+
+                <form action="{{ url_for('admin.settings', tab='backup') }}" method="post" class="d-flex flex-col">
+
+                    <!-- 4. Agendamento Automático de Backups -->
+                    <div class="bot-card-glass">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                                    <i class="fa-solid fa-calendar-days"></i>
+                                </span>
+                                4. Agendamento Automático de Backups
+                            </h4>
+                            <span class="text-xs text-muted">Rotina Programada</span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Configure o sistema para gerar cópias de segurança periódicas de forma autônoma sem necessidade de intervenção humana.
+                        </p>
+
+                        <div class="form-group mb-3">
+                            <label for="backup_auto_enabled" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Status da Rotina Automática
+                            </label>
+                            <select name="backup_auto_enabled" id="backup_auto_enabled" class="input-glass w-100 font-semibold" style="font-size: 0.88rem;">
+                                <option value="true" {% if settings.get('backup_auto_enabled', 'false')|lower in ['true', '1'] %}selected{% endif %}>
+                                    🟢 Ativado (Executar rotina nos horários programados)
+                                </option>
+                                <option value="false" {% if settings.get('backup_auto_enabled', 'false')|lower in ['false', '0', ''] %}selected{% endif %}>
+                                    🔴 Desativado (Apenas backups manuais)
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="grid-2 gap-3 mb-3">
+                            <div class="form-group mb-0">
+                                <label for="backup_frequency" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Frequência da Execução
+                                </label>
+                                <select name="backup_frequency" id="backup_frequency" class="input-glass w-100 text-xs">
+                                    <option value="daily" {% if settings.get('backup_frequency', 'daily') == 'daily' %}selected{% endif %}>
+                                        📅 Diário (Todos os dias)
+                                    </option>
+                                    <option value="weekly" {% if settings.get('backup_frequency') == 'weekly' %}selected{% endif %}>
+                                        🗓️ Semanal (Aos Domingos)
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="backup_time" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Horário de Execução
+                                </label>
+                                <input type="time" name="backup_time" id="backup_time" class="input-glass w-100"
+                                       value="{{ settings.get('backup_time', '03:00') }}">
+                                <small class="text-xs text-muted mt-1 d-block">Recomendado na madrugada (ex: 03:00).</small>
+                            </div>
+                        </div>
+
+                        <div class="grid-2 gap-3 mb-2">
+                            <div class="form-group mb-0">
+                                <label for="backup_destination" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Destino do Backup
+                                </label>
+                                <select name="backup_destination" id="backup_destination" class="input-glass w-100 text-xs">
+                                    <option value="both" {% if settings.get('backup_destination', 'both') == 'both' %}selected{% endif %}>
+                                        🌐 Ambos (Local + Google Drive)
+                                    </option>
+                                    <option value="local" {% if settings.get('backup_destination') == 'local' %}selected{% endif %}>
+                                        💾 Apenas Servidor Local
+                                    </option>
+                                    <option value="gdrive" {% if settings.get('backup_destination') == 'gdrive' %}selected{% endif %}>
+                                        ☁️ Apenas Google Drive
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="form-group mb-0">
+                                <label for="backup_retention_days" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                    Retenção Local (Dias)
+                                </label>
+                                <input type="number" min="1" max="90" name="backup_retention_days" id="backup_retention_days" class="input-glass w-100"
+                                       value="{{ settings.get('backup_retention_days', '7') }}">
+                                <small class="text-xs text-muted mt-1 d-block">Apaga cópias locais com mais de X dias.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Integração com Google Drive -->
+                    <div class="bot-card-glass" style="border-color: rgba(59, 130, 246, 0.25);">
+                        <div class="bot-card-header">
+                            <h4 class="bot-card-title text-white">
+                                <span class="bot-icon-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                                    <i class="fa-brands fa-google-drive"></i>
+                                </span>
+                                5. Sincronização em Nuvem (Google Drive API)
+                            </h4>
+                            <span class="badge text-xs px-2 py-1" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">
+                                Cloud Storage
+                            </span>
+                        </div>
+                        <p class="bot-card-subtitle">
+                            Envie cópias dos backups diretamente para a sua conta corporativa ou pessoal do Google Drive através de uma Conta de Serviço (Service Account).
+                        </p>
+
+                        <div class="form-group mb-3">
+                            <label for="gdrive_enabled" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                Ativar Envio para o Google Drive
+                            </label>
+                            <select name="gdrive_enabled" id="gdrive_enabled" class="input-glass w-100 text-xs font-semibold">
+                                <option value="true" {% if settings.get('gdrive_enabled')|lower in ['true', '1'] %}selected{% endif %}>
+                                    🟢 Ativado (Sincronizar backups na nuvem do Google Drive)
+                                </option>
+                                <option value="false" {% if settings.get('gdrive_enabled', 'false')|lower in ['false', '0', ''] %}selected{% endif %}>
+                                    🔴 Desativado (Não enviar para o Drive)
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="gdrive_folder_id" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                ID da Pasta no Google Drive (Folder ID)
+                            </label>
+                            <input type="text" name="gdrive_folder_id" id="gdrive_folder_id" class="input-glass w-100"
+                                   value="{{ settings.get('gdrive_folder_id', '') }}"
+                                   placeholder="ex: 1A2b3C4d5E6F7g8H9i0jKLMNOPQRST">
+                            <small class="text-xs text-muted mt-1 d-block">
+                                É o código final na barra de endereço ao abrir a pasta no Google Drive (ex: <code>drive.google.com/drive/folders/<strong>ID_DA_PASTA</strong></code>).
+                            </small>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <div class="d-flex align-center justify-between mb-1">
+                                <label for="gdrive_credentials_json" class="text-xs font-semibold m-0 text-gray-300">
+                                    Chave JSON da Conta de Serviço (Service Account)
+                                </label>
+                                <button type="button" class="btn-secondary text-xs py-1 px-2 text-info" onclick="testGoogleDriveConnection()" style="border-radius: 6px;">
+                                    <i class="fa-solid fa-plug-circle-check"></i> Testar Conexão com Google Drive
+                                </button>
+                            </div>
+                            <textarea name="gdrive_credentials_json" id="gdrive_credentials_json" class="input-glass w-100" rows="5"
+                                      style="font-family: monospace; font-size: 0.75rem;"
+                                      placeholder='Cole aqui o JSON gerado no Google Cloud: {"type": "service_account", "project_id": "...", "private_key": "...", ...}'>{{ settings.get('gdrive_credentials_json', '') }}</textarea>
+                            <div id="gdrive_feedback" class="d-none text-xs mt-2 p-2 rounded-md"></div>
+                        </div>
+
+                        <!-- Status do Último Envio -->
+                        <div class="p-2 px-3 rounded-md mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); font-size: 0.74rem;">
+                            <span class="text-muted d-block mb-1">Status da Última Sincronização com o Drive:</span>
+                            <strong class="text-gray-200">{{ settings.get('gdrive_last_status', 'Nenhum envio recente registrado.') }}</strong>
+                        </div>
+
+                        <!-- Passo a Passo Google Drive -->
+                        <details class="p-2 px-3 rounded-md cursor-pointer" style="background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.2); font-size: 0.75rem;">
+                            <summary class="font-semibold text-primary">
+                                <i class="fa-solid fa-circle-info me-1"></i> Como configurar o Google Drive em 4 passos (Guia Rápido)
+                            </summary>
+                            <ol class="mt-2 mb-1 ps-3 text-muted" style="line-height: 1.6;">
+                                <li>Acesse o <strong>Google Cloud Console</strong> (<a href="https://console.cloud.google.com" target="_blank" class="text-primary">console.cloud.google.com</a>) e crie um novo projeto.</li>
+                                <li>No menu <em>APIs e Serviços</em>, clique em <strong>Ativar APIs</strong> e ative a <strong>Google Drive API</strong>.</li>
+                                <li>Vá em <em>Credenciais -> Criar Credenciais -> Conta de Serviço (Service Account)</em>. Após criá-la, vá na aba <em>Chaves -> Adicionar Chave -> Criar nova chave (JSON)</em> e faça o download.</li>
+                                <li>Abra a pasta desejada no seu Google Drive, clique em <strong>Compartilhar</strong> e adicione o e-mail da Conta de Serviço (ex: <code>sua-conta@projeto.iam.gserviceaccount.com</code>) como <strong>Editor</strong>. Cole o JSON e o ID da pasta acima!</li>
+                            </ol>
+                        </details>
+                    </div>
+
+                    <div class="d-flex align-center justify-between mt-3">
+                        <button type="submit" class="btn-save-bot w-100 justify-center text-center" style="justify-content: center;">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações de Backup & Nuvem
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+
+        </div>
+
     </div>
 </div>
 
@@ -832,6 +1835,53 @@ async function improveTextWithAI(targetId, btnElement) {
             toggleAiProviderFields();
         }
     });
+
+    function insertPromptVar(tag) {
+        const textarea = document.getElementById("whatsapp_bot_system_prompt");
+        if (!textarea) return;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const before = text.substring(0, start);
+        const after = text.substring(end, text.length);
+        textarea.value = before + tag + after;
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+    }
+
+    async function testGoogleDriveConnection() {
+        const folderId = document.getElementById('gdrive_folder_id').value;
+        const credsJson = document.getElementById('gdrive_credentials_json').value;
+        const feedback = document.getElementById('gdrive_feedback');
+        feedback.className = 'text-xs mt-2 text-warning';
+        feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testando autenticação com o Google Drive...';
+        feedback.classList.remove('d-none');
+
+        try {
+            const resp = await fetch("{{ url_for('admin.backup_test_gdrive') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({folder_id: folderId, credentials_json: credsJson})
+            });
+            const data = await resp.json();
+            if (data.success) {
+                feedback.className = 'text-xs mt-2 text-success p-2 rounded-md';
+                feedback.style.background = 'rgba(16, 185, 129, 0.1)';
+                feedback.style.border = '1px solid #10b981';
+                feedback.innerHTML = `✔ ${data.message}`;
+            } else {
+                feedback.className = 'text-xs mt-2 text-danger p-2 rounded-md';
+                feedback.style.background = 'rgba(239, 68, 68, 0.1)';
+                feedback.style.border = '1px solid #ef4444';
+                feedback.innerHTML = `❌ ${data.message}`;
+            }
+        } catch(err) {
+            feedback.className = 'text-xs mt-2 text-danger p-2 rounded-md';
+            feedback.style.background = 'rgba(239, 68, 68, 0.1)';
+            feedback.style.border = '1px solid #ef4444';
+            feedback.innerHTML = `❌ Erro de requisição: ${err.message}`;
+        }
+    }
 
     {% for instance in waha_instances %}
     checkWhatsAppStatus({{ instance.id }});

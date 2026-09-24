@@ -3,13 +3,15 @@ from app import create_app, db
 from app.models import User, Client
 from app.utils.maps_scraper import MapsScraperClient
 
+from config import TestConfig
+
 class TestLeadFields(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = create_app()
-        cls.app.config['TESTING'] = True
-        cls.app.config['WTF_CSRF_ENABLED'] = False
+        cls.app = create_app(TestConfig)
         cls.client = cls.app.test_client()
+        with cls.app.app_context():
+            db.create_all()
 
     def setUp(self):
         self.ctx = self.app.app_context()

@@ -35,4 +35,12 @@ class Config:
         SQLALCHEMY_ENGINE_OPTIONS = {}
     REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
     MAPS_SCRAPER_URL = os.environ.get('MAPS_SCRAPER_URL') or 'http://localhost:8080'
+    BACKUP_DIR = os.environ.get('BACKUP_DIR') or os.path.join(os.path.abspath(os.path.dirname(__file__)), 'backups')
+
+
+class TestConfig(Config):
+    TESTING = True
+    WTF_CSRF_ENABLED = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_ENGINE_OPTIONS = {}
 

@@ -70,15 +70,42 @@ with app.app_context():
     else:
         print("Usuário Admin já existe.")
 
-    # Inicializa configurações padrão para Ollama se ainda não existirem
+    # Inicializa configurações padrão para Ollama e Bot de Respostas WhatsApp se ainda não existirem
     default_settings = {
         'ai_provider': 'ollama',
         'ai_ollama_url': 'http://localhost:11434',
-        'ai_ollama_model': 'llama3.2'
+        'ai_ollama_model': 'llama3.2',
+        'whatsapp_bot_enabled': 'true',
+        'whatsapp_bot_ignore_groups': 'true',
+        'whatsapp_bot_ignore_broadcast': 'true',
+        'whatsapp_send_seen': 'true',
+        'whatsapp_simulate_typing': 'true',
+        'whatsapp_debounce_delay': '12',
+        'whatsapp_history_turns': '8',
+        'whatsapp_history_ttl_hours': '4',
+        'whatsapp_bot_persona_name': 'Sofia',
+        'whatsapp_bot_company_name': 'CRM Pro',
+        'whatsapp_bot_system_prompt': (
+            'Você é um assistente comercial educado, atencioso e prestativo. Responda de forma clara, natural, '
+            'profissional e amigável em português do Brasil. Mantenha respostas curtas e fáceis de ler no celular '
+            '(1 a 3 parágrafos curtos). Seu objetivo é tirar dúvidas sobre nossos serviços, qualificar o interesse do '
+            'lead e propor que um consultor da equipe entre em contato para prosseguir com a proposta.'
+        ),
+        'whatsapp_bot_fallback_msg': 'Olá! Recebemos sua mensagem e nossa equipe retornará em instantes.',
+        'whatsapp_bot_handover_trigger': 'humano, atendente, falar com pessoa, falar com alguem, atendente humano, suporte humano, cancelar',
+        'whatsapp_bot_handover_msg': 'Com certeza! Estou direcionando seu atendimento para um de nossos consultores humanos. Em instantes alguém da equipe responderá aqui.',
+        'whatsapp_bot_work_hours_enabled': 'false',
+        'whatsapp_bot_work_hours_start': '08:00',
+        'whatsapp_bot_work_hours_end': '18:00',
+        'whatsapp_bot_out_of_hours_msg': 'Olá! No momento estamos fora do nosso horário de atendimento (Seg à Sex, 08h às 18h). Deixe sua mensagem que responderemos assim que retornarmos!',
+        'whatsapp_bot_auto_create_lead': 'true',
+        'whatsapp_bot_inject_client_data': 'true'
     }
     for key, val in default_settings.items():
         if not Setting.query.filter_by(key=key).first():
             db.session.add(Setting(key=key, value=val))
+
+
     
     # Inicializa ou corrige instância padrão WAHA buscando dinamicamente o IP conectado ou variável de ambiente
     from app.models import WahaInstance

@@ -157,17 +157,53 @@ class AIHandler:
             return text, f"Erro na IA ({cfg['provider']}): {error_msg[:100]}"
 
     @staticmethod
-    def generate_reply(customer_message):
-        """Gera respostas automáticas e inteligentes para mensagens recebidas de clientes no WhatsApp."""
+    @staticmethod
+    def generate_chat_reply(customer_message, chat_history=None, client_info=None):
+        """
+        Gera respostas inteligentes e contextualizadas para o WhatsApp utilizando histórico
+        conversacional (multi-turno) e dados cadastrais do cliente no CRM.
+        """
         cfg = AIHandler.get_config()
         if cfg['provider'] != 'ollama' and not cfg['api_key']:
             return "Olá! Recebemos sua mensagem e entraremos em contato em breve.", "API Key não configurada."
 
-        system_prompt = (
-            "Você é um assistente de atendimento educado, atencioso e prestativo de uma empresa comercial. "
-            "Responda de forma curta, natural e amigável em português do Brasil, buscando sempre sanar a dúvida do cliente "
-            "ou direcioná-lo para um atendente humano quando necessário."
+        base_prompt = (
+            "Você é um assistente de atendimento educado, atencioso e prestativo de uma empresa comercial no WhatsApp. "
+            "Responda de forma clara, natural, profissional e amigável em português do Brasil. "
+            "Mantenha respostas concisas e legíveis em tela de celular (evite blocos excessivamente longos). "
+            "Busque sempre sanar as dúvidas do cliente ou indicar que um consultor da equipe entrará em contato quando necessário."
         )
+
+        # Enriquecimento com dados do CRM se disponíveis
+        context_lines = []
+        if client_info and isinstance(client_info, dict):
+            if client_info.get('name'):
+                context_lines.append(f"Nome do cliente: {client_info['name']}")
+            if client_info.get('status'):
+                context_lines.append(f"Etapa no CRM: {client_info['status']}")
+            if client_info.get('segment'):
+                context_lines.append(f"Segmento de mercado: {client_info['segment']}")
+            if client_info.get('assigned_user'):
+                context_lines.append(f"Consultor responsável: {client_info['assigned_user']}")
+
+        if context_lines:
+            system_prompt = (
+                f"{base_prompt}\n\nContexto do contato no CRM:\n"
+                + "\n".join(f"- {line}" for line in context_lines)
+                + "\nUse essas informações para personalizar o atendimento com empatia e naturalidade."
+            )
+        else:
+            system_prompt = base_prompt
+
+        # Construção da lista estruturada de mensagens (Chat Multi-turno)
+        messages = [{"role": "system", "content": system_prompt}]
+        if chat_history and isinstance(chat_history, list):
+            for turn in chat_history:
+                if isinstance(turn, dict) and turn.get('role') in ['user', 'assistant'] and turn.get('content'):
+                    messages.append({"role": turn['role'], "content": str(turn['content']).strip()})
+
+        # Adiciona a mensagem unificada atual do cliente
+        messages.append({"role": "user", "content": customer_message.strip()})
 
         try:
             # Provedor 1: OLLAMA (Local Docker)
@@ -175,33 +211,27 @@ class AIHandler:
                 url = f"{cfg['ollama_url']}/api/chat"
                 payload = {
                     "model": cfg['ollama_model'],
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": customer_message}
-                    ],
+                    "messages": messages,
                     "stream": False,
                     "options": {"temperature": 0.7}
                 }
-                resp = requests.post(url, json=payload, timeout=60)
+                resp = requests.post(url, json=payload, timeout=75)
                 if resp.status_code == 200:
                     content = resp.json().get("message", {}).get("content", "")
                     cleaned = AIHandler.clean_text(content)
                     if cleaned and not AIHandler.is_refusal(cleaned):
                         return cleaned, None
-                return "Olá! Recebemos sua mensagem e já vamos te responder.", f"Ollama retorno vazio ou recusa"
+                return "Olá! Recebemos sua mensagem e já vamos te responder.", f"Ollama retorno vazio ou recusa ({resp.status_code})"
 
             # Provedor 2: DEEPSEEK (Cloud API)
             elif cfg['provider'] == 'deepseek':
                 headers = {"Authorization": f"Bearer {cfg['api_key']}", "Content-Type": "application/json"}
                 data = {
                     "model": "deepseek-chat",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": customer_message}
-                    ],
+                    "messages": messages,
                     "stream": False
                 }
-                resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=data, timeout=30)
+                resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=data, timeout=35)
                 if resp.status_code == 200:
                     choices = resp.json().get("choices", [])
                     if choices and choices[0].get("message"):
@@ -213,7 +243,15 @@ class AIHandler:
             # Provedor 3: GOOGLE GEMINI (Cloud API)
             else:
                 client = genai.Client(api_key=cfg['api_key'])
-                full_prompt = f"{system_prompt}\n\nCliente diz: {customer_message}\n\nResponda:"
+                # Formata o histórico conversacional como texto concatenado para o Gemini
+                conversation_text = ""
+                for msg in messages:
+                    if msg['role'] == 'system':
+                        continue
+                    prefix = "Cliente" if msg['role'] == 'user' else "Assistente"
+                    conversation_text += f"{prefix}: {msg['content']}\n"
+
+                full_prompt = f"{system_prompt}\n\nHistórico da conversa:\n{conversation_text}\nAssistente:"
                 response = client.models.generate_content(
                     model='gemini-2.0-flash',
                     contents=full_prompt
@@ -225,8 +263,14 @@ class AIHandler:
                 return "Olá! Recebemos sua mensagem.", "Resposta vazia ou recusada pelo Gemini"
 
         except Exception as e:
-            print(f"Erro no generate_reply: {e}")
+            print(f"Erro no generate_chat_reply: {e}")
             return "Olá! Recebemos sua mensagem e um de nossos atendentes entrará em contato em instantes.", str(e)
+
+    @staticmethod
+    def generate_reply(customer_message):
+        """Wrapper de compatibilidade para chamadas legadas de resposta simples."""
+        return AIHandler.generate_chat_reply(customer_message)
+
 
     @staticmethod
     def generate_text(instruction):

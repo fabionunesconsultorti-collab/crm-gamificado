@@ -1,11 +1,13 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app, send_file, send_from_directory
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 from app import db
 from app.admin import bp
 from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog, WahaInstance
 from app.utils.waha import WahaAPI
 from app.utils.exports import ReportGenerator
 from app.utils.ai_handler import AIHandler
+from app.utils.backup_manager import BackupManager
 import os
 import io
 from datetime import datetime
@@ -64,10 +66,23 @@ def settings():
     if request.method == 'POST':
         keys = [
             'msg_boas_vindas', 'msg_proposta', 'msg_fechamento', 'frase_bom_dia', 
-            'ai_api_key', 'ai_provider', 'ai_system_prompt', 'ai_ollama_url', 'ai_ollama_model'
+            'ai_api_key', 'ai_provider', 'ai_system_prompt', 'ai_ollama_url', 'ai_ollama_model',
+            # Parâmetros do Bot de Resposta Automática
+            'whatsapp_bot_enabled', 'whatsapp_bot_persona_name', 'whatsapp_bot_company_name',
+            'whatsapp_bot_system_prompt', 'whatsapp_bot_fallback_msg',
+            'whatsapp_debounce_delay', 'whatsapp_history_turns', 'whatsapp_history_ttl_hours',
+            'whatsapp_simulate_typing', 'whatsapp_send_seen',
+            'whatsapp_bot_handover_trigger', 'whatsapp_bot_handover_msg',
+            'whatsapp_bot_auto_create_lead', 'whatsapp_bot_inject_client_data',
+            'whatsapp_bot_work_hours_enabled', 'whatsapp_bot_work_hours_start',
+            'whatsapp_bot_work_hours_end', 'whatsapp_bot_out_of_hours_msg',
+            'whatsapp_bot_ignore_groups', 'whatsapp_bot_ignore_broadcast',
+            # Parâmetros de Backup e Restauração
+            'backup_auto_enabled', 'backup_frequency', 'backup_time', 'backup_retention_days',
+            'backup_destination', 'gdrive_enabled', 'gdrive_folder_id', 'gdrive_credentials_json'
         ]
-        
-        # Only process keys that are actually in the submitted form
+
+        # Processa chaves presentes no formulário enviado
         for key in keys:
             if key in request.form:
                 val = request.form.get(key)
@@ -87,14 +102,190 @@ def settings():
     all_settings = {s.key: s.value for s in Setting.query.all()}
     stores = Store.query.all()
     waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
+    backups = BackupManager.list_backups()
     active_tab = request.args.get('tab', 'templates')
     from app.utils.network import get_connected_ip, resolve_instance_api_url
     detected_ip = get_connected_ip()
     return render_template('admin/settings.html', title='Configurações do Sistema',
                            settings=all_settings, stores=stores, waha_instances=waha_instances,
-                           active_tab=active_tab, detected_ip=detected_ip)
+                           backups=backups, active_tab=active_tab, detected_ip=detected_ip)
+
+@bp.route('/bot/clear_memory', methods=['POST'])
+@login_required
+@admin_required
+def clear_bot_memory():
+    chat_id = request.form.get('chat_id', '').strip()
+    from app.utils.conversation_memory import ConversationMemory
+    if chat_id:
+        clean_chat = chat_id if '@' in chat_id else f"{''.join(filter(str.isdigit, chat_id))}@c.us"
+        ConversationMemory.clear(clean_chat)
+        flash(f'🧹 Memória do chat {clean_chat} foi limpa do Redis!')
+    else:
+        from app.tasks.queue import get_redis_connection
+        conn = get_redis_connection()
+        keys = conn.keys("crm:wa:history:*")
+        if keys:
+            conn.delete(*keys)
+        flash(f'🧹 Toda a memória conversacional ({len(keys)} chats) foi limpa do Redis!')
+    return redirect(url_for('admin.settings', tab='bot'))
+
+@bp.route('/backup/create', methods=['POST'])
+@login_required
+@admin_required
+def backup_create():
+    """Gera um backup completo manual e opcionalmente envia ao Google Drive."""
+    upload_gdrive = request.form.get('upload_gdrive') == 'true'
+    dest = "both" if upload_gdrive else "local"
+    result = BackupManager.create_backup(destination=dest, upload_gdrive=upload_gdrive)
+    if result.get('success'):
+        msg = f"✔ Backup criado com sucesso! Arquivo: {result.get('filename')} ({result.get('total_records')} registros)."
+        if result.get('gdrive'):
+            gd = result.get('gdrive')
+            msg += f" Google Drive: {gd.get('message')}"
+        flash(msg)
+    else:
+        flash(f"❌ Erro ao criar backup: {result.get('error')}")
+    return redirect(url_for('admin.settings', tab='backup'))
+
+@bp.route('/backup/download/<filename>', methods=['GET'])
+@login_required
+@admin_required
+def backup_download(filename):
+    """Download seguro de arquivo de backup local."""
+    safe_name = secure_filename(filename)
+    backup_dir = BackupManager.get_backup_dir()
+    file_path = os.path.join(backup_dir, safe_name)
+    if not os.path.exists(file_path):
+        flash('Arquivo de backup não encontrado.')
+        return redirect(url_for('admin.settings', tab='backup'))
+    return send_from_directory(backup_dir, safe_name, as_attachment=True)
+
+@bp.route('/backup/restore', methods=['POST'])
+@login_required
+@admin_required
+def backup_restore():
+    """Restaura o banco a partir de arquivo enviado ou de backup local."""
+    uploaded_file = request.files.get('backup_file')
+    local_filename = request.form.get('local_filename', '').strip()
+
+    if uploaded_file and uploaded_file.filename:
+        safe_name = secure_filename(uploaded_file.filename)
+        if not safe_name.endswith(('.json.gz', '.json')):
+            flash('Formato inválido. Envie um arquivo .json.gz ou .json de backup do CRM.')
+            return redirect(url_for('admin.settings', tab='backup'))
+        result = BackupManager.restore_backup(uploaded_file)
+    elif local_filename:
+        safe_name = secure_filename(local_filename)
+        backup_dir = BackupManager.get_backup_dir()
+        file_path = os.path.join(backup_dir, safe_name)
+        if not os.path.exists(file_path):
+            flash('Arquivo de backup local não encontrado.')
+            return redirect(url_for('admin.settings', tab='backup'))
+        result = BackupManager.restore_backup(file_path)
+    else:
+        flash('Nenhum arquivo de backup selecionado para restauração.')
+        return redirect(url_for('admin.settings', tab='backup'))
+
+    if result.get('success'):
+        stats = result.get('stats', {})
+        total_restored = sum(stats.values())
+        flash(f"🎉 Backup restaurado com sucesso! {total_restored} registros sincronizados.")
+    else:
+        flash(f"❌ {result.get('error')}")
+
+    return redirect(url_for('admin.settings', tab='backup'))
+
+@bp.route('/backup/delete/<filename>', methods=['POST'])
+@login_required
+@admin_required
+def backup_delete(filename):
+    """Exclui um backup armazenado no servidor."""
+    safe_name = secure_filename(filename)
+    deleted = BackupManager.delete_backup(safe_name)
+    if deleted:
+        flash(f'🗑️ Backup {safe_name} removido com sucesso.')
+    else:
+        flash('Arquivo de backup não encontrado para exclusão.')
+    return redirect(url_for('admin.settings', tab='backup'))
+
+@bp.route('/backup/test_gdrive', methods=['POST'])
+@login_required
+@admin_required
+def backup_test_gdrive():
+    """Valida a conexão com o Google Drive via JSON ou formulário."""
+    data = request.get_json(silent=True) or request.form
+    folder_id = data.get('folder_id', '').strip()
+    creds_json = data.get('credentials_json', '').strip()
+    if not creds_json:
+        creds_json = Setting.get('gdrive_credentials_json', '').strip()
+    if not folder_id:
+        folder_id = Setting.get('gdrive_folder_id', '').strip()
+
+    success, message = BackupManager.test_gdrive_connection(folder_id, creds_json)
+    return jsonify({'success': success, 'message': message})
+
+@bp.route('/bot/live')
+@login_required
+@admin_required
+def bot_live():
+    """Tela em tempo real do fluxo autônomo de atendimento WAHA + Ollama + Redis."""
+    from app.utils.live_tracker import LiveTracker
+    from app.models import Setting
+    stats = LiveTracker.get_system_stats()
+    debounce_delay = Setting.get('whatsapp_debounce_delay', 12)
+    return render_template('admin/bot_live.html', title='Fluxo em Tempo Real - Bot IA', stats=stats, debounce_delay=debounce_delay)
+
+@bp.route('/bot/live-events')
+@login_required
+@admin_required
+def bot_live_events():
+    """API JSON consumida pelo frontend para atualizar o grafo e métricas ao vivo."""
+    from app.utils.live_tracker import LiveTracker
+    events = LiveTracker.get_recent_events(limit=25)
+    batches = LiveTracker.get_active_batches()
+    stats = LiveTracker.get_system_stats()
+    return jsonify({
+        "ok": True,
+        "events": events,
+        "batches": batches,
+        "stats": stats
+    })
+
+@bp.route('/bot/simulate-message', methods=['POST'])
+@login_required
+@admin_required
+def bot_simulate_message():
+    """Permite ao operador simular mensagens recebidas para ver o grafo visual em ação."""
+    import time
+    data = request.get_json(silent=True) or request.form
+    message_text = (data.get('message') or '').strip()
+    chat_id = (data.get('chat_id') or '5511999990001@c.us').strip()
+    if not message_text:
+        return jsonify({"ok": False, "error": "Mensagem vazia"}), 400
+
+    clean_chat = chat_id if '@' in chat_id else f"{''.join(filter(str.isdigit, chat_id))}@c.us"
+    payload = {
+        "id": f"sim_{int(time.time() * 1000)}",
+        "from": clean_chat,
+        "body": message_text,
+        "fromMe": False,
+        "timestamp": time.time()
+    }
+
+    from app.tasks.buffer import add_to_buffer
+    batch_token, delay = add_to_buffer(chat_id=clean_chat, message_payload=payload)
+
+    return jsonify({
+        "ok": True,
+        "batch_token": batch_token,
+        "delay_seconds": delay,
+        "chat_id": clean_chat,
+        "message": message_text
+    })
 
 @bp.route('/stores/new', methods=['POST'])
+
+
 @login_required
 @admin_required
 def new_store():

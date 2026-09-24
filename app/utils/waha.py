@@ -99,6 +99,63 @@ class WahaAPI:
             return False, str(e)
 
     @staticmethod
+    def start_typing(phone_or_chat_id, instance_id=None):
+        """Ativa o indicador 'digitando...' (presença) no chat do WhatsApp."""
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
+        raw = str(phone_or_chat_id)
+        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        url = f"{cfg['api_url']}/api/startTyping"
+        payload = {"session": cfg['session_name'], "chatId": chat_id}
+
+        try:
+            resp = requests.post(url, headers=WahaAPI.get_headers(instance_id), json=payload, timeout=5)
+            return resp.status_code in [200, 201], resp.text
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def stop_typing(phone_or_chat_id, instance_id=None):
+        """Desativa o indicador 'digitando...' no chat do WhatsApp."""
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
+        raw = str(phone_or_chat_id)
+        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        url = f"{cfg['api_url']}/api/stopTyping"
+        payload = {"session": cfg['session_name'], "chatId": chat_id}
+
+        try:
+            resp = requests.post(url, headers=WahaAPI.get_headers(instance_id), json=payload, timeout=5)
+            return resp.status_code in [200, 201], resp.text
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def send_seen(phone_or_chat_id, message_id=None, instance_id=None):
+        """Marca as mensagens como vistas/lidas no WhatsApp."""
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return False, "WAHA API não configurada."
+
+        raw = str(phone_or_chat_id)
+        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        url = f"{cfg['api_url']}/api/sendSeen"
+        payload = {"session": cfg['session_name'], "chatId": chat_id}
+        if message_id:
+            payload["messageId"] = message_id
+
+        try:
+            resp = requests.post(url, headers=WahaAPI.get_headers(instance_id), json=payload, timeout=5)
+            return resp.status_code in [200, 201], resp.text
+        except Exception as e:
+            return False, str(e)
+
+
+    @staticmethod
     def get_connection_state(instance_id=None):
         cfg = WahaAPI.get_settings(instance_id)
         if not WahaAPI.is_configured(instance_id):

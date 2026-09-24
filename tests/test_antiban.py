@@ -4,21 +4,19 @@ from unittest.mock import patch, MagicMock
 from app import create_app, db
 from app.models import WahaInstance, User
 
+from config import TestConfig
+
 class TestAntiBanSystem(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = create_app()
-        cls.app.config['TESTING'] = True
-        cls.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        cls.app.config['WTF_CSRF_ENABLED'] = False
+        cls.app = create_app(TestConfig)
         cls.client = cls.app.test_client()
         with cls.app.app_context():
             db.create_all()
 
     @classmethod
     def tearDownClass(cls):
-        with cls.app.app_context():
-            db.drop_all()
+        pass
 
     def setUp(self):
         with self.app.app_context():

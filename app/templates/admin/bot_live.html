@@ -1,0 +1,825 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Estilos Avançados para o Pipeline em Tempo Real */
+    .live-hero {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(99, 102, 241, 0.1) 50%, rgba(168, 85, 247, 0.08) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(16px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .pulse-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.8rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: currentColor;
+        box-shadow: 0 0 10px currentColor;
+        animation: pulseAnimation 1.5s infinite;
+    }
+
+    @keyframes pulseAnimation {
+        0% { transform: scale(0.95); opacity: 0.7; }
+        50% { transform: scale(1.3); opacity: 1; }
+        100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    /* Grid do Grafo do Fluxo */
+    .flow-pipeline {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 0.75rem;
+        position: relative;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 1200px) {
+        .flow-pipeline {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .flow-pipeline {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .flow-node {
+        background: rgba(18, 24, 38, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-height: 150px;
+    }
+
+    .flow-node:hover {
+        transform: translateY(-3px);
+        border-color: rgba(255, 255, 255, 0.25);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .flow-node.active {
+        border-color: #10b981;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
+        background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(18, 24, 38, 0.95) 100%);
+    }
+
+    .flow-node.active .node-icon {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 10px currentColor);
+    }
+
+    .flow-node.processing {
+        border-color: #f59e0b;
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+        background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(18, 24, 38, 0.95) 100%);
+        animation: glowPulse 2s infinite alternate;
+    }
+
+    @keyframes glowPulse {
+        from { box-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
+        to { box-shadow: 0 0 25px rgba(245, 158, 11, 0.6); }
+    }
+
+    .flow-node .node-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .flow-node .node-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+
+    .flow-node .node-step-num {
+        font-size: 0.7rem;
+        font-weight: 800;
+        opacity: 0.5;
+        letter-spacing: 0.05em;
+    }
+
+    .flow-node .node-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        color: var(--text-main);
+    }
+
+    .flow-node .node-desc {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        line-height: 1.3;
+    }
+
+    .flow-node .node-status {
+        margin-top: 0.75rem;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 600;
+    }
+
+    /* Conectores luminosos entre etapas (Desktop) */
+    @media (min-width: 1201px) {
+        .flow-node:not(:last-child)::after {
+            content: "➔";
+            position: absolute;
+            right: -13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 0.85rem;
+            z-index: 2;
+            font-weight: 900;
+            pointer-events: none;
+        }
+        .flow-node.active:not(:last-child)::after {
+            color: #10b981;
+            text-shadow: 0 0 8px #10b981;
+        }
+    }
+
+    /* Estilos do Simulador de WhatsApp */
+    .phone-mockup {
+        background: #0b141a;
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        height: 580px;
+    }
+
+    .phone-header {
+        background: #202c33;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .phone-body {
+        flex: 1;
+        background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" opacity="0.03"><path d="M20 20h40v40H20z" fill="white"/></svg>'), #0b141a;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .chat-bubble {
+        max-width: 82%;
+        padding: 0.55rem 0.85rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        position: relative;
+        word-break: break-word;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        animation: bubbleIn 0.25s ease-out;
+    }
+
+    @keyframes bubbleIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble-user {
+        background: #005c4b;
+        color: #e9edef;
+        align-self: flex-end;
+        border-top-right-radius: 2px;
+    }
+
+    .bubble-bot {
+        background: #202c33;
+        color: #d1d7db;
+        align-self: flex-start;
+        border-top-left-radius: 2px;
+    }
+
+    .bubble-time {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.5);
+        text-align: right;
+        margin-top: 0.2rem;
+    }
+
+    .typing-indicator {
+        display: none;
+        align-self: flex-start;
+        background: #202c33;
+        padding: 0.5rem 0.85rem;
+        border-radius: 12px;
+        border-top-left-radius: 2px;
+        font-size: 0.75rem;
+        color: #8696a0;
+        gap: 0.4rem;
+        align-items: center;
+    }
+
+    .debounce-countdown-bar {
+        background: rgba(59, 130, 246, 0.15);
+        border: 1px dashed rgba(59, 130, 246, 0.4);
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.72rem;
+        color: #60a5fa;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .phone-footer {
+        background: #202c33;
+        padding: 0.6rem 0.8rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    /* Terminal de Logs ao Vivo */
+    .terminal-box {
+        background: #0f172a;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 1rem;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.78rem;
+        height: 580px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .terminal-logs {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    .log-entry {
+        padding: 0.45rem 0.65rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        border-left: 3px solid #64748b;
+        transition: all 0.2s ease;
+    }
+
+    .log-entry.step-1 { border-left-color: #3b82f6; }
+    .log-entry.step-2 { border-left-color: #f59e0b; }
+    .log-entry.step-3 { border-left-color: #a855f7; }
+    .log-entry.step-4 { border-left-color: #06b6d4; }
+    .log-entry.step-5 { border-left-color: #ec4899; }
+    .log-entry.step-6 { border-left-color: #10b981; }
+
+    .log-entry:hover {
+        background: rgba(255, 255, 255, 0.07);
+    }
+</style>
+
+<!-- Hero / Topo de Métricas -->
+<div class="live-hero">
+    <div class="d-flex align-center justify-between flex-wrap gap-3 mb-3">
+        <div>
+            <div class="d-flex align-center gap-2 mb-1">
+                <h3 class="m-0 text-white font-extrabold" style="letter-spacing: -0.02em;">
+                    <i class="fa-solid fa-network-wired text-success"></i> Central de Operações Autônomas
+                </h3>
+                <span class="pulse-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <span class="pulse-dot"></span> Tempo Real Ativo
+                </span>
+            </div>
+            <p class="text-xs text-muted m-0">
+                Visualização ao vivo do pipeline de processamento: <strong>WAHA</strong> (Webhook & Presença) ➔ <strong>Redis</strong> (Buffer Debounce & Memória) ➔ <strong>Ollama</strong> (Inferência LLM).
+            </p>
+        </div>
+
+        <div class="d-flex align-center gap-2">
+            <a href="{{ url_for('admin.settings', tab='bot') }}" class="btn-secondary text-xs p-2 px-3">
+                <i class="fa-solid fa-gear"></i> Ajustar Configurações do Bot
+            </a>
+            <button type="button" class="btn-primary text-xs p-2 px-3" onclick="triggerQuickBurstTest()">
+                <i class="fa-solid fa-bolt"></i> Simular Rajada Rápida (3 msgs)
+            </button>
+        </div>
+    </div>
+
+    <!-- 4 Indicadores de Saúde -->
+    <div class="grid-4 gap-3">
+        <div class="p-2 px-3 rounded-md d-flex align-center justify-between" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-brands fa-whatsapp text-success" style="font-size: 1.4rem;"></i>
+                <div>
+                    <div class="text-xs text-muted">WhatsApp API</div>
+                    <div class="font-bold text-sm text-white" id="stat-waha">Verificando...</div>
+                </div>
+            </div>
+            <span class="pulse-dot" id="dot-waha" style="color: #64748b;"></span>
+        </div>
+
+        <div class="p-2 px-3 rounded-md d-flex align-center justify-between" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-database text-danger" style="font-size: 1.4rem; color: #ef4444;"></i>
+                <div>
+                    <div class="text-xs text-muted">Redis Buffer / Memória</div>
+                    <div class="font-bold text-sm text-white" id="stat-redis">Verificando...</div>
+                </div>
+            </div>
+            <span class="pulse-dot" id="dot-redis" style="color: #64748b;"></span>
+        </div>
+
+        <div class="p-2 px-3 rounded-md d-flex align-center justify-between" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-robot text-primary" style="font-size: 1.4rem; color: #a855f7;"></i>
+                <div>
+                    <div class="text-xs text-muted">Ollama (LLM Local)</div>
+                    <div class="font-bold text-sm text-white" id="stat-ollama">Verificando...</div>
+                </div>
+            </div>
+            <span class="pulse-dot" id="dot-ollama" style="color: #64748b;"></span>
+        </div>
+
+        <div class="p-2 px-3 rounded-md d-flex align-center justify-between" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-stopwatch text-warning" style="font-size: 1.4rem; color: #f59e0b;"></i>
+                <div>
+                    <div class="text-xs text-muted">Janela de Debounce</div>
+                    <div class="font-bold text-sm text-white" id="stat-debounce">{{ debounce_delay }}s configurados</div>
+                </div>
+            </div>
+            <i class="fa-solid fa-hourglass-half text-warning text-xs"></i>
+        </div>
+    </div>
+</div>
+
+<!-- O GRAFO VISUAL DO PIPELINE (6 NÓS) -->
+<div class="flow-pipeline" id="pipeline-nodes">
+    <!-- Nó 1 -->
+    <div class="flow-node" id="node-1">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
+                    <i class="fa-solid fa-inbox"></i>
+                </div>
+                <span class="node-step-num">ETAPA 01</span>
+            </div>
+            <div class="node-title">1. Webhook WAHA</div>
+            <div class="node-desc">Recepção assíncrona da mensagem HTTP via WAHA em &lt;10ms.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-1">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+
+    <!-- Nó 2 -->
+    <div class="flow-node" id="node-2">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                    <i class="fa-solid fa-stopwatch"></i>
+                </div>
+                <span class="node-step-num">ETAPA 02</span>
+            </div>
+            <div class="node-title">2. Buffer & Debounce</div>
+            <div class="node-desc">Acúmulo no Redis. Reinicia timer a cada nova frase picada.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-2">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+
+    <!-- Nó 3 -->
+    <div class="flow-node" id="node-3">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <span class="node-step-num">ETAPA 03</span>
+            </div>
+            <div class="node-title">3. Montagem Contexto</div>
+            <div class="node-desc">Recupera histórico multi-turno no Redis + dados do Lead no CRM.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-3">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+
+    <!-- Nó 4 -->
+    <div class="flow-node" id="node-4">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;">
+                    <i class="fa-solid fa-keyboard"></i>
+                </div>
+                <span class="node-step-num">ETAPA 04</span>
+            </div>
+            <div class="node-title">4. Presença WAHA</div>
+            <div class="node-desc">Confirma leitura (check azul) e simula "digitando..." ao cliente.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-4">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+
+    <!-- Nó 5 -->
+    <div class="flow-node" id="node-5">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(236, 72, 153, 0.15); color: #ec4899;">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <span class="node-step-num">ETAPA 05</span>
+            </div>
+            <div class="node-title">5. Inferência Ollama</div>
+            <div class="node-desc">Execução no LLM local Docker (/api/chat) com prompt corporativo.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-5">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+
+    <!-- Nó 6 -->
+    <div class="flow-node" id="node-6">
+        <div>
+            <div class="node-header">
+                <div class="node-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </div>
+                <span class="node-step-num">ETAPA 06</span>
+            </div>
+            <div class="node-title">6. Envio & Memória</div>
+            <div class="node-desc">Despacho WAHA, stopTyping, gravação na memória e MessageLog.</div>
+        </div>
+        <div class="node-status text-muted" id="status-node-6">
+            <i class="fa-regular fa-circle"></i> Aguardando
+        </div>
+    </div>
+</div>
+
+<!-- CORPO SPLIT: SIMULADOR WHATSAPP + LOGS DE TELEMETRIA -->
+<div class="grid-2 gap-4">
+    <!-- Coluna Esquerda: Sandbox Interativo -->
+    <div>
+        <div class="d-flex align-center justify-between mb-2">
+            <span class="font-bold text-sm text-white d-flex align-center gap-2">
+                <i class="fa-solid fa-mobile-screen text-success"></i> Simulador WhatsApp (Live Sandbox)
+            </span>
+            <span class="text-xs text-muted">Testa o fluxo em tempo real</span>
+        </div>
+
+        <div class="phone-mockup">
+            <!-- Header do Chat -->
+            <div class="phone-header">
+                <div class="avatar avatar-sm bg-success text-white font-bold" style="width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">
+                    🤖
+                </div>
+                <div style="flex: 1;">
+                    <div class="font-bold text-xs text-white">Assistente Virtual CRM Pro</div>
+                    <div class="text-xs text-success" id="chat-contact-status" style="font-size: 0.68rem;">online</div>
+                </div>
+                <button type="button" class="btn-secondary text-xs p-1 px-2 m-0" onclick="clearSimulatorChat()" title="Limpar Conversa">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+
+            <!-- Corpo de Mensagens -->
+            <div class="phone-body" id="chat-messages">
+                <div class="chat-bubble bubble-bot">
+                    Olá! Eu sou a Sofia, assistente virtual do CRM Pro. Envie uma ou mais mensagens em sequência para ver o agrupamento temporal no Redis e a geração com Ollama!
+                    <div class="bubble-time">Agora</div>
+                </div>
+            </div>
+
+            <!-- Barra de Contagem Regressiva do Debounce -->
+            <div class="debounce-countdown-bar" id="debounce-bar">
+                <span><i class="fa-solid fa-stopwatch animate-spin"></i> Agrupando mensagens no Redis...</span>
+                <strong id="debounce-timer-text">12s</strong>
+            </div>
+
+            <!-- Indicador "Digitando..." -->
+            <div class="typing-indicator" id="chat-typing">
+                <i class="fa-solid fa-pen-fancy text-success"></i> Assistente está digitando...
+            </div>
+
+            <!-- Footer / Input -->
+            <div class="phone-footer">
+                <input type="text" id="sim-message-input" class="input-glass text-xs p-2" 
+                       placeholder="Digite uma mensagem e tecle Enter..." 
+                       onkeydown="if(event.key==='Enter') sendSimulatedMessage()">
+                <button type="button" class="btn-primary text-xs p-2 px-3 m-0" onclick="sendSimulatedMessage()">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coluna Direita: Terminal de Eventos e Telemetria -->
+    <div>
+        <div class="d-flex align-center justify-between mb-2">
+            <span class="font-bold text-sm text-white d-flex align-center gap-2">
+                <i class="fa-solid fa-terminal text-info"></i> Telemetria do Pipeline & Logs
+            </span>
+            <button type="button" class="btn-secondary text-xs p-1 px-2 m-0" onclick="fetchLiveEvents(true)">
+                <i class="fa-solid fa-arrows-rotate"></i> Atualizar
+            </button>
+        </div>
+
+        <div class="terminal-box">
+            <div class="d-flex align-center justify-between border-bottom pb-2 mb-2 text-muted" style="border-color: rgba(255,255,255,0.08); font-size: 0.7rem;">
+                <span>TEMPO | ETAPA | STATUS</span>
+                <span>DESTINO / DETALHES</span>
+            </div>
+            <div class="terminal-logs" id="terminal-logs">
+                <div class="text-center text-muted p-4">Iniciando monitoramento de eventos...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let activeBatchId = null;
+    let debounceCountdown = 0;
+    let debounceTimerInterval = null;
+    let pollingInterval = null;
+    const DEFAULT_DEBOUNCE_CONFIG = parseInt("{{ debounce_delay or 12 }}");
+
+    // Inicialização da Página
+    document.addEventListener("DOMContentLoaded", function() {
+        fetchLiveEvents();
+        // Polling contínuo a cada 1.5 segundos
+        pollingInterval = setInterval(fetchLiveEvents, 1500);
+    });
+
+    // Atualização de Status e Eventos via API
+    function fetchLiveEvents(isManual = false) {
+        fetch("{{ url_for('admin.bot_live_events') }}")
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    updateSystemBadges(data.stats);
+                    renderTerminalLogs(data.events);
+                    highlightActivePipeline(data.batches, data.events);
+                }
+            })
+            .catch(err => {
+                console.warn("Erro ao buscar eventos ao vivo:", err);
+            });
+    }
+
+    // Atualiza badges de saúde dos serviços
+    function updateSystemBadges(stats) {
+        if (!stats) return;
+
+        // WAHA
+        const wahaText = document.getElementById("stat-waha");
+        const dotWaha = document.getElementById("dot-waha");
+        if (stats.waha && stats.waha.online) {
+            wahaText.innerHTML = '<span class="text-success">Conectado (Online)</span>';
+            dotWaha.style.color = '#10b981';
+        } else {
+            wahaText.innerHTML = '<span class="text-muted">Aguardando / Offline</span>';
+            dotWaha.style.color = '#64748b';
+        }
+
+        // Redis
+        const redisText = document.getElementById("stat-redis");
+        const dotRedis = document.getElementById("dot-redis");
+        if (stats.redis && stats.redis.online) {
+            redisText.innerHTML = `<span class="text-success">${stats.redis.active_conversations || 0} Memórias Ativas</span>`;
+            dotRedis.style.color = '#10b981';
+        } else {
+            redisText.innerHTML = '<span class="text-danger">Desconectado</span>';
+            dotRedis.style.color = '#ef4444';
+        }
+
+        // Ollama
+        const ollamaText = document.getElementById("stat-ollama");
+        const dotOllama = document.getElementById("dot-ollama");
+        if (stats.ollama && stats.ollama.online) {
+            ollamaText.innerHTML = `<span class="text-success">${stats.ollama.model || 'Ativo'}</span>`;
+            dotOllama.style.color = '#a855f7';
+        } else {
+            ollamaText.innerHTML = `<span class="text-warning">${stats.ollama.model || 'Carregando...'}</span>`;
+            dotOllama.style.color = '#f59e0b';
+        }
+    }
+
+    // Renderiza lista de logs no terminal
+    function renderTerminalLogs(events) {
+        const container = document.getElementById("terminal-logs");
+        if (!events || events.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted p-4">Nenhum evento recente registrado. Envie uma mensagem pelo simulador para iniciar!</div>';
+            return;
+        }
+
+        let html = '';
+        events.forEach(ev => {
+            const stepClass = 'step-' + (ev.step_index || 1);
+            let statusColor = '#38bdf8';
+            if (ev.status === 'completed') statusColor = '#10b981';
+            if (ev.status === 'active') statusColor = '#f59e0b';
+            if (ev.status === 'error') statusColor = '#ef4444';
+
+            let detailStr = '';
+            if (ev.details) {
+                if (ev.details.message) detailStr = `"${ev.details.message}"`;
+                else if (ev.details.reply_preview) detailStr = `Resp: "${ev.details.reply_preview}"`;
+                else if (ev.details.reply_text) detailStr = `Enviado: "${ev.details.reply_text.substring(0, 60)}..."`;
+                else if (ev.details.batch_size) detailStr = `Lote consolidado (${ev.details.batch_size} msgs)`;
+                else if (ev.details.lead_name) detailStr = `Lead: ${ev.details.lead_name} (${ev.details.history_turns} turnos)`;
+            }
+
+            const durationText = ev.duration_ms ? `<span class="text-warning font-bold">[${ev.duration_ms}ms]</span>` : '';
+
+            html += `
+                <div class="log-entry ${stepClass}">
+                    <div class="d-flex justify-between align-center">
+                        <span style="color: #94a3b8;">${ev.time_str || ''} &bull; <strong style="color:${statusColor};">${ev.step_title || ev.step}</strong> ${durationText}</span>
+                        <span class="text-muted" style="font-size: 0.68rem;">Chat: ${ev.chat_id ? ev.chat_id.split('@')[0] : 'Sistema'}</span>
+                    </div>
+                    ${detailStr ? `<div style="color: #cbd5e1; margin-top: 2px;">${detailStr}</div>` : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // Ilumina os nós do pipeline com base no lote ativo
+    function highlightActivePipeline(batches, events) {
+        // Reset de todos os nós para estado neutro
+        for (let i = 1; i <= 6; i++) {
+            const node = document.getElementById('node-' + i);
+            const statusEl = document.getElementById('status-node-' + i);
+            node.className = 'flow-node';
+            statusEl.innerHTML = '<i class="fa-regular fa-circle text-muted"></i> Pronto';
+        }
+
+        if (!events || events.length === 0) return;
+
+        // Pega o evento mais recente do lote mais recente
+        const latest = events[0];
+        const currentStep = latest.step_index || 1;
+
+        // Marca as etapas anteriores como completed e a atual como processing/active
+        for (let i = 1; i <= 6; i++) {
+            const node = document.getElementById('node-' + i);
+            const statusEl = document.getElementById('status-node-' + i);
+
+            if (i < currentStep) {
+                node.classList.add('active');
+                statusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> Concluído';
+            } else if (i === currentStep) {
+                if (latest.status === 'completed' && i === 6) {
+                    node.classList.add('active');
+                    statusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> Concluído com Sucesso';
+                } else {
+                    node.classList.add('processing');
+                    statusEl.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-warning"></i> Processando...';
+                }
+            }
+        }
+    }
+
+    // Envia mensagem no simulador de WhatsApp
+    function sendSimulatedMessage(textOverride = null) {
+        const input = document.getElementById("sim-message-input");
+        const msg = textOverride || input.value.trim();
+        if (!msg) return;
+
+        if (!textOverride) input.value = '';
+
+        // Adiciona balão do cliente no chat
+        addChatBubble(msg, 'user');
+
+        // Dispara requisição para o backend
+        fetch("{{ url_for('admin.bot_simulate_message') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                message: msg,
+                chat_id: "5511999990001@c.us"
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                activeBatchId = data.batch_token;
+                startDebounceCountdown(data.delay_seconds || DEFAULT_DEBOUNCE_CONFIG);
+                fetchLiveEvents();
+            }
+        })
+        .catch(err => console.error("Erro na simulação:", err));
+    }
+
+    // Dispara rajada rápida de 3 mensagens para testar debounce
+    function triggerQuickBurstTest() {
+        const burst = [
+            "Oi, boa tarde!",
+            "Queria saber mais sobre o sistema de CRM",
+            "Vocês têm integração com o WhatsApp oficial ou WAHA?"
+        ];
+
+        burst.forEach((msg, idx) => {
+            setTimeout(() => {
+                sendSimulatedMessage(msg);
+            }, idx * 1200);
+        });
+    }
+
+    // Gerenciamento visual do timer de Debounce no Chat
+    function startDebounceCountdown(seconds) {
+        debounceCountdown = seconds;
+        const bar = document.getElementById("debounce-bar");
+        const timerText = document.getElementById("debounce-timer-text");
+        bar.style.display = "flex";
+
+        if (debounceTimerInterval) clearInterval(debounceTimerInterval);
+
+        debounceTimerInterval = setInterval(() => {
+            debounceCountdown--;
+            if (debounceCountdown <= 0) {
+                clearInterval(debounceTimerInterval);
+                bar.style.display = "none";
+                showBotTyping();
+            } else {
+                timerText.innerText = debounceCountdown + "s";
+            }
+        }, 1000);
+    }
+
+    function showBotTyping() {
+        const typingEl = document.getElementById("chat-typing");
+        typingEl.style.display = "flex";
+
+        // Simula o tempo que o Ollama leva e busca a resposta do log
+        setTimeout(() => {
+            typingEl.style.display = "none";
+            fetch("{{ url_for('admin.bot_live_events') }}")
+                .then(r => r.json())
+                .then(data => {
+                    const lastDispatch = data.events.find(e => e.step === 'waha_dispatched' || (e.details && e.details.reply_text));
+                    if (lastDispatch && lastDispatch.details && lastDispatch.details.reply_text) {
+                        addChatBubble(lastDispatch.details.reply_text, 'bot');
+                    } else {
+                        addChatBubble("Olá! Recebemos sua mensagem e já estamos processando com o modelo local.", 'bot');
+                    }
+                });
+        }, 3500);
+    }
+
+    function addChatBubble(text, sender = 'user') {
+        const body = document.getElementById("chat-messages");
+        const bubble = document.createElement("div");
+        bubble.className = `chat-bubble bubble-${sender}`;
+        const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        bubble.innerHTML = `${text}<div class="bubble-time">${timeStr}</div>`;
+        body.appendChild(bubble);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function clearSimulatorChat() {
+        const body = document.getElementById("chat-messages");
+        body.innerHTML = '<div class="chat-bubble bubble-bot">Conversa limpa. Envie novas mensagens para iniciar outro ciclo de atendimento autônomo!<div class="bubble-time">Agora</div></div>';
+    }
+</script>
+{% endblock %}

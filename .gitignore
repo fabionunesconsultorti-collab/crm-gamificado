@@ -54,5 +54,7 @@ postgres_data/
 redis_data/
 ollama_data/
 scraper_data/
+backups/
+*.json.gz
 
 
