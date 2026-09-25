@@ -3,7 +3,8 @@ from flask_login import login_required, current_user
 from app import db
 from app.crm import bp
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import or_, and_
 
 import urllib.parse
 from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance, ScrapingJob
@@ -28,33 +29,222 @@ def award_xp(user, points, reason):
 @bp.route('/clients')
 @login_required
 def list_clients():
-    badge = request.args.get('badge')
+    q = request.args.get('q', '').strip()
+    status = request.args.get('status', '').strip()
+    segment = request.args.get('segment', '').strip()
+    seller_id = request.args.get('seller_id', '').strip()
+    store_id = request.args.get('store_id', '').strip()
+    tier = request.args.get('tier', '').strip()
+    source = request.args.get('source', '').strip()
+    badge = request.args.get('badge', '').strip()
+    date_range = request.args.get('date_range', '').strip()
+
     query = Client.query
+
+    # Busca inteligente textual
+    if q:
+        search_filter = or_(
+            Client.name.ilike(f'%{q}%'),
+            Client.phone.ilike(f'%{q}%'),
+            Client.email.ilike(f'%{q}%'),
+            Client.cpf.ilike(f'%{q}%'),
+            Client.segment.ilike(f'%{q}%'),
+            Client.category.ilike(f'%{q}%'),
+            Client.notes.ilike(f'%{q}%'),
+            Client.website.ilike(f'%{q}%'),
+            Client.instagram.ilike(f'%{q}%')
+        )
+        query = query.filter(search_filter)
+
+    # Filtros por atributos principais
+    if status:
+        query = query.filter(Client.status == status)
+
+    if segment:
+        query = query.filter(or_(Client.segment == segment, Client.category == segment))
+
+    if seller_id:
+        try:
+            sid = int(seller_id)
+            query = query.filter(or_(Client.assigned_to == sid, Client.referred_by_id == sid))
+        except ValueError:
+            pass
+
+    if store_id:
+        try:
+            stid = int(store_id)
+            query = query.filter(Client.preferred_store_id == stid)
+        except ValueError:
+            pass
+
+    if tier:
+        query = query.filter(Client.tier == tier)
+
+    if source:
+        if source == 'gmaps':
+            query = query.filter(Client.badges.ilike('%outbound_gmaps%'))
+        else:
+            query = query.filter(Client.lead_source == source)
+
     if badge:
         query = query.filter(Client.badges.contains(badge))
+
+    if date_range:
+        now = datetime.utcnow()
+        if date_range == 'today':
+            query = query.filter(Client.created_at >= now.replace(hour=0, minute=0, second=0, microsecond=0))
+        elif date_range == '7days':
+            query = query.filter(Client.created_at >= now - timedelta(days=7))
+        elif date_range == '30days':
+            query = query.filter(Client.created_at >= now - timedelta(days=30))
+
     clients = query.order_by(Client.updated_at.desc()).all()
-    return render_template('crm/list.html', title='Lista de Clientes', clients=clients, active_badge=badge)
+
+    # Contagens para chips e métricas rápidas
+    total_count = Client.query.count()
+    status_counts = {
+        'all': total_count,
+        'lead': Client.query.filter_by(status='lead').count(),
+        'contato': Client.query.filter_by(status='contato').count(),
+        'proposta': Client.query.filter_by(status='proposta').count(),
+        'fechado': Client.query.filter_by(status='fechado').count(),
+        'perdido': Client.query.filter_by(status='perdido').count(),
+    }
+
+    # Listas auxiliares para preencher os selects
+    segments_raw = db.session.query(Client.segment).filter(Client.segment.isnot(None), Client.segment != '').distinct().all()
+    categories_raw = db.session.query(Client.category).filter(Client.category.isnot(None), Client.category != '').distinct().all()
+    all_segments = sorted(list(set([s[0].strip() for s in segments_raw + categories_raw if s[0] and s[0].strip()])))
+
+    users = User.query.order_by(User.username).all()
+    stores = Store.query.order_by(Store.name).all()
+
+    current_filters = {
+        'q': q,
+        'status': status,
+        'segment': segment,
+        'seller_id': seller_id,
+        'store_id': store_id,
+        'tier': tier,
+        'source': source,
+        'badge': badge,
+        'date_range': date_range
+    }
+
+    has_active_filters = bool(q or status or segment or seller_id or store_id or tier or source or badge or date_range)
+
+    return render_template(
+        'crm/list.html',
+        title='Gestão de Clientes e Leads',
+        clients=clients,
+        total_count=total_count,
+        status_counts=status_counts,
+        all_segments=all_segments,
+        users=users,
+        stores=stores,
+        current_filters=current_filters,
+        has_active_filters=has_active_filters,
+        active_badge=badge
+    )
 
 
 # ── Kanban board ──────────────────────────────────────────────────────────────
 @bp.route('/kanban')
 @login_required
 def kanban():
-    badge = request.args.get('badge')
+    q = request.args.get('q', '').strip()
+    segment = request.args.get('segment', '').strip()
+    seller_id = request.args.get('seller_id', '').strip()
+    store_id = request.args.get('store_id', '').strip()
+    tier = request.args.get('tier', '').strip()
+    source = request.args.get('source', '').strip()
+    badge = request.args.get('badge', '').strip()
+
     query = Client.query
+
+    if q:
+        query = query.filter(or_(
+            Client.name.ilike(f'%{q}%'),
+            Client.phone.ilike(f'%{q}%'),
+            Client.email.ilike(f'%{q}%'),
+            Client.cpf.ilike(f'%{q}%'),
+            Client.segment.ilike(f'%{q}%'),
+            Client.category.ilike(f'%{q}%'),
+            Client.notes.ilike(f'%{q}%'),
+            Client.website.ilike(f'%{q}%'),
+            Client.instagram.ilike(f'%{q}%')
+        ))
+
+    if segment:
+        query = query.filter(or_(Client.segment == segment, Client.category == segment))
+
+    if seller_id:
+        try:
+            sid = int(seller_id)
+            query = query.filter(or_(Client.assigned_to == sid, Client.referred_by_id == sid))
+        except ValueError:
+            pass
+
+    if store_id:
+        try:
+            stid = int(store_id)
+            query = query.filter(Client.preferred_store_id == stid)
+        except ValueError:
+            pass
+
+    if tier:
+        query = query.filter(Client.tier == tier)
+
+    if source:
+        if source == 'gmaps':
+            query = query.filter(Client.badges.ilike('%outbound_gmaps%'))
+        else:
+            query = query.filter(Client.lead_source == source)
+
     if badge:
         query = query.filter(Client.badges.contains(badge))
-    all_clients = query.all()
+
+    all_clients = query.order_by(Client.updated_at.desc()).all()
     clients_by_status = defaultdict(list)
     for c in all_clients:
         clients_by_status[c.status].append(c)
 
+    # Segmentos e usuários para os filtros
+    segments_raw = db.session.query(Client.segment).filter(Client.segment.isnot(None), Client.segment != '').distinct().all()
+    categories_raw = db.session.query(Client.category).filter(Client.category.isnot(None), Client.category != '').distinct().all()
+    all_segments = sorted(list(set([s[0].strip() for s in segments_raw + categories_raw if s[0] and s[0].strip()])))
+
+    users = User.query.order_by(User.username).all()
+    stores = Store.query.order_by(Store.name).all()
+
+    current_filters = {
+        'q': q,
+        'segment': segment,
+        'seller_id': seller_id,
+        'store_id': store_id,
+        'tier': tier,
+        'source': source,
+        'badge': badge
+    }
+    has_active_filters = bool(q or segment or seller_id or store_id or tier or source or badge)
+
     settings = {s.key: s.value for s in Setting.query.all()}
-    return render_template('crm/kanban.html', title='Funil de Vendas',
-                           clients_by_status=clients_by_status,
-                           total_clients=len(all_clients),
-                           settings=settings,
-                           active_badge=badge)
+    total_db_clients = Client.query.count()
+
+    return render_template(
+        'crm/kanban.html',
+        title='Funil de Vendas',
+        clients_by_status=clients_by_status,
+        total_clients=len(all_clients),
+        total_db_clients=total_db_clients,
+        all_segments=all_segments,
+        users=users,
+        stores=stores,
+        settings=settings,
+        current_filters=current_filters,
+        has_active_filters=has_active_filters,
+        active_badge=badge
+    )
 
 
 # ── Move card via drag-and-drop (AJAX) ───────────────────────────────────────
@@ -540,11 +730,15 @@ def prospeccao():
     jobs = ScrapingJob.query.order_by(ScrapingJob.created_at.desc()).limit(100).all()
     scraper_client = MapsScraperClient()
     is_online = scraper_client.is_online()
+    total_scraped = sum((j.total_scraped or 0) for j in jobs)
+    total_imported = sum((j.total_imported or 0) for j in jobs)
     return render_template(
         'crm/prospeccao.html',
         title='Prospecção Ativa de Leads',
         jobs=jobs,
-        is_online=is_online
+        is_online=is_online,
+        total_scraped=total_scraped,
+        total_imported=total_imported
     )
 
 @bp.route('/prospeccao/start', methods=['POST'])
@@ -596,4 +790,25 @@ def prospeccao_job_status(id):
 def prospeccao_active_jobs():
     active_jobs = ScrapingJob.query.filter(ScrapingJob.status.in_(['queued', 'processing'])).all()
     return jsonify({'ok': True, 'jobs': [j.to_dict() for j in active_jobs]})
+
+
+@bp.route('/prospeccao/job/<int:id>/cancel', methods=['POST'])
+@login_required
+def prospeccao_job_cancel(id):
+    from app.tasks.lead_scraper import cancel_scraping_job
+    job = ScrapingJob.query.get_or_404(id)
+    success, message = cancel_scraping_job(job.id)
+
+    db.session.refresh(job)
+
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'ok': success,
+            'message': message,
+            'job': job.to_dict()
+        }), (200 if success else 400)
+
+    flash(message, 'success' if success else 'warning')
+    return redirect(url_for('crm.prospeccao'))
+
 

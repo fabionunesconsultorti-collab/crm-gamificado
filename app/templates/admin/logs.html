@@ -1,46 +1,129 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <div class="search-bar-glass">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="logSearchInput" placeholder="Filtrar por usuário ou ação..." onkeyup="filterLogs()" autocomplete="off">
+    </div>
+    <button type="button" class="btn-primary btn-outline btn-sm" onclick="window.location.reload()" title="Atualizar Logs">
+        <i class="fa-solid fa-arrows-rotate"></i> Atualizar
+    </button>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0">Logs de Operação</h3>
-    <span class="text-xs text-muted">Últimas 100 ações do sistema</span>
+<!-- KPI Cards de Auditoria -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-list-check"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val" id="kpi_total_logs">{{ logs|length }}</span>
+            <span class="kpi-label">Total de Logs</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="kpi-info">
+            {% set today_str = now().strftime('%d/%m/%Y') if now is defined else '' %}
+            <span class="kpi-val">Últimos 100</span>
+            <span class="kpi-label">Histórico Recente</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">Auditoria</span>
+            <span class="kpi-label">Rastreabilidade Total</span>
+        </div>
+    </div>
 </div>
 
-<div class="header-glass p-0 mb-4" style="overflow: hidden; display: block;">
+<!-- Tabela de Logs Padronizada -->
+<div class="card table-card mb-4">
     <div class="table-responsive">
-        <table class="table-glass">
+        <table class="table-glass" id="logsTable">
             <thead>
                 <tr>
-                    <th>Data/Hora</th>
-                    <th>Usuário</th>
-                    <th>Ação</th>
+                    <th style="width: 170px;">Data/Hora</th>
+                    <th style="width: 220px;">Usuário Responsável</th>
+                    <th>Ação Executada</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in logs %}
-                <tr>
+                <tr class="log-row">
                     <td class="text-sm text-muted nowrap">
-                        {{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}
+                        <i class="fa-regular fa-clock me-1 opacity-75"></i>
+                        {{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}
                     </td>
                     <td>
                         <div class="d-flex align-center gap-2">
-                            <div class="avatar avatar-sm">
-                                {{ log.user.username[0] | upper if log.user else '?' }}
+                            <div class="avatar avatar-sm" style="background: {% if log.user and log.user.role == 'admin' %}var(--primary-color){% elif log.user and log.user.role == 'gerente' %}#f59e0b{% else %}#475569{% endif %};">
+                                {{ log.user.username[0] | upper if log.user else 'S' }}
                             </div>
-                            <span class="text-sm font-semibold">{{ log.user.username if log.user else 'Sistema' }}</span>
+                            <div>
+                                <div class="text-sm font-semibold user-name">{{ log.user.username if log.user else 'Sistema' }}</div>
+                                {% if log.user %}
+                                <div class="text-xs text-muted">{{ log.user.role | capitalize }}</div>
+                                {% endif %}
+                            </div>
                         </div>
                     </td>
-                    <td class="text-sm">{{ log.action }}</td>
+                    <td class="text-sm log-action">
+                        <span class="action-text">{{ log.action }}</span>
+                    </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="3" class="p-4 text-center text-muted">
+                <tr id="emptyLogsRow">
+                    <td colspan="3" class="p-5 text-center text-muted">
+                        <i class="fa-solid fa-inbox text-3xl mb-2 d-block opacity-40"></i>
                         Nenhum log registrado ainda.
                     </td>
                 </tr>
                 {% endfor %}
+                <tr id="noResultsRow" style="display: none;">
+                    <td colspan="3" class="p-5 text-center text-muted">
+                        <i class="fa-solid fa-magnifying-glass text-3xl mb-2 d-block opacity-40"></i>
+                        Nenhum log encontrado para o termo pesquisado.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterLogs() {
+    const input = document.getElementById('logSearchInput');
+    const filter = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.log-row');
+    const noResults = document.getElementById('noResultsRow');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+</script>
 {% endblock %}

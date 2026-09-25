@@ -84,11 +84,15 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0"><i class="fa-solid fa-paper-plane text-success"></i> {{ title }}</h3>
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <span class="badge badge-success">
+        <i class="fa-solid fa-satellite-dish"></i> Fila de Disparo WAHA
+    </span>
 </div>
+{% endblock %}
 
+{% block content %}
 <div class="tabs-header">
     <button class="tab-btn {% if active_tab == 'disparo' or not active_tab %}active{% endif %}" onclick="switchTab('disparo', this)">
         <i class="fa-solid fa-rocket text-success"></i> Motor de Disparo
@@ -104,8 +108,12 @@
 
 <div class="d-grid grid-cols-1 md:grid-cols-2 gap-4">
     <!-- Configuração de Disparo -->
-    <div class="header-glass flex-col align-start m-0">
-        <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-gears"></i> Configurações da Fila</h4>
+    <div class="card m-0">
+        <div class="card-header">
+            <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                <i class="fa-solid fa-gears text-primary"></i> Configurações da Fila
+            </h4>
+        </div>
         
         <div class="form-group w-100">
             <label for="template_id">1. Escolha o Template</label>
@@ -218,8 +226,12 @@
     </div>
 
     <!-- Engine / Execução -->
-    <div class="header-glass flex-col align-start m-0">
-        <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-rocket"></i> Motor de Envio</h4>
+    <div class="card m-0">
+        <div class="card-header">
+            <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                <i class="fa-solid fa-rocket text-success"></i> Motor de Envio
+            </h4>
+        </div>
         
         <div class="d-flex align-center justify-between w-100 mb-2">
             <div class="text-sm font-semibold">Progresso: <span id="progress_text">0 / 0</span></div>
@@ -284,9 +296,11 @@
 
 <!-- Tab: Histórico -->
 <div id="tab-historico" class="tab-content {% if active_tab == 'historico' %}active{% endif %}">
-    <div class="header-glass max-w-full flex-col align-start m-0">
-        <div class="d-flex justify-between align-center w-100 mb-3">
-            <h4 class="m-0 text-main"><i class="fa-solid fa-list"></i> Histórico de Disparos</h4>
+    <div class="card table-card m-0">
+        <div class="card-header p-4 m-0">
+            <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                <i class="fa-solid fa-list text-primary"></i> Histórico de Disparos
+            </h4>
             <div class="d-flex gap-2">
                 <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm d-flex align-center justify-center gap-2" style="padding: 0.5rem 1rem;">
                     <i class="fa-solid fa-file-csv"></i> Exportar CSV

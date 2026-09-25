@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <span class="badge badge-primary">
+        <i class="fa-solid fa-sliders"></i> Painel de Controle
+    </span>
+</div>
+{% endblock %}
+
 {% block content %}
 <style>
     .btn-ai-improve {
@@ -214,10 +222,6 @@
         filter: brightness(1.08);
     }
 </style>
-
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0">Configurações do Sistema</h3>
-</div>
 
 <div class="tabs-header">
     <button class="tab-btn {% if active_tab == 'templates' %}active{% endif %}" onclick="switchTab('templates', this)">
@@ -1414,6 +1418,29 @@
             </div>
             <span class="text-xs text-muted">Detectado dinamicamente via interface de rede ativa (sempre atualizado)</span>
         </div>
+
+        <!-- Painel de Recuperação do Recebimento de Mensagens -->
+        <div class="w-100 p-3 mb-4 rounded-md border" style="background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.3) !important;">
+            <div class="d-flex align-center justify-between flex-wrap gap-3">
+                <div class="d-flex align-center gap-3">
+                    <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; color: #f59e0b; font-size: 1.25rem;">
+                        <i class="fa-solid fa-satellite-dish"></i>
+                    </div>
+                    <div>
+                        <h5 class="m-0 font-semibold" style="color: #f59e0b;">Recuperação do Recebimento de Mensagens</h5>
+                        <p class="text-xs text-muted m-0">O WhatsApp parou de receber mensagens? Este procedimento reinicia a sessão no WAHA, reconfigura o webhook do CRM e destrava o buffer do Redis.</p>
+                    </div>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <button type="button" class="btn-primary py-2 px-3 text-sm font-semibold" onclick="triggerRestartCapture()" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                        <i class="fa-solid fa-arrows-rotate"></i> Reiniciar Recebimento WhatsApp
+                    </button>
+                    <a href="{{ url_for('admin.bot_live') }}" class="btn-secondary py-2 px-3 text-sm" title="Acessar painel visual do fluxo">
+                        <i class="fa-solid fa-diagram-project"></i> Monitor Live
+                    </a>
+                </div>
+            </div>
+        </div>
         
         <div class="w-100 mb-4">
             {% for instance in waha_instances %}
@@ -1595,8 +1622,11 @@
                     <span id="wa_status_badge_{{ instance.id }}" class="badge" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem;">Aguardando verificação...</span>
                 </div>
                 
-                <div id="wa_actions_{{ instance.id }}" class="w-100 d-flex gap-2 mb-2">
+                <div id="wa_actions_{{ instance.id }}" class="w-100 d-flex gap-2 mb-2 flex-wrap">
                     <button id="btn_wa_connect_{{ instance.id }}" class="btn-primary flex-1 py-1" onclick="connectWhatsApp({{ instance.id }})">Verificar Status / Conectar</button>
+                    <button type="button" id="btn_wa_restart_{{ instance.id }}" class="btn-secondary py-1 px-3 text-xs" onclick="triggerRestartCapture({{ instance.id }})" title="Reiniciar captura e reconfigurar webhook desta instância" style="border-color: rgba(245, 158, 11, 0.4); color: #f59e0b;">
+                        <i class="fa-solid fa-arrows-rotate"></i> Reiniciar Captura
+                    </button>
                     <button id="btn_wa_logout_{{ instance.id }}" class="btn-danger flex-1 py-1 d-none" onclick="logoutWhatsApp({{ instance.id }})" style="background:#ef4444; color:white;"><i class="fa-solid fa-power-off"></i> Desconectar</button>
                 </div>
 
@@ -3073,9 +3103,120 @@ async function improveTextWithAI(targetId, btnElement) {
         }
     }
 
+    async function triggerRestartCapture(instanceId = null) {
+        const modal = document.getElementById("wahaRecoveryModalSettings");
+        const modalTitle = document.getElementById("recovModalSettingsTitle");
+        const modalIcon = document.getElementById("recovModalSettingsIcon");
+        const stepsList = document.getElementById("recovModalSettingsSteps");
+        const alertBox = document.getElementById("recovModalSettingsAlert");
+        const actions = document.getElementById("recovModalSettingsActions");
+
+        if (modal) modal.style.display = "flex";
+        if (modalTitle) modalTitle.textContent = "Reiniciando Recebimento WhatsApp...";
+        if (modalIcon) modalIcon.className = "fa-solid fa-arrows-rotate fa-spin text-primary";
+        if (alertBox) alertBox.style.display = "none";
+        if (stepsList) {
+            stepsList.innerHTML = `
+                <div class="p-2 rounded text-xs d-flex align-center gap-2" style="background: rgba(255,255,255,0.04);">
+                    <i class="fa-solid fa-spinner fa-spin text-primary"></i> <span>Executando diagnóstico, reiniciando sessão e re-sincronizando webhook com WAHA...</span>
+                </div>
+            `;
+        }
+        if (actions) actions.innerHTML = `<button type="button" class="btn-secondary text-xs py-1 px-3" disabled>Aguarde...</button>`;
+
+        try {
+            const url = instanceId ? `/admin/api/waha/restart_capture?instance_id=${instanceId}` : `/admin/api/waha/restart_capture`;
+            const resp = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await resp.json();
+
+            if (modalIcon) modalIcon.className = data.ok ? "fa-solid fa-circle-check text-success" : "fa-solid fa-triangle-exclamation text-danger";
+            if (modalTitle) modalTitle.textContent = data.ok ? "Recebimento Restaurado!" : "Atenção na Restauração";
+
+            if (data.steps && data.steps.length > 0 && stepsList) {
+                stepsList.innerHTML = data.steps.map(s => {
+                    const iconClass = s.status === 'ok' ? 'fa-solid fa-circle-check text-success' : s.status === 'warning' ? 'fa-solid fa-triangle-exclamation text-warning' : 'fa-solid fa-circle-xmark text-danger';
+                    return `
+                        <div class="p-2 rounded text-xs d-flex align-center justify-between" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                            <div class="d-flex align-center gap-2">
+                                <i class="${iconClass}"></i>
+                                <span class="font-semibold text-white">${s.title}</span>
+                            </div>
+                            <span class="text-muted" style="font-size: 0.7rem;">${s.detail || ''}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            if (alertBox) {
+                alertBox.style.display = "block";
+                alertBox.className = data.ok ? "p-2 rounded text-xs mb-3 text-success" : "p-2 rounded text-xs mb-3 text-danger";
+                alertBox.style.background = data.ok ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+                alertBox.style.border = data.ok ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)";
+                alertBox.innerHTML = `<strong>${data.message}</strong>`;
+            }
+
+            let actionBtns = `<button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModalSettings()">Concluído</button>`;
+            if (data.session_status === 'SCAN_QR_CODE' && instanceId) {
+                actionBtns = `
+                    <button type="button" class="btn-primary text-xs py-1 px-3" onclick="closeRecoveryModalSettings(); connectWhatsApp(${instanceId});" style="background: #10b981;">
+                        <i class="fa-solid fa-qrcode"></i> Ver QR Code
+                    </button>
+                    <button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModalSettings()">Fechar</button>
+                `;
+            }
+            if (actions) actions.innerHTML = actionBtns;
+
+            if (instanceId) {
+                checkWhatsAppStatus(instanceId);
+            } else {
+                {% for instance in waha_instances %}
+                checkWhatsAppStatus({{ instance.id }});
+                {% endfor %}
+            }
+        } catch (err) {
+            if (modalIcon) modalIcon.className = "fa-solid fa-triangle-exclamation text-danger";
+            if (modalTitle) modalTitle.textContent = "Falha de Comunicação";
+            if (stepsList) stepsList.innerHTML = `<div class="p-2 rounded text-xs text-danger">${err.message || 'Erro ao comunicar com o servidor.'}</div>`;
+            if (actions) actions.innerHTML = `<button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModalSettings()">Fechar</button>`;
+        }
+    }
+
+    function closeRecoveryModalSettings() {
+        const modal = document.getElementById("wahaRecoveryModalSettings");
+        if (modal) modal.style.display = "none";
+    }
+
     {% for instance in waha_instances %}
     checkWhatsAppStatus({{ instance.id }});
-{% endfor %}
+    {% endfor %}
 </script>
+
+<!-- Modal de Diagnóstico e Recuperação WAHA em Settings -->
+<div id="wahaRecoveryModalSettings" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; max-width: 520px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); overflow: hidden;">
+        <div class="p-3 d-flex align-center justify-between border-bottom" style="border-color: rgba(255,255,255,0.08);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-arrows-rotate text-primary" id="recovModalSettingsIcon"></i>
+                <h4 class="font-bold text-sm text-white m-0" id="recovModalSettingsTitle">Reiniciando Recebimento WhatsApp...</h4>
+            </div>
+            <button type="button" onclick="closeRecoveryModalSettings()" style="background:none; border:none; color: #94a3b8; cursor: pointer; font-size: 1rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-3">
+            <p class="text-xs text-muted mb-3">
+                Executando checklist: validando conectividade com WAHA, iniciando sessão, re-injetando webhook do CRM e desobstruindo o buffer do Redis.
+            </p>
+            <div id="recovModalSettingsSteps" class="d-flex flex-column gap-2 mb-3"></div>
+            <div id="recovModalSettingsAlert" class="p-2 rounded text-xs mb-3" style="display: none;"></div>
+            <div class="d-flex justify-end gap-2" id="recovModalSettingsActions">
+                <button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModalSettings()">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

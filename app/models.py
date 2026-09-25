@@ -83,6 +83,7 @@ class Client(db.Model):
     google_rating = db.Column(db.Float, default=0.0)
     google_reviews_count = db.Column(db.Integer, default=0)
 
+    assigned_user = db.relationship('User', foreign_keys=[assigned_to], backref='assigned_clients')
     referred_by = db.relationship('User', foreign_keys=[referred_by_id], backref='referrals')
 
     @property

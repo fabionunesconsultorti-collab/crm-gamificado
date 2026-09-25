@@ -706,10 +706,23 @@ O Google Maps aplica mecanismos de rate-limiting (CAPTCHAs e bloqueios temporár
      - PROXY=http://usuario:senha@ip-do-proxy:porta
    ```
 
-### 12.3. Testes Automatizados do Scraper
+### 12.3. Cancelamento e Interrupção Segura de Prospecções
+
+Caso uma prospecção demore muito, enfrente lentidão ou tenha sido iniciada por engano, o operador pode cancelá-la a qualquer momento:
+
+1. **Botão de Cancelamento Instantâneo:**
+   - Disponível no **Card de Monitoramento ao Vivo** no topo da tela (`#liveBtnCancel`).
+   - Disponível na coluna de **Ações** da tabela de histórico para qualquer busca com status `Na Fila (queued)` ou `Minerando (processing)`.
+2. **Ciclo de Cancelamento no Backend:**
+   - Endpoint seguro `POST /crm/prospeccao/job/<id>/cancel` com feedback visual imediato e notificação toast.
+   - Envia instrução de cancelamento (`DELETE /api/v1/jobs/{id}`) para o container `maps-scraper` desalocando recursos do scraper externo.
+   - A tarefa assíncrona verifica ativamente o status no banco durante o polling e nas transições de etapa, interrompendo a execução de forma graciosa sem deixar jobs travados.
+   - O status é registrado como `cancelled` ("Cancelado"), salvando data e hora de encerramento (`finished_at`) e liberando a interface.
+
+### 12.4. Testes Automatizados do Scraper
 
 ```bash
-# Executar a suíte de testes de Prospecção e Normalização
+# Executar a suíte de testes de Prospecção, Normalização e Cancelamento
 ./venv/bin/python -m unittest tests/test_lead_scraper.py -v
 ```
 
@@ -947,7 +960,123 @@ flowchart TD
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp e Enriquecimento Progressivo de Leads.*
+## 17. Sistema de Busca Inteligente, Filtros de Atributos e Melhorias no Cadastro de Clientes
+
+Para agilizar a gestão de milhares de contatos e fornecer controle operacional rápido sobre o funil de vendas, foram implementados sistemas modernos de **busca inteligente instantânea** e **filtros por atributos principais** tanto na listagem de clientes quanto no quadro Kanban, além de melhorias no formulário de cadastro.
+
+### 17.1. Melhorias na Tela de Cadastro e Edição de Clientes (`/crm/client/new` & `/crm/client/<id>/edit`)
+- **Autocompletar de CEP em Tempo Real (ViaCEP):** Ao preencher os 8 dígitos do CEP, uma requisição assíncrona consulta a API ViaCEP, preenche automaticamente rua, bairro, cidade e UF, atualiza o mapa embutido do Google Maps e exibe feedback visual com sucesso.
+- **Máscara Inteligente de Telefone:** Formatação dinâmica automática `(XX) 9XXXX-XXXX` para celulares e `(XX) XXXX-XXXX` para números fixos, com indicador de integridade do número.
+- **Detecção e Validação de CPF/CNPJ:** Formatação automática em tempo real com identificador visual do tipo de documento informado.
+- **Sugestões Rápidas de Segmento:** Input com `<datalist>` e botões/chips rápidos clicáveis (ex: *Restaurante*, *Padaria*, *Varejo*, *Saúde / Clínica*, *Estética*, *Imobiliária*, *Tecnologia*, *Automotivo*) para padronização cadastral com 1 clique.
+- **Ações Rápidas Integradas:** Atalho para abrir conversa direta no WhatsApp com o número informado.
+
+### 17.2. Busca Inteligente e Filtro por Atributos na Gestão de Clientes (`/crm/clients`)
+- **Barra de Chips Rápidos de Status:** Contadores dinâmicos no topo para filtragem imediata em 1 clique (*Todos os Leads*, *Novos Leads*, *Em Contato*, *Proposta Enviada*, *Vendas Fechadas*, *Perdidos*).
+- **Busca Inteligente Híbrida:** Pesquisa simultânea por Nome, Telefone, E-mail, CPF/CNPJ, Segmento, Instagram, Website e Anotações. Filtra instantaneamente no navegador enquanto o usuário digita e suporta requisições via parâmetros GET para compartilhamento de URL.
+- **Painel de Atributos Avançados:** Filtros combinados por:
+  - **Etapa do Funil (Status)**
+  - **Segmento / Ramo de Atuação** (carregado dinamicamente do banco de dados)
+  - **Vendedor Responsável** (`assigned_to` / `referred_by`)
+  - **Origem do Cadastro** (Google Maps Outbound, Loja Física, E-commerce, Instagram, Indicação)
+  - **Nível / Tier** (Bronze, Prata, Ouro, VIP)
+  - **Data de Cadastro** (Hoje, Últimos 7 dias, Últimos 30 dias, Qualquer data)
+- **Tabela Enriquecida:** Avatares com iniciais coloridas, tags de segmento e origem, links diretos para WhatsApp e Instagram, e ações rápidas de edição e disparo.
+
+### 17.3. Busca e Filtro em Tempo Real no Funil Kanban (`/crm/kanban`)
+- **Filtro Instantâneo das 5 Colunas:** Campo de busca e seletores de segmento, vendedor, origem e tier no topo do Kanban.
+- **Contadores de Coluna Vivos:** O badge numérico de cada etapa (*Novos Leads*, *Em Contato*, *Proposta*, *Fechado*, *Perdido*) recalcula dinamicamente conforme os filtros são aplicados, exibindo mensagem amigável quando nenhum card bater com a busca em uma etapa específica.
+- **Drag & Drop Preservado:** Mover cards entre colunas continua funcionando normalmente com os filtros ativos, com atualização persistente via AJAX e recalculo de contagens.
+
+### 17.4. Redefinição do Padrão de Card e Layout Responsivo do Funil Kanban
+- **Eliminação de Cards Desproporcionais e Quebras de Tela:**
+  - Travamento rígido das colunas com `flex: 0 0 310px; width: 310px; min-width: 310px; max-width: 310px;` e scroll horizontal contínuo na `.kanban-wrap`.
+  - Inclusão de `flex-shrink: 0 !important;` e `min-height: 0` nos containers internos para impedir colapso ou gigantismo dos cards em colunas com grande volume de leads.
+- **Padrão Completo de Acompanhamento do Lead nos Cards:**
+  - **Identificação do Lead:** Título destacado com limitação suave a 2 linhas (`-webkit-line-clamp: 2`) e quebra de palavras segura (`word-break: break-word`).
+  - **Badges Estratégicos:** Selos de Nível/Tier (*VIP*, *Ouro*, *Prata*) e tags de Origem (*📍 Maps*, *📸 Insta*, *🏪 Loja*, *🛒 Web*, *🤝 Indicação*).
+  - **Segmento e Avaliação:** Tag em destaque com ícone de maleta para segmento/categoria e estrelas de avaliação média do Google Maps quando disponíveis.
+  - **Informações de Contato:** Telefone com ícone de clique rápido para conversa no WhatsApp e e-mail com truncamento elegante.
+  - **Vendedor Responsável:** Avatar circular com inicial do consultor/vendedor atribuído e atalhos rápidos para Instagram e Website.
+  - **Anotações Resumidas:** Box em itálico com citação limitada a 2 linhas, evitando que dados extensos de prospecção inflem a altura do card.
+  - **Barra de Ações Padronizada:** Botões de ação uniformes (32x32px) para WhatsApp, edição de cadastro e exclusão alinhados à direita, eliminando botões esticados.
+
+### 17.5. Otimização de Layout e Responsividade na Prospecção Ativa (`/crm/prospeccao`)
+- **Proporção Perfeita de Tela e Eliminação de Transbordamento:**
+  - Travamento responsivo do grid com `grid-template-columns: 300px minmax(0, 1fr)` em telas desktop (>=1024px) e empilhamento vertical suave em telas menores.
+  - O contêiner de histórico e monitoramento utiliza `min-width: 0` e `table-layout: fixed;` garantindo que as 6 colunas da tabela (*ID/Data*, *Termo Pesquisado*, *Status*, *Minerados*, *Usuário*, *Ações*) fiquem 100% visíveis dentro da largura da tela sem cortes ou quebras acidentais.
+- **Barra de Métricas e KPIs no Topo:**
+  - Painel com 4 cartões de indicadores em tempo real: *Buscas Realizadas*, *Locais Minerados no Maps*, *Leads Inseridos no Funil* e *Status de Conexão do Docker Scraper (:8080)*.
+- **Sugestões Rápidas de Nicho (Quick Chips):**
+  - Botões interativos abaixo do campo de busca (*Academias*, *Lanches*, *Odonto*, *Auto Peças*, *Salões*) que preenchem instantaneamente o termo e localidade com 1 clique.
+- **Barra Superior Integrada:**
+  - Remoção do cabeçalho redundante; status do scraper Docker e botões de atalho (*Funil Kanban* e *Lista de Clientes*) unificados na barra superior da aplicação.
+
+### 17.6. Padronização Visual Global e Sistema de Design Unificado em Todas as Telas
+Para garantir uma experiência de usuário (UX) coesa, fluida e de alto padrão visual (*glassmorphism*, dark mode e harmonia de cores em todos os módulos), todas as telas do sistema foram refatoradas sob um mesmo padrão arquitetural e de CSS:
+
+1. **Eliminação de Cabeçalhos Duplicados:**
+   - Remoção de blocos `.header-glass` redundantes internos que repetiam o título da página.
+   - Centralização de todas as ações de página, atalhos, botões primários e badges de contexto no `{% block topbar_actions %}`, injetados diretamente na barra superior global do layout (`base.html`).
+
+2. **Componente Universal de Indicadores (`.kpi-card`):**
+   - Criação de cartões métricos universais com fundo translúcido (`var(--card-bg)`), efeito de desfoque (`backdrop-filter: blur(12px)`), borda sutil (`var(--glass-border)`), ícones arredondados temáticos e tipografia destacada.
+   - Implementado nos módulos: *Logs de Operação* (`/admin/logs`), *Gestão de Usuários* (`/admin/users`), *Modelos de Templates* (`/admin/templates`), *Histórico de Mensagens* (`/admin/messages`), *Dashboard Principal* (`/`), *Ranking XP* (`/ranking`), *Importação* (`/crm/import`) e *Prospecção* (`/crm/prospeccao`).
+
+3. **Contêineres de Tabela Padronizados (`.card.table-card`):**
+   - Substituição de contêineres improvisados por contêineres `.card.table-card` com cantos arredondados contínuos (`border-radius: 14px`), corte perfeito de transbordamento (`overflow: hidden`) e scroll responsivo horizontal (`.table-responsive`).
+   - Padronização das tabelas de dados: *Logs de Operação*, *Usuários*, *Modelos de Mensagem*, *Histórico de Disparos*, *Clientes* e *Histórico de Prospecção*.
+
+4. **Busca e Filtragem Instantânea Client-Side (`.search-bar-glass`):**
+   - Campo de busca embutido com ícone de lupa e expansão suave no foco inserido na barra superior ou cabeçalho das tabelas.
+   - Filtragem dinâmica em tempo real (sem recarregamento de página) implementada nas telas de *Logs de Operação*, *Gestão de Usuários*, *Histórico de Mensagens* e *Listagem de Clientes*.
+
+5. **Formulários e Cartões de Ação Centralizados (`.card`):**
+   - Formulários de edição/criação (*Cadastro de Usuário*, *Novo Template*, *Envio WhatsApp Avulso*, *Importação de Planilha*) agora utilizam contêineres `.card` estruturados com cabeçalho (`.card-header`), corpo com inputs translúcidos (`.input-glass`) e rodapé de ações (`.card-footer`).
+   - Alinhamento ergonômico com largura controlada (`max-width: 650px`) e centralização visual na viewport.
+
+6. **Padrão de Badges e Selos de Status:**
+   - Unificação das classes `.badge-primary`, `.badge-secondary`, `.badge-success`, `.badge-warning`, `.badge-danger` e `.badge-info` com bordas translúcidas, ícones de apoio e tipografia legível em todos os temas.
+
+---
+
+## 25. Procedimento de Recuperação e Reinício de Captura do WhatsApp (WAHA)
+
+### 25.1 Causa Raiz de Interrupções de Captura
+O recebimento de mensagens do WhatsApp depende da cadeia contínua:
+1. **Container WAHA:** A sessão WhatsApp precisa estar no estado `WORKING` (conectada ao aparelho). Caso o container seja reiniciado, caia ou perca a sessão, a API do WAHA retorna `404 Not Found` para a sessão ou a mantém em `STOPPED`/`SCAN_QR_CODE`.
+2. **Subscrição de Webhook:** O WAHA precisa estar configurado com a URL correta do backend CRM (`http://172.18.0.1:5000/api/webhook/whatsapp` na rede Docker) com os eventos `message`, `message.any` e `messages.update`.
+3. **Locks do Buffer Redis:** Caso uma mensagem tenha sofrido crash ou interrupção durante o debounce, chaves de lock (`crm:wa:lock:*`) podem ficar retidas temporariamente.
+
+### 25.2 Procedimento Automatizado de Reinício (5 Etapas)
+Foi implementado o método centralizado `WahaAPI.restart_whatsapp_capture(instance_id=None)` que executa um diagnóstico e reparo completo em tempo real:
+1. **Validação de Conectividade:** Testa a API HTTP do WAHA na porta 3000 com resolução automática de IP (`127.0.0.1`, IP de rede local ativa ou `host.docker.internal`).
+2. **Diagnóstico & Inicialização da Sessão:**
+   - Se a sessão não existir (`HTTP 404`), cria a instância imediatamente com a configuração correta de webhook.
+   - Se a sessão estiver `STOPPED` ou `FAILED`, envia comando `POST /api/sessions/{session}/restart` (ou `/start`).
+   - Se a sessão exigir leitura do QR Code, sinaliza `SCAN_QR_CODE` para exibição imediata do código na interface.
+3. **Injeção Forçada de Webhook:**
+   - Envia um `PUT /api/sessions/{session}` com payload explícito contendo os webhooks do CRM, garantindo que o WAHA passe a rotear os eventos de mensagens recebidas.
+4. **Desobstrução do Buffer Redis:**
+   - Varre e remove travas orfãs em `crm:wa:lock:*`, permitindo que novas mensagens recebidas entrem no debounce sem bloqueios.
+5. **Sincronização no CRM:**
+   - Atualiza o registro local da instância no banco de dados (`connected`, `waiting_qr` ou `connecting`) e grava evento no `SystemLog` para auditoria.
+
+### 25.3 Como Acionar o Procedimento na Interface
+O procedimento pode ser acionado em 1 clique em dois locais estratégicos:
+- **Central de Operações Autônomas / Bot Live (`/admin/bot/live`):**
+  - Botão **"Reiniciar Recebimento"** no cabeçalho superior.
+  - Botão de ação rápida no **Nó 1 (Webhook WAHA)** do grafo do pipeline.
+  - Exibe modal com checklist visual em tempo real de cada etapa e atalho para escanear o QR Code se a sessão foi recriada.
+- **Configurações do Sistema (`/admin/settings?tab=waha`):**
+  - Banner de destaque **"Recuperação do Recebimento de Mensagens"**.
+  - Botão individual **"Reiniciar Captura"** dentro de cada cartão de instância configurada.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global e Procedimento Automatizado de Recuperação e Reinício de Captura WhatsApp (WAHA).*
+
+
 
 
 

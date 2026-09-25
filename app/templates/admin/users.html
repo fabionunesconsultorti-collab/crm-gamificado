@@ -1,62 +1,118 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0">Gestão de Usuários</h3>
-    <a href="{{ url_for('admin.new_user') }}" class="btn-primary w-auto">
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <div class="search-bar-glass">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="userSearchInput" placeholder="Buscar usuário ou perfil..." onkeyup="filterUsers()" autocomplete="off">
+    </div>
+    <a href="{{ url_for('admin.new_user') }}" class="btn-primary btn-sm">
         <i class="fa-solid fa-user-plus"></i> Novo Usuário
     </a>
 </div>
+{% endblock %}
 
-<div class="header-glass p-0 mb-4" style="overflow:hidden;display:block;">
+{% block content %}
+<!-- KPI Cards de Usuários -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ users|length }}</span>
+            <span class="kpi-label">Total de Usuários</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-user-tie"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ users | selectattr('role', 'equalto', 'vendedor') | list | length }}</span>
+            <span class="kpi-label">Vendedores Ativos</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ users | selectattr('role', 'ne', 'vendedor') | list | length }}</span>
+            <span class="kpi-label">Gerentes & Admins</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;">
+            <i class="fa-solid fa-trophy"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ users | map(attribute='performance_points') | sum }} XP</span>
+            <span class="kpi-label">Pontuação Global</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Usuários Padronizada -->
+<div class="card table-card mb-4">
     <div class="table-responsive">
-        <table class="table-glass">
+        <table class="table-glass" id="usersTable">
             <thead>
                 <tr>
                     <th>Usuário</th>
                     <th>E-mail</th>
-                    <th>Perfil</th>
+                    <th>Perfil de Acesso</th>
                     <th>Pontos XP</th>
                     <th>Criado em</th>
-                    <th>Ações</th>
+                    <th class="text-right" style="width: 120px;">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
-                <tr>
+                <tr class="user-row">
                     <td>
-                        <div class="d-flex align-center gap-2">
+                        <div class="d-flex align-center gap-3">
                             <div class="avatar avatar-md"
-                                 style="background:{% if user.role == 'admin' %}var(--primary-color){% elif user.role == 'gerente' %}#f59e0b{% else %}#475569{% endif %};">
+                                 style="background:{% if user.role == 'admin' %}var(--primary-color){% elif user.role == 'gerente' %}#f59e0b{% else %}#475569{% endif %}; font-weight:700;">
                                 {{ user.username[0] | upper }}
                             </div>
-                            <span class="font-semibold">{{ user.username }}</span>
+                            <div>
+                                <span class="font-semibold text-main d-block user-name">{{ user.username }}</span>
+                                {% if user.id == current_user.id %}
+                                <span class="badge badge-primary text-xs" style="padding: 0.15rem 0.4rem; font-size: 0.65rem;">Você</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </td>
-                    <td class="text-sm text-muted">{{ user.email }}</td>
+                    <td class="text-sm text-muted user-email">{{ user.email }}</td>
                     <td>
                         <span class="badge 
                             {% if user.role == 'admin' %} badge-primary
                             {% elif user.role == 'gerente' %} badge-warning
-                            {% else %} badge-secondary {% endif %}">
+                            {% else %} badge-secondary {% endif %} user-role">
+                            <i class="fa-solid {% if user.role == 'admin' %}fa-crown{% elif user.role == 'gerente' %}fa-star{% else %}fa-user{% endif %} me-1"></i>
                             {{ user.role | capitalize }}
                         </span>
                     </td>
                     <td>
-                        <span class="text-warning font-semibold">{{ user.performance_points }} XP</span>
+                        <span class="text-warning font-semibold"><i class="fa-solid fa-bolt me-1"></i>{{ user.performance_points }} XP</span>
                     </td>
-                    <td class="text-sm text-muted">
+                    <td class="text-sm text-muted nowrap">
+                        <i class="fa-regular fa-calendar me-1 opacity-75"></i>
                         {{ user.created_at.strftime('%d/%m/%Y') }}
                     </td>
-                    <td>
-                        <div class="d-flex gap-2">
-                            <a href="{{ url_for('admin.edit_user', id=user.id) }}" class="icon-btn-solid primary">
+                    <td class="text-right">
+                        <div class="d-flex gap-2 justify-end">
+                            <a href="{{ url_for('admin.edit_user', id=user.id) }}" class="icon-btn-solid primary" title="Editar Usuário">
                                 <i class="fa-solid fa-pen"></i>
                             </a>
                             {% if user.id != current_user.id %}
                             <form action="{{ url_for('admin.delete_user', id=user.id) }}" method="post"
-                                  class="d-inline" onsubmit="return confirm('Excluir usuário {{ user.username }}?')">
-                                <button class="icon-btn-solid danger">
+                                  class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir o usuário {{ user.username }}?')">
+                                <button class="icon-btn-solid danger" title="Excluir Usuário">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>
@@ -64,9 +120,48 @@
                         </div>
                     </td>
                 </tr>
+                {% else %}
+                <tr id="emptyUsersRow">
+                    <td colspan="6" class="p-5 text-center text-muted">
+                        <i class="fa-solid fa-users text-3xl mb-2 d-block opacity-40"></i>
+                        Nenhum usuário cadastrado.
+                    </td>
+                </tr>
                 {% endfor %}
+                <tr id="noResultsUsersRow" style="display: none;">
+                    <td colspan="6" class="p-5 text-center text-muted">
+                        <i class="fa-solid fa-magnifying-glass text-3xl mb-2 d-block opacity-40"></i>
+                        Nenhum usuário encontrado para a busca.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterUsers() {
+    const input = document.getElementById('userSearchInput');
+    const filter = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.user-row');
+    const noResults = document.getElementById('noResultsUsersRow');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+</script>
 {% endblock %}

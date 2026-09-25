@@ -113,6 +113,51 @@ def normalize_brazilian_phone(raw_phone: str) -> tuple[str | None, bool, bool]:
 
     return None, False, False
 
+def cancel_scraping_job(job_id: int) -> tuple[bool, str]:
+    """
+    Cancela com segurança uma tarefa de prospecção ativa de leads.
+    Marca o status como 'cancelled', define o término e notifica o scraper
+    externo para abortar o job caso esteja em execução.
+    """
+    job = ScrapingJob.query.get(job_id)
+    if not job:
+        return False, f"Prospecção #{job_id} não encontrada."
+
+    if job.status in ('completed', 'failed', 'cancelled'):
+        status_pt = {'completed': 'concluída', 'failed': 'falhou', 'cancelled': 'cancelada'}.get(job.status, job.status)
+        return False, f"Esta prospecção já está {status_pt} e não pode ser cancelada."
+
+    job.status = 'cancelled'
+    job.current_step = 'Cancelado pelo usuário'
+    job.finished_at = datetime.utcnow()
+
+    # Se já tiver disparado no scraper externo, envia cancelamento imediato
+    if job.external_job_id:
+        try:
+            client_api = MapsScraperClient()
+            client_api.cancel_job(job.external_job_id)
+        except Exception as e:
+            logger.warning(f"[LeadScraper] Erro ao enviar cancelamento para o scraper externo ({job.external_job_id}): {e}")
+
+    try:
+        db.session.commit()
+        logger.info(f"[LeadScraper] Prospecção Job #{job.id} cancelada com sucesso pelo usuário.")
+        return True, f"Prospecção #{job.id} cancelada com sucesso!"
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[LeadScraper] Erro ao persistir cancelamento do Job #{job.id}: {e}")
+        return False, f"Erro ao registrar cancelamento no banco de dados: {e}"
+
+def _is_job_cancelled_or_missing(job, job_id: int) -> bool:
+    """Verifica se o job foi cancelado ou removido pelo usuário."""
+    try:
+        db.session.expire(job)
+        db.session.refresh(job)
+        return job.status == 'cancelled'
+    except Exception:
+        logger.warning(f"[LeadScraper Task] Job ID {job_id} indisponível ou removido do banco.")
+        return True
+
 def run_lead_scraper_task(job_id: int):
     """
     Ciclo de vida completo da tarefa em segundo plano de prospecção ativa de leads:
@@ -127,6 +172,10 @@ def run_lead_scraper_task(job_id: int):
     job = ScrapingJob.query.get(job_id)
     if not job:
         logger.error(f"[LeadScraper Task] Job ID {job_id} não encontrado no banco de dados.")
+        return
+
+    if job.status == 'cancelled':
+        logger.info(f"[LeadScraper Task] Job ID {job_id} já consta como cancelado. Abortando execução.")
         return
 
     client_api = MapsScraperClient()
@@ -144,6 +193,7 @@ def run_lead_scraper_task(job_id: int):
     job.current_step = 'Conectando ao Google Maps Scraper...'
     db.session.commit()
 
+    external_id = None
     try:
         # 1. Dispara o job no Scraper
         external_id = client_api.create_job(
@@ -165,6 +215,16 @@ def run_lead_scraper_task(job_id: int):
         is_completed = False
 
         while (time.time() - start_time) < max_wait_seconds:
+            # Checa se o usuário cancelou o job ou o registro foi alterado
+            if _is_job_cancelled_or_missing(job, job_id):
+                logger.info(f"[LeadScraper Task] Job {job_id} cancelado pelo usuário durante o polling. Abortando tarefa...")
+                if external_id:
+                    try:
+                        client_api.cancel_job(external_id)
+                    except Exception:
+                        pass
+                return
+
             elapsed = time.time() - start_time
             status_data = client_api.check_status(external_id)
             current_status = status_data.get("status")
@@ -203,6 +263,11 @@ def run_lead_scraper_task(job_id: int):
         if not is_completed:
             raise TimeoutError(f"Tempo limite excedido ({max_wait_seconds}s) aguardando o scraper concluir o job.")
 
+        # Checa cancelamento antes de baixar resultados
+        if _is_job_cancelled_or_missing(job, job_id):
+            logger.info(f"[LeadScraper Task] Job {job_id} cancelado antes do download de resultados. Abortando...")
+            return
+
         # 3. Download e higienização dos resultados
         job.progress = 85
         job.current_step = 'Baixando resultados e iniciando higienização de contatos...'
@@ -211,6 +276,11 @@ def run_lead_scraper_task(job_id: int):
         raw_items = client_api.fetch_results(external_id)
         job.total_scraped = len(raw_items)
         logger.info(f"[LeadScraper Task] {len(raw_items)} registros brutos baixados do scraper.")
+
+        # Checa cancelamento antes da higienização e salvamento
+        if _is_job_cancelled_or_missing(job, job_id):
+            logger.info(f"[LeadScraper Task] Job {job_id} cancelado antes da inserção no banco. Abortando...")
+            return
 
         job.progress = 90
         job.current_step = f'Normalizando telefones E.164 e deduplicando {len(raw_items)} empresas...'
@@ -314,6 +384,15 @@ def run_lead_scraper_task(job_id: int):
 
     except Exception as e:
         db.session.rollback()
+        try:
+            db.session.expire(job)
+            db.session.refresh(job)
+            if job.status == 'cancelled':
+                logger.info(f"[LeadScraper Task] Job ID {job.id} finalizado conforme solicitação de cancelamento.")
+                return
+        except Exception:
+            pass
+
         logger.error(f"[LeadScraper Task] Erro fatal durante execução do Job {job.id}: {e}", exc_info=True)
         job.status = 'failed'
         job.progress = 100

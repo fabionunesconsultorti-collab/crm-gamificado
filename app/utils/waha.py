@@ -275,6 +275,10 @@ class WahaAPI:
         url = f"{cfg['api_url']}/api/sessions/{session_name}"
         try:
             get_resp = requests.get(url, headers=headers, timeout=10)
+            if get_resp.status_code == 404:
+                # Se a sessão não existir no WAHA, cria e inicializa automaticamente com webhooks
+                return WahaAPI.create_instance(instance_id)
+
             if get_resp.status_code != 200:
                 return False, f"Sessão '{session_name}' não encontrada ou inativa no WAHA."
 
@@ -307,6 +311,165 @@ class WahaAPI:
                 return False, f"Falha ao registrar webhook no WAHA ({put_resp.status_code}): {put_resp.text}"
         except Exception as e:
             return False, str(e)
+
+    @staticmethod
+    def restart_whatsapp_capture(instance_id=None):
+        """
+        Procedimento de emergência e diagnóstico para restaurar a captura de mensagens do WhatsApp:
+        1. Validação de Conectividade com a API WAHA (com auto-resolução de IP se necessário).
+        2. Diagnóstico & Ativação de Sessão: Se ausente (404), cria; se parada/falha (STOPPED/FAILED), reinicia/inicia.
+        3. Sincronização Forçada de Webhooks: Injeta a URL atual do backend com eventos de mensagem.
+        4. Desobstrução do Buffer Redis: Remove eventuais travas órfãs que possam impedir processamento.
+        5. Atualização de estado da instância no banco de dados.
+        """
+        steps = []
+        cfg = WahaAPI.get_settings(instance_id)
+        session_name = cfg['session_name'] or 'default'
+        api_url = cfg['api_url']
+        headers = WahaAPI.get_headers(instance_id)
+
+        # 1. Teste de Conexão com o WAHA
+        conn_ok = False
+        try:
+            test_resp = requests.get(f"{api_url}/api/sessions", headers=headers, timeout=5)
+            if test_resp.status_code == 200:
+                conn_ok = True
+                steps.append({"step": "api_connect", "title": "Conectividade com API WAHA", "status": "ok", "detail": f"Online em {api_url}"})
+        except Exception:
+            # Tenta auto-resolver IP se estiver inacessível
+            resolved = resolve_instance_api_url(api_url)
+            if resolved != api_url:
+                try:
+                    retry_resp = requests.get(f"{resolved}/api/sessions", headers=headers, timeout=5)
+                    if retry_resp.status_code == 200:
+                        conn_ok = True
+                        api_url = resolved
+                        if cfg.get('id'):
+                            inst = WahaInstance.query.get(cfg['id'])
+                            if inst:
+                                inst.api_url = resolved
+                                from app import db
+                                db.session.commit()
+                        steps.append({"step": "api_connect", "title": "Conectividade com API WAHA", "status": "ok", "detail": f"Reconectado após ajuste de IP para {resolved}"})
+                except Exception:
+                    pass
+
+        if not conn_ok:
+            steps.append({"step": "api_connect", "title": "Conectividade com API WAHA", "status": "error", "detail": f"Inacessível em {api_url}. Verifique se o container 'crm-waha-1' está rodando no Docker."})
+            return {
+                "ok": False,
+                "message": f"Não foi possível conectar ao servidor WAHA em {api_url}. O container Docker pode estar parado.",
+                "steps": steps
+            }
+
+        # 2. Diagnóstico & Ativação da Sessão
+        session_url = f"{api_url}/api/sessions/{session_name}"
+        session_status = 'UNKNOWN'
+
+        try:
+            get_resp = requests.get(session_url, headers=headers, timeout=8)
+            if get_resp.status_code == 404:
+                # Sessão não existe: cria sessão imediatamente com webhook
+                create_ok, create_data = WahaAPI.create_instance(instance_id)
+                if create_ok:
+                    session_status = (create_data.get('status') if isinstance(create_data, dict) else None) or 'STARTING'
+                    steps.append({"step": "session_state", "title": f"Criação da Sessão '{session_name}'", "status": "ok", "detail": f"Sessão criada e inicializada (Status: {session_status})."})
+                else:
+                    steps.append({"step": "session_state", "title": f"Criação da Sessão '{session_name}'", "status": "error", "detail": str(create_data)})
+                    return {"ok": False, "message": f"Erro ao criar sessão no WAHA: {create_data}", "steps": steps}
+            elif get_resp.status_code == 200:
+                session_data = get_resp.json() or {}
+                raw_status = session_data.get('status', 'STOPPED')
+                session_status = raw_status
+
+                if raw_status in ['STOPPED', 'FAILED']:
+                    restart_resp = requests.post(f"{session_url}/restart", headers=headers, timeout=15)
+                    if restart_resp.status_code in [200, 201]:
+                        session_status = 'STARTING'
+                        steps.append({"step": "session_state", "title": f"Reinicialização da Sessão '{session_name}'", "status": "ok", "detail": f"Status anterior era {raw_status}; reiniciada."})
+                    else:
+                        start_resp = requests.post(f"{session_url}/start", headers=headers, timeout=15)
+                        session_status = 'STARTING' if start_resp.status_code in [200, 201] else raw_status
+                        steps.append({"step": "session_state", "title": f"Ativação da Sessão '{session_name}'", "status": "ok", "detail": f"Comando start enviado (HTTP {start_resp.status_code})."})
+                else:
+                    steps.append({"step": "session_state", "title": f"Status da Sessão '{session_name}'", "status": "ok", "detail": f"Estado atual no WAHA: {raw_status}"})
+        except Exception as e:
+            steps.append({"step": "session_state", "title": f"Status da Sessão '{session_name}'", "status": "error", "detail": str(e)})
+            return {"ok": False, "message": f"Erro ao diagnosticar sessão no WAHA: {e}", "steps": steps}
+
+        # 3. Sincronização Forçada do Webhook
+        webhook_url = WahaAPI.get_webhook_url()
+        events = ["message", "message.any", "messages.update"]
+        try:
+            put_payload = {
+                "name": session_name,
+                "config": {
+                    "webhooks": [
+                        {"url": webhook_url, "events": events}
+                    ]
+                }
+            }
+            put_resp = requests.put(session_url, headers=headers, json=put_payload, timeout=12)
+            if put_resp.status_code in [200, 201]:
+                steps.append({"step": "webhook_sync", "title": "Sincronização de Webhook", "status": "ok", "detail": f"Webhook apontado para {webhook_url}"})
+            else:
+                steps.append({"step": "webhook_sync", "title": "Sincronização de Webhook", "status": "warning", "detail": f"WAHA retornou HTTP {put_resp.status_code}"})
+        except Exception as e:
+            steps.append({"step": "webhook_sync", "title": "Sincronização de Webhook", "status": "warning", "detail": str(e)})
+
+        # 4. Desobstrução do Buffer Redis (Anti-Stuck)
+        try:
+            from app.tasks.queue import get_redis_connection, check_redis_health
+            if check_redis_health():
+                conn = get_redis_connection()
+                lock_keys = conn.keys("crm:wa:lock:*")
+                if lock_keys:
+                    conn.delete(*lock_keys)
+                    steps.append({"step": "redis_buffer", "title": "Desobstrução do Buffer Redis", "status": "ok", "detail": f"{len(lock_keys)} bloqueios temporários liberados."})
+                else:
+                    steps.append({"step": "redis_buffer", "title": "Fila e Buffer Redis", "status": "ok", "detail": "Operacional, sem travas retidas."})
+            else:
+                steps.append({"step": "redis_buffer", "title": "Buffer Redis", "status": "warning", "detail": "Serviço Redis indisponível no host."})
+        except Exception as e:
+            steps.append({"step": "redis_buffer", "title": "Buffer Redis", "status": "warning", "detail": str(e)})
+
+        # 5. Atualização de status da instância no banco de dados local
+        try:
+            if cfg.get('id'):
+                inst = WahaInstance.query.get(cfg['id'])
+                if inst:
+                    from app import db
+                    if session_status == 'WORKING':
+                        inst.status = 'connected'
+                    elif session_status == 'SCAN_QR_CODE':
+                        inst.status = 'waiting_qr'
+                    elif session_status == 'STARTING':
+                        inst.status = 'connecting'
+                    else:
+                        inst.status = 'disconnected'
+                    db.session.commit()
+                    steps.append({"step": "database_sync", "title": "Sincronização no CRM", "status": "ok", "detail": f"Status atualizado para '{inst.status}'."})
+        except Exception:
+            pass
+
+        # 6. Avaliação Geral
+        if session_status == 'WORKING':
+            msg = "✅ Captura de mensagens reiniciada e 100% operacional! A sessão está conectada ao WhatsApp e os webhooks estão ativos."
+        elif session_status == 'SCAN_QR_CODE':
+            msg = "⚠️ Captura reiniciada e webhook sincronizado! A sessão requer leitura do QR Code no WhatsApp para conectar."
+        elif session_status == 'STARTING':
+            msg = "🔄 Captura reiniciada com sucesso! A sessão está inicializando no WhatsApp e estará pronta em alguns segundos."
+        else:
+            msg = f"ℹ️ Procedimento concluído. Sessão: {session_status}. Webhook configurado em {webhook_url}."
+
+        return {
+            "ok": True,
+            "session_name": session_name,
+            "session_status": session_status,
+            "webhook_url": webhook_url,
+            "message": msg,
+            "steps": steps
+        }
 
     @staticmethod
     def connect_instance(instance_id=None):

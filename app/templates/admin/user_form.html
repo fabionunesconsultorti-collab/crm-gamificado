@@ -1,57 +1,76 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<a href="{{ url_for('admin.list_users') }}" class="btn-primary btn-outline btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Voltar para Usuários
+</a>
+{% endblock %}
+
 {% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0">{{ title }}</h3>
-    <a href="{{ url_for('admin.list_users') }}" class="nav-link p-0 m-0 w-auto">
-        <i class="fa-solid fa-arrow-left nav-icon"></i> Voltar
-    </a>
-</div>
-
-<div class="header-glass max-w-md">
-    <form action="" method="post" class="w-100">
-        <div class="grid grid-cols-2 gap-4">
-            <div class="form-group mb-0">
-                <label for="username">Nome de Usuário</label>
-                <input type="text" name="username" id="username" class="input-glass"
-                       value="{{ user.username if user else '' }}" required placeholder="Ex: joao.silva">
+<div class="d-flex justify-center w-100">
+    <div class="card w-100" style="max-width: 650px;">
+        <div class="card-header">
+            <div>
+                <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                    <i class="fa-solid {% if user %}fa-user-pen text-primary{% else %}fa-user-plus text-success{% endif %}"></i>
+                    {{ title }}
+                </h4>
+                <div class="text-xs text-muted mt-1">
+                    {% if user %}Atualize as credenciais e permissões do usuário cadastrado.{% else %}Preencha os dados abaixo para cadastrar um novo usuário no sistema.{% endif %}
+                </div>
             </div>
-            <div class="form-group mb-0">
-                <label for="email">E-mail</label>
-                <input type="email" name="email" id="email" class="input-glass"
-                       value="{{ user.email if user else '' }}" required placeholder="email@empresa.com">
+            {% if user %}
+            <div class="avatar avatar-md" style="background: var(--primary-color);">
+                {{ user.username[0] | upper }}
             </div>
-            <div class="form-group mb-0">
-                <label for="role">Perfil de Acesso</label>
-                <select name="role" id="role" class="input-glass">
-                    <option value="vendedor" {{ 'selected' if user and user.role == 'vendedor' }}>Vendedor</option>
-                    <option value="gerente"  {{ 'selected' if user and user.role == 'gerente'  }}>Gerente</option>
-                    <option value="admin"    {{ 'selected' if user and user.role == 'admin'    }}>Administrador</option>
-                </select>
-            </div>
-            <div class="form-group mb-0">
-                <label for="performance_points">Pontos XP</label>
-                <input type="number" name="performance_points" id="performance_points" class="input-glass"
-                       value="{{ user.performance_points if user else 0 }}" min="0">
-            </div>
+            {% endif %}
         </div>
 
-        <div class="form-group mt-3">
-            <label for="password">
-                Senha {% if user %}<span class="text-xs text-muted">(deixe em branco para manter)</span>{% endif %}
-            </label>
-            <input type="password" name="password" id="password" class="input-glass"
-                   placeholder="Nova senha" {{ 'required' if not user }}>
-        </div>
+        <form action="" method="post" class="w-100">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="form-group mb-0">
+                    <label for="username"><i class="fa-solid fa-user text-muted me-1"></i> Nome de Usuário</label>
+                    <input type="text" name="username" id="username" class="input-glass"
+                           value="{{ user.username if user else '' }}" required placeholder="Ex: joao.silva">
+                </div>
+                <div class="form-group mb-0">
+                    <label for="email"><i class="fa-solid fa-envelope text-muted me-1"></i> E-mail Corporativo</label>
+                    <input type="email" name="email" id="email" class="input-glass"
+                           value="{{ user.email if user else '' }}" required placeholder="email@empresa.com">
+                </div>
+                <div class="form-group mb-0">
+                    <label for="role"><i class="fa-solid fa-shield-halved text-muted me-1"></i> Perfil de Acesso</label>
+                    <select name="role" id="role" class="input-glass">
+                        <option value="vendedor" {{ 'selected' if user and user.role == 'vendedor' }}>Vendedor</option>
+                        <option value="gerente"  {{ 'selected' if user and user.role == 'gerente'  }}>Gerente</option>
+                        <option value="admin"    {{ 'selected' if user and user.role == 'admin'    }}>Administrador</option>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="performance_points"><i class="fa-solid fa-bolt text-warning me-1"></i> Pontos XP</label>
+                    <input type="number" name="performance_points" id="performance_points" class="input-glass"
+                           value="{{ user.performance_points if user else 0 }}" min="0">
+                </div>
+            </div>
 
-        <div class="d-flex flex-wrap gap-3 mt-4">
-            <button type="submit" class="btn-primary w-auto flex-1">
-                <i class="fa-solid fa-floppy-disk"></i> Salvar
-            </button>
-            <a href="{{ url_for('admin.list_users') }}" class="btn-primary btn-outline w-auto flex-1 text-center">
-                Cancelar
-            </a>
-        </div>
-    </form>
+            <div class="form-group mt-4 mb-0">
+                <label for="password">
+                    <i class="fa-solid fa-lock text-muted me-1"></i> Senha de Acesso
+                    {% if user %}<span class="text-xs text-muted">(deixe em branco para manter a senha atual)</span>{% endif %}
+                </label>
+                <input type="password" name="password" id="password" class="input-glass"
+                       placeholder="••••••••" {{ 'required' if not user }}>
+            </div>
+
+            <div class="card-footer d-flex flex-wrap gap-3">
+                <button type="submit" class="btn-primary w-auto flex-1">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar Usuário
+                </button>
+                <a href="{{ url_for('admin.list_users') }}" class="btn-primary btn-outline w-auto flex-1 text-center">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

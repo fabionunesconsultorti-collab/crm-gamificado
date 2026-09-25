@@ -1,66 +1,163 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <div class="search-bar-glass">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="messageSearchInput" placeholder="Buscar destinatário, texto..." onkeyup="filterMessages()" autocomplete="off">
+    </div>
+    <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-primary btn-outline btn-sm">
+        <i class="fa-solid fa-file-csv"></i> CSV
+    </a>
+    <a href="{{ url_for('admin.export_messages', format='pdf') }}" class="btn-primary btn-outline btn-sm">
+        <i class="fa-solid fa-file-pdf"></i> PDF
+    </a>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0"><i class="fa-solid fa-satellite-dish text-success"></i> {{ title }}</h3>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm">
-            <i class="fa-solid fa-file-csv"></i> Exportar CSV
-        </a>
-        <a href="{{ url_for('admin.export_messages', format='pdf') }}" class="btn-secondary text-sm">
-            <i class="fa-solid fa-file-pdf"></i> Exportar PDF (Refinado)
-        </a>
+<!-- KPI Cards de Mensagens -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-satellite-dish"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ logs|length }}</span>
+            <span class="kpi-label">Total de Disparos</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ logs | selectattr('status', 'equalto', 'sent') | list | length }}</span>
+            <span class="kpi-label">Entregues com Sucesso</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ logs | selectattr('status', 'equalto', 'error') | list | length }}</span>
+            <span class="kpi-label">Erros / Bloqueios</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+            <i class="fa-brands fa-whatsapp"></i>
+        </div>
+        <div class="kpi-info">
+            {% set total = logs|length %}
+            {% set sent = logs | selectattr('status', 'equalto', 'sent') | list | length %}
+            <span class="kpi-val">{% if total > 0 %}{{ ((sent / total) * 100) | round }}%{% else %}100%{% endif %}</span>
+            <span class="kpi-label">Taxa de Sucesso</span>
+        </div>
     </div>
 </div>
 
-<div class="header-glass max-w-full flex-col align-start m-0">
+<!-- Tabela de Logs de Mensagens -->
+<div class="card table-card mb-4">
     <div class="table-responsive w-100">
-        <table class="table-glass">
+        <table class="table-glass" id="messagesTable">
             <thead>
                 <tr>
-                    <th>Data/Hora</th>
-                    <th>Recebedor</th>
-                    <th>Envio por</th>
-                    <th>Mensagem</th>
-                    <th>Canal</th>
-                    <th>Status</th>
+                    <th style="width: 160px;">Data/Hora</th>
+                    <th style="width: 200px;">Destinatário</th>
+                    <th style="width: 150px;">Enviado por</th>
+                    <th>Mensagem Enviada</th>
+                    <th style="width: 120px;">Canal</th>
+                    <th style="width: 110px;">Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in logs %}
-                <tr>
-                    <td class="nowrap text-sm text-muted">{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
-                    <td class="font-semibold">{{ log.client.name if log.client else 'Deletado' }}</td>
-                    <td class="text-sm">{{ log.user.username if log.user else 'API/Bot' }}</td>
+                <tr class="message-row">
+                    <td class="nowrap text-sm text-muted">
+                        <i class="fa-regular fa-clock me-1 opacity-75"></i>
+                        {{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}
+                    </td>
+                    <td>
+                        <span class="font-semibold text-main d-block">{{ log.client.name if log.client else 'Deletado' }}</span>
+                        {% if log.client and log.client.phone %}
+                        <span class="text-xs text-muted font-mono">{{ log.client.phone }}</span>
+                        {% endif %}
+                    </td>
                     <td class="text-sm">
-                        <div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ log.content }}">
+                        <span class="badge badge-secondary" style="font-size: 0.72rem;">
+                            <i class="fa-solid {% if log.user %}fa-user{% else %}fa-robot{% endif %} me-1"></i>
+                            {{ log.user.username if log.user else 'API/Bot' }}
+                        </span>
+                    </td>
+                    <td class="text-sm">
+                        <div style="max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ log.content }}">
                             {{ log.content }}
                         </div>
                     </td>
                     <td>
-                        {% if log.channel in ['evolution_api', 'waha_api'] %}
-                        <span class="badge badge-primary"><i class="fa-solid fa-robot"></i> API</span>
+                        {% if log.channel in ['evolution_api', 'waha_api', 'whatsapp_waha'] %}
+                        <span class="badge badge-primary"><i class="fa-solid fa-robot me-1"></i> API WAHA</span>
                         {% else %}
-                        <span class="badge badge-success"><i class="fa-brands fa-whatsapp"></i> ZAP Link</span>
+                        <span class="badge badge-success"><i class="fa-brands fa-whatsapp me-1"></i> ZAP Link</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if log.status == 'sent' %}
-                        <span class="badge badge-primary">Enviado</span>
+                        <span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Enviado</span>
                         {% elif log.status == 'error' %}
-                        <span class="badge badge-danger">Erro</span>
+                        <span class="badge badge-danger"><i class="fa-solid fa-circle-xmark me-1"></i> Erro</span>
                         {% else %}
                         <span class="badge badge-secondary">{{ log.status }}</span>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted p-4">Nenhum registro de disparo encontrado.</td>
+                <tr id="emptyMessagesRow">
+                    <td colspan="6" class="text-center text-muted p-5">
+                        <i class="fa-regular fa-paper-plane text-3xl mb-2 d-block opacity-40"></i>
+                        Nenhum registro de disparo encontrado.
+                    </td>
                 </tr>
                 {% endfor %}
+                <tr id="noResultsMessagesRow" style="display: none;">
+                    <td colspan="6" class="text-center text-muted p-5">
+                        <i class="fa-solid fa-magnifying-glass text-3xl mb-2 d-block opacity-40"></i>
+                        Nenhum registro encontrado para a busca.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterMessages() {
+    const input = document.getElementById('messageSearchInput');
+    const filter = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.message-row');
+    const noResults = document.getElementById('noResultsMessagesRow');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+}
+</script>
 {% endblock %}

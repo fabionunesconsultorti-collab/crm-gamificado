@@ -114,6 +114,27 @@ class MapsScraperClient:
             logger.warning(f"[MapsScraper] Erro ao consultar status do job {job_id}: {e}")
             return {"ok": False, "job_id": job_id, "status": "connection_error", "error": str(e)}
 
+    def cancel_job(self, job_id: str) -> bool:
+        """
+        Cancela ou remove um job do scraper externo via DELETE /api/v1/jobs/{id}.
+        Retorna True se cancelado ou já removido com sucesso.
+        """
+        if not job_id:
+            return False
+        url = f"{self.base_url}/api/v1/jobs/{job_id}"
+        logger.info(f"[MapsScraper] Solicitando cancelamento do job {job_id} em {url}")
+        try:
+            resp = requests.delete(url, timeout=self.timeout)
+            if resp.status_code in (200, 204, 404):
+                logger.info(f"[MapsScraper] Job {job_id} cancelado/removido no scraper com sucesso (HTTP {resp.status_code}).")
+                return True
+            else:
+                logger.warning(f"[MapsScraper] Resposta inesperada ao cancelar job {job_id}: {resp.status_code} - {resp.text}")
+                return False
+        except requests.RequestException as e:
+            logger.warning(f"[MapsScraper] Falha de conexão ao comunicar cancelamento do job {job_id}: {e}")
+            return False
+
     def fetch_results(self, job_id: str) -> list[dict]:
         """
         Faz o download dos resultados do job.

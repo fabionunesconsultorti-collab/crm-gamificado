@@ -229,6 +229,77 @@ class TestLeadScraper(unittest.TestCase):
                 db.session.delete(j)
                 db.session.commit()
 
+    def test_cancel_scraping_job_unit(self):
+        """Valida a função cancel_scraping_job no modelo e banco."""
+        from app.tasks.lead_scraper import cancel_scraping_job
+
+        with self.app.app_context():
+            # 1. Cria um job ativo
+            job = ScrapingJob(
+                query_term="Padarias em Sumaré SP",
+                status="processing",
+                progress=40,
+                current_step="Minerando..."
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+            # Cancela
+            ok, msg = cancel_scraping_job(job_id)
+            self.assertTrue(ok)
+            self.assertIn("cancelada com sucesso", msg)
+
+            db.session.refresh(job)
+            self.assertEqual(job.status, "cancelled")
+            self.assertEqual(job.current_step, "Cancelado pelo usuário")
+            self.assertIsNotNone(job.finished_at)
+
+            # Tenta cancelar novamente job já cancelado
+            ok2, msg2 = cancel_scraping_job(job_id)
+            self.assertFalse(ok2)
+            self.assertIn("já está cancelada", msg2)
+
+            # Limpeza
+            db.session.delete(job)
+            db.session.commit()
+
+    def test_cancel_scraping_job_route(self):
+        """Testa o endpoint POST /crm/prospeccao/job/<id>/cancel."""
+        with self.app.app_context():
+            user = User.query.filter_by(username='admin').first()
+            if not user:
+                user = User(username='admin', email='admin@test.com', role='admin')
+                user.set_password('admin123')
+                db.session.add(user)
+                db.session.commit()
+
+            job = ScrapingJob(
+                query_term="Farmácias em Americana",
+                status="queued"
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        # Login
+        self.client.post('/auth/login', data={'username': 'admin', 'password': 'admin123'})
+
+        # Cancelar via POST JSON
+        resp = self.client.post(f'/crm/prospeccao/job/{job_id}/cancel', json={})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data.get('ok'))
+        self.assertEqual(data.get('job', {}).get('status'), 'cancelled')
+
+        # Verificar se o status no banco é cancelled
+        with self.app.app_context():
+            j = ScrapingJob.query.get(job_id)
+            self.assertEqual(j.status, 'cancelled')
+            db.session.delete(j)
+            db.session.commit()
+
 
 if __name__ == '__main__':
     unittest.main()
+

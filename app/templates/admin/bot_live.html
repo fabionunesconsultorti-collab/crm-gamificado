@@ -332,7 +332,10 @@
             </p>
         </div>
 
-        <div class="d-flex align-center gap-2">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <button type="button" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" onclick="restartWhatsAppCapture()" id="btnRestartCapture" title="Procedimento para reiniciar a captura de mensagens e re-sincronizar o webhook com o WAHA">
+                <i class="fa-solid fa-arrows-rotate" id="iconRestartCapture"></i> Reiniciar Recebimento
+            </button>
             <a href="{{ url_for('admin.settings', tab='bot') }}" class="btn-secondary text-xs p-2 px-3">
                 <i class="fa-solid fa-gear"></i> Ajustar Configurações do Bot
             </a>
@@ -401,7 +404,12 @@
                 </div>
                 <span class="node-step-num">ETAPA 01</span>
             </div>
-            <div class="node-title">1. Webhook WAHA</div>
+            <div class="node-title d-flex align-center justify-between">
+                <span>1. Webhook WAHA</span>
+                <button type="button" class="btn-secondary py-0 px-2 text-xs" style="font-size: 0.65rem;" onclick="restartWhatsAppCapture()" title="Reiniciar recebimento e sincronizar webhook">
+                    <i class="fa-solid fa-arrows-rotate"></i> Sincronizar
+                </button>
+            </div>
             <div class="node-desc">Recepção assíncrona da mensagem HTTP via WAHA em &lt;10ms.</div>
         </div>
         <div class="node-status text-muted" id="status-node-1">
@@ -612,12 +620,20 @@
         // WAHA
         const wahaText = document.getElementById("stat-waha");
         const dotWaha = document.getElementById("dot-waha");
+        const wahaStatusText = (stats.waha && stats.waha.status_text) ? stats.waha.status_text : (stats.waha && stats.waha.online ? 'Conectado (Online)' : 'Aguardando / Offline');
+        
         if (stats.waha && stats.waha.online) {
-            wahaText.innerHTML = '<span class="text-success">Conectado (Online)</span>';
+            wahaText.innerHTML = `<span class="text-success">${wahaStatusText}</span>`;
             dotWaha.style.color = '#10b981';
+        } else if (wahaStatusText.includes('QR')) {
+            wahaText.innerHTML = `<span class="text-warning">${wahaStatusText}</span>`;
+            dotWaha.style.color = '#f59e0b';
+        } else if (wahaStatusText.includes('Iniciando')) {
+            wahaText.innerHTML = `<span class="text-info">${wahaStatusText}</span>`;
+            dotWaha.style.color = '#38bdf8';
         } else {
-            wahaText.innerHTML = '<span class="text-muted">Aguardando / Offline</span>';
-            dotWaha.style.color = '#64748b';
+            wahaText.innerHTML = `<span class="text-muted">${wahaStatusText}</span>`;
+            dotWaha.style.color = '#ef4444';
         }
 
         // Redis
@@ -821,5 +837,119 @@
         const body = document.getElementById("chat-messages");
         body.innerHTML = '<div class="chat-bubble bubble-bot">Conversa limpa. Envie novas mensagens para iniciar outro ciclo de atendimento autônomo!<div class="bubble-time">Agora</div></div>';
     }
+
+    async function restartWhatsAppCapture(instanceId = null) {
+        const btn = document.getElementById("btnRestartCapture");
+        const icon = document.getElementById("iconRestartCapture");
+        if (btn) {
+            btn.disabled = true;
+            if (icon) icon.className = "fa-solid fa-arrows-rotate fa-spin";
+        }
+
+        const modal = document.getElementById("wahaRecoveryModal");
+        const modalTitle = document.getElementById("recovModalTitle");
+        const modalIcon = document.getElementById("recovModalIcon");
+        const stepsList = document.getElementById("recovStepsList");
+        const alertBox = document.getElementById("recovAlertBox");
+        const actions = document.getElementById("recovActions");
+
+        modal.style.display = "flex";
+        modalTitle.textContent = "Reiniciando Recebimento WhatsApp...";
+        modalIcon.className = "fa-solid fa-arrows-rotate fa-spin text-primary";
+        alertBox.style.display = "none";
+        stepsList.innerHTML = `
+            <div class="p-2 rounded text-xs d-flex align-center gap-2" style="background: rgba(255,255,255,0.04);">
+                <i class="fa-solid fa-spinner fa-spin text-primary"></i> <span>Executando diagnóstico e re-sincronizando sessão com WAHA...</span>
+            </div>
+        `;
+        actions.innerHTML = `<button type="button" class="btn-secondary text-xs py-1 px-3" disabled>Aguarde...</button>`;
+
+        try {
+            const url = instanceId ? `/admin/api/waha/restart_capture?instance_id=${instanceId}` : `/admin/api/waha/restart_capture`;
+            const resp = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await resp.json();
+
+            modalIcon.className = data.ok ? "fa-solid fa-circle-check text-success" : "fa-solid fa-triangle-exclamation text-danger";
+            modalTitle.textContent = data.ok ? "Recebimento Restaurado!" : "Atenção na Restauração";
+
+            // Renderiza checklist dos passos
+            if (data.steps && data.steps.length > 0) {
+                stepsList.innerHTML = data.steps.map(s => {
+                    const iconClass = s.status === 'ok' ? 'fa-solid fa-circle-check text-success' : s.status === 'warning' ? 'fa-solid fa-triangle-exclamation text-warning' : 'fa-solid fa-circle-xmark text-danger';
+                    return `
+                        <div class="p-2 rounded text-xs d-flex align-center justify-between" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                            <div class="d-flex align-center gap-2">
+                                <i class="${iconClass}"></i>
+                                <span class="font-semibold text-white">${s.title}</span>
+                            </div>
+                            <span class="text-muted" style="font-size: 0.7rem;">${s.detail || ''}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            alertBox.style.display = "block";
+            alertBox.className = data.ok ? "p-2 rounded text-xs mb-3 text-success" : "p-2 rounded text-xs mb-3 text-danger";
+            alertBox.style.background = data.ok ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+            alertBox.style.border = data.ok ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)";
+            alertBox.innerHTML = `<strong>${data.message}</strong>`;
+
+            let actionBtns = `<button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModal()">Concluído</button>`;
+            if (data.session_status === 'SCAN_QR_CODE') {
+                actionBtns = `
+                    <a href="/admin/settings?tab=waha" class="btn-primary text-xs py-1 px-3 d-inline-flex align-center gap-1" style="background: #10b981; text-decoration: none; color: white;">
+                        <i class="fa-solid fa-qrcode"></i> Escanear QR Code
+                    </a>
+                    <button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModal()">Fechar</button>
+                `;
+            }
+            actions.innerHTML = actionBtns;
+
+            fetchLiveEvents(true);
+        } catch (err) {
+            modalIcon.className = "fa-solid fa-triangle-exclamation text-danger";
+            modalTitle.textContent = "Falha de Comunicação";
+            stepsList.innerHTML = `<div class="p-2 rounded text-xs text-danger">${err.message || 'Erro ao conectar ao servidor do CRM.'}</div>`;
+            actions.innerHTML = `<button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModal()">Fechar</button>`;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                if (icon) icon.className = "fa-solid fa-arrows-rotate";
+            }
+        }
+    }
+
+    function closeRecoveryModal() {
+        const modal = document.getElementById("wahaRecoveryModal");
+        if (modal) modal.style.display = "none";
+    }
 </script>
+
+<!-- Modal de Diagnóstico e Recuperação de Captura do WhatsApp -->
+<div id="wahaRecoveryModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; max-width: 520px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); overflow: hidden;">
+        <div class="p-3 d-flex align-center justify-between border-bottom" style="border-color: rgba(255,255,255,0.08);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-arrows-rotate text-primary" id="recovModalIcon"></i>
+                <h4 class="font-bold text-sm text-white m-0" id="recovModalTitle">Reiniciando Recebimento WhatsApp...</h4>
+            </div>
+            <button type="button" onclick="closeRecoveryModal()" style="background:none; border:none; color: #94a3b8; cursor: pointer; font-size: 1rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-3">
+            <p class="text-xs text-muted mb-3" id="recovModalSubtitle">
+                Executando checklist: conectando à API WAHA, ativando sessão, forçando injeção de webhooks e desobstruindo buffer do Redis.
+            </p>
+            <div id="recovStepsList" class="d-flex flex-column gap-2 mb-3"></div>
+            <div id="recovAlertBox" class="p-2 rounded text-xs mb-3" style="display: none;"></div>
+            <div class="d-flex justify-end gap-2" id="recovActions">
+                <button type="button" class="btn-secondary text-xs py-1 px-3" onclick="closeRecoveryModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

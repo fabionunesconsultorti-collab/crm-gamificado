@@ -431,6 +431,29 @@ def sync_waha_ip(id):
     flash(f'🔄 Instância "{instance.name}" atualizada para o IP conectado atual: {instance.api_url}')
     return redirect(url_for('admin.settings', tab='waha'))
 
+@bp.route('/waha/<int:id>/restart_capture', methods=['POST'])
+@login_required
+@admin_required
+def restart_waha_capture(id):
+    instance = WahaInstance.query.get_or_404(id)
+    result = WahaAPI.restart_whatsapp_capture(instance.id)
+
+    try:
+        log = SystemLog(
+            level='INFO' if result.get('ok') else 'WARNING',
+            module='WhatsApp',
+            action='restart_capture',
+            details=f"Reinicialização da captura para '{instance.name}': {result.get('message')}"
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        pass
+
+    flash(result.get('message', 'Procedimento executado.'), 'success' if result.get('ok') else 'warning')
+    return redirect(url_for('admin.settings', tab='waha'))
+
+
 @bp.route('/waha/<int:id>/delete', methods=['POST'])
 @login_required
 @admin_required
@@ -646,6 +669,29 @@ def waha_list_sessions():
     return jsonify({'ok': success, 'data': data})
 
 evo_list_sessions = waha_list_sessions
+
+@bp.route('/api/waha/restart_capture', methods=['POST'])
+@login_required
+@admin_required
+def api_waha_restart_capture():
+    data = request.get_json(silent=True) or {}
+    instance_id = request.args.get('instance_id') or data.get('instance_id')
+    result = WahaAPI.restart_whatsapp_capture(instance_id)
+
+    try:
+        log = SystemLog(
+            level='INFO' if result.get('ok') else 'WARNING',
+            module='WhatsApp',
+            action='restart_capture',
+            details=f"API Reinício de Captura: {result.get('message')}"
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        pass
+
+    return jsonify(result)
+
 
 
 

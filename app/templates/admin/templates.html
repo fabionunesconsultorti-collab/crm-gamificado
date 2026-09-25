@@ -1,33 +1,88 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <span class="badge badge-primary">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> IA Ativa
+    </span>
+    <span class="text-xs text-muted d-none md:d-inline">
+        {{ templates|length }} templates cadastrados
+    </span>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0"><i class="fa-solid fa-file-code text-primary"></i> {{ title }}</h3>
+<!-- KPI Cards de Templates -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-file-code"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ templates|length }}</span>
+            <span class="kpi-label">Templates Cadastrados</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-code"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">5 Tags</span>
+            <span class="kpi-label">Variáveis Dinâmicas</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">Ollama</span>
+            <span class="kpi-label">Geração IA Local</span>
+        </div>
+    </div>
 </div>
 
 <div class="grid grid-main-layout gap-4">
+    <!-- Coluna Esquerda: Lista de Templates -->
     <div>
-        <div class="header-glass flex-col align-start m-0">
-            <h4 class="card-title w-100 flex justify-between">
-                <span>Lista de Templates</span>
-            </h4>
-            <div class="table-responsive w-100 mt-3">
-                <table class="table-glass">
+        <div class="card p-0" style="overflow: hidden;">
+            <div class="p-4 border-bottom d-flex justify-between align-center" style="border-color: var(--glass-border);">
+                <div>
+                    <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                        <i class="fa-solid fa-list text-primary"></i> Biblioteca de Modelos
+                    </h4>
+                    <div class="text-xs text-muted mt-1">Textos pré-configurados para disparo individual ou em massa</div>
+                </div>
+                <span class="badge badge-secondary">{{ templates|length }} ativos</span>
+            </div>
+
+            <div class="table-responsive w-100">
+                <table class="table-glass m-0">
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>Conteúdo (Início)</th>
-                            <th class="text-right">Ação</th>
+                            <th style="width: 35%;">Nome do Template</th>
+                            <th>Conteúdo da Mensagem</th>
+                            <th class="text-right" style="width: 70px;">Ação</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for t in templates %}
                         <tr>
-                            <td class="font-semibold">{{ t.name }}</td>
-                            <td><span class="text-xs text-muted">{{ t.text_content[:80] }}...</span></td>
+                            <td class="font-semibold text-main">
+                                <i class="fa-regular fa-comment-dots text-primary me-1"></i>
+                                {{ t.name }}
+                            </td>
+                            <td>
+                                <div class="text-xs text-muted" style="max-height: 48px; overflow: hidden; line-height: 1.4;">
+                                    {{ t.text_content[:100] }}{% if t.text_content|length > 100 %}...{% endif %}
+                                </div>
+                            </td>
                             <td class="text-right">
-                                <form action="{{ url_for('admin.delete_template', id=t.id) }}" method="post" class="d-inline" onsubmit="return confirm('Excluir este template?');">
-                                    <button type="submit" class="icon-btn text-danger">
+                                <form action="{{ url_for('admin.delete_template', id=t.id) }}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir o template \'{{ t.name }}\'?');">
+                                    <button type="submit" class="icon-btn-solid danger" title="Excluir Template">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </form>
@@ -35,7 +90,10 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="3" class="text-center text-muted p-4">Nenhum template cadastrado.</td>
+                            <td colspan="3" class="text-center text-muted p-5">
+                                <i class="fa-regular fa-folder-open text-3xl mb-2 d-block opacity-40"></i>
+                                Nenhum template cadastrado ainda. Use o formulário ao lado para criar o primeiro.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -44,57 +102,84 @@
         </div>
     </div>
 
+    <!-- Coluna Direita: Criar Novo Template -->
     <div>
-        <div class="header-glass flex-col align-start m-0">
-            <h4 class="card-title w-100 text-success flex justify-between align-center">
-                <span><i class="fa-solid fa-plus"></i> Novo Template</span>
-            </h4>
-            <div class="text-xs text-muted w-100 mb-3">
-                Variáveis Mágicas Suportadas:<br>
-                <span class="badge badge-primary mt-1">[NOME]</span>
-                <span class="badge badge-primary mt-1">[DATA]</span>
-                <span class="badge badge-primary mt-1">[HORA]</span>
-                <span class="badge badge-primary mt-1">[VENDEDOR]</span>
-                <span class="badge badge-primary mt-1">[STATUS]</span>
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                        <i class="fa-solid fa-plus text-success"></i> Novo Template
+                    </h4>
+                    <div class="text-xs text-muted mt-1">Crie mensagens com tags inteligentes para preenchimento automático</div>
+                </div>
             </div>
 
-            <!-- Criador de Textos com IA -->
-            <div class="w-100 p-3 mb-3 rounded-md" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
-                <label class="text-xs font-semibold text-warning d-block mb-2">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Criar Texto com IA (Ollama / Local)
+            <!-- Variáveis Mágicas Suportadas -->
+            <div class="mb-3">
+                <div class="text-xs font-semibold text-muted mb-2">Variáveis Inteligentes Disponíveis (clique para copiar):</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge badge-primary cursor-pointer" onclick="insertTag('[NOME]')">[NOME]</span>
+                    <span class="badge badge-primary cursor-pointer" onclick="insertTag('[DATA]')">[DATA]</span>
+                    <span class="badge badge-primary cursor-pointer" onclick="insertTag('[HORA]')">[HORA]</span>
+                    <span class="badge badge-primary cursor-pointer" onclick="insertTag('[VENDEDOR]')">[VENDEDOR]</span>
+                    <span class="badge badge-primary cursor-pointer" onclick="insertTag('[STATUS]')">[STATUS]</span>
+                </div>
+            </div>
+
+            <!-- Assistente de IA -->
+            <div class="p-3 mb-3 rounded-md" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25);">
+                <label class="text-xs font-semibold text-warning d-flex align-center gap-2 mb-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Criar Texto com IA (Ollama Local)
                 </label>
                 <div class="w-100 mb-2">
                     <input type="text" id="ai_prompt_input" class="input-glass text-sm w-100" 
-                           style="width: 100%; box-sizing: border-box;"
-                           placeholder="Ex: Mensagem de aniversário com cupom de 15% off..."
+                           placeholder="Ex: Mensagem de retorno com cupom de 15% para clientes inativos..."
                            onkeydown="if(event.key === 'Enter'){ event.preventDefault(); generateTemplateText(); }">
                 </div>
-                <button type="button" class="btn-primary text-xs py-2 w-100" id="btn_generate_ai" onclick="generateTemplateText()" style="width: 100%;">
-                    <i class="fa-solid fa-sparkles"></i> Gerar Texto
+                <button type="button" class="btn-primary text-xs py-2 w-100" id="btn_generate_ai" onclick="generateTemplateText()">
+                    <i class="fa-solid fa-sparkles"></i> Gerar Mensagem com IA
                 </button>
                 <div id="ai_generate_status" class="text-xs text-muted mt-2" style="display:none;"></div>
             </div>
 
+            <!-- Formulário Principal -->
             <form action="" method="post" class="w-100">
-                <div class="form-group mb-2">
-                    <input type="text" name="name" id="template_name" class="input-glass" placeholder="Nome do Template (ex: Cobrança Amigável)" required>
+                <div class="form-group mb-3">
+                    <label for="template_name"><i class="fa-solid fa-tag text-muted me-1"></i> Nome do Template</label>
+                    <input type="text" name="name" id="template_name" class="input-glass" placeholder="Ex: Retorno de Proposta, Aniversário..." required>
                 </div>
                 <div class="form-group mb-3">
                     <div class="d-flex justify-between align-center mb-1">
-                        <label class="text-xs text-muted">Corpo da Mensagem:</label>
-                        <button type="button" class="btn-secondary text-xs p-1 px-2" id="btn_improve_ai" onclick="improveTemplateText()">
-                            <i class="fa-solid fa-magic"></i> Humanizar / Reescrever
+                        <label for="template_text_content" class="m-0"><i class="fa-solid fa-align-left text-muted me-1"></i> Mensagem do Template</label>
+                        <button type="button" class="btn-secondary text-xs py-1 px-2" id="btn_improve_ai" onclick="improveTemplateText()" title="Reescreve e humaniza o texto com IA">
+                            <i class="fa-solid fa-magic"></i> Humanizar / Melhorar
                         </button>
                     </div>
                     <textarea name="text_content" id="template_text_content" class="input-glass" rows="6" placeholder="Olá [NOME]! Notamos que hoje, [DATA], o seu pedido..." required></textarea>
                 </div>
-                <button type="submit" class="btn-primary w-100">Registrar Template</button>
+                <div class="card-footer p-0 pt-3">
+                    <button type="submit" class="btn-primary w-100">
+                        <i class="fa-solid fa-floppy-disk"></i> Registrar Template
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
+function insertTag(tag) {
+    const textarea = document.getElementById('template_text_content');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + tag + text.substring(end);
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+}
+
 async function generateTemplateText() {
     const promptInput = document.getElementById('ai_prompt_input');
     const statusDiv = document.getElementById('ai_generate_status');
@@ -125,7 +210,6 @@ async function generateTemplateText() {
         if (data.ok) {
             textarea.value = data.text;
             if (!nameInput.value) {
-                // Sugere um nome automático baseado na instrução
                 nameInput.value = instruction.substring(0, 30);
             }
             statusDiv.className = 'text-xs text-success mt-1';

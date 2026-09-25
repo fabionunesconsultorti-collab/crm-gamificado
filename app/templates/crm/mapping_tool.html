@@ -1,15 +1,19 @@
 <style>
     .mapping-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    .mapping-table th, .mapping-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--glass-border); }
+    .mapping-table th, .mapping-table td { padding: 0.6rem; text-align: left; border-bottom: 1px solid var(--glass-border); }
     .mapping-table select { width: 100%; }
 </style>
 
-<div class="header-glass flex-col align-start m-0 w-100" id="mapping_tool_container">
-    <h4 class="m-0 mb-3 text-main"><i class="fa-solid fa-file-import text-primary"></i> Importação de Arquivo</h4>
+<div class="card w-100 m-0" id="mapping_tool_container">
+    <div class="card-header">
+        <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+            <i class="fa-solid fa-file-import text-primary"></i> Leitor & Mapeamento de Planilhas
+        </h4>
+    </div>
     
     <div class="w-100 mb-4" id="mt_step_1">
-        <label>1. Selecione o arquivo (.csv, .xlsx)</label>
-        <div class="input-glass d-flex align-center justify-center p-4 border-bottom rounded-md" style="border: 2px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
+        <label class="text-xs font-semibold text-muted mb-2 d-block">1. Selecione o arquivo (.csv, .xlsx)</label>
+        <div class="input-glass d-flex align-center justify-center p-4 rounded-md" style="border: 2px dashed rgba(255,255,255,0.15); background: rgba(0,0,0,0.25);">
             <input type="file" id="mt_file_input" accept=".csv, .xlsx" class="w-100" style="color:var(--text-main);">
         </div>
         <button class="btn-secondary w-100 mt-2" type="button" onclick="MT_PreviewFile()">

@@ -1,62 +1,230 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0">{{ title }}</h3>
-    <a href="{{ url_for('crm.list_clients') }}" class="nav-link p-0 m-0 w-auto">
-        <i class="fa-solid fa-arrow-left nav-icon"></i> Voltar listagem
+{% block extra_css %}
+<style>
+/* ── Estilos da Tela de Cadastro / Edição de Cliente ── */
+.form-section-card {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(14px);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-section-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+.form-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+.form-section-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.segment-quick-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+.segment-pill {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.segment-pill:hover {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.4);
+    transform: translateY(-1px);
+}
+.input-status-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2 flex-wrap">
+    {% if client %}
+    <span class="badge 
+        {% if client.status == 'fechado' %} badge-success
+        {% elif client.status == 'perdido' %} badge-danger
+        {% elif client.status == 'lead' %} badge-primary
+        {% elif client.status == 'proposta' %} badge-secondary
+        {% else %} badge-warning
+        {% endif %}">
+        Status: {{ client.status | upper }}
+    </span>
+    {% else %}
+    <span class="badge badge-primary">NOVO REGISTRO</span>
+    {% endif %}
+
+    {% if client and client.phone %}
+    <a href="https://wa.me/55{{ client.phone | replace('(', '') | replace(')', '') | replace('-', '') | replace(' ', '') }}" 
+       target="_blank" rel="noopener noreferrer" class="btn-primary btn-outline btn-sm" style="color:#25d366; border-color: rgba(37, 211, 102, 0.4);">
+        <i class="fa-brands fa-whatsapp"></i> WhatsApp
+    </a>
+    {% endif %}
+    <a href="{{ url_for('crm.list_clients') }}" class="btn-primary btn-outline btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Voltar à Lista
     </a>
 </div>
+{% endblock %}
 
-<form action="" method="post" class="w-100">
+{% block content %}
+<form action="" method="post" class="w-100" id="clientForm">
     <!-- 1. Dados Essenciais -->
-    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
-        <h4 class="card-title w-100 text-primary">
-            <i class="fa-solid fa-address-card"></i> 1. Dados Essenciais (Operação/Fiscal)
-        </h4>
-        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+    <div class="form-section-card max-w-lg m-0 mb-4">
+        <div class="form-section-header">
+            <h4 class="form-section-title text-primary">
+                <i class="fa-solid fa-address-card"></i> 1. Dados Essenciais (Operação &amp; Contato)
+            </h4>
+            <span class="text-xs text-muted">* Campos Obrigatórios</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 w-100">
+            <!-- Nome -->
             <div class="form-group mb-0">
-                <label for="name">Nome Completo *</label>
-                <input type="text" name="name" id="name" class="input-glass" value="{{ client.name if client else '' }}" required placeholder="Ex: João Silva">
+                <label for="name">Nome Completo / Razão Social *</label>
+                <input type="text" name="name" id="name" class="input-glass" 
+                       value="{{ client.name if client else '' }}" required 
+                       placeholder="Ex: Carlos Silva ou Padaria Central Ltda">
             </div>
+
+            <!-- CPF / CNPJ -->
             <div class="form-group mb-0">
-                <label for="cpf">CPF / CNPJ</label>
-                <input type="text" name="cpf" id="cpf" class="input-glass" value="{{ client.cpf if client else '' }}" placeholder="000.000.000-00 ou 00.000.000/0001-00" maxlength="18">
+                <div class="d-flex justify-between align-center mb-1">
+                    <label for="cpf" class="mb-0">CPF ou CNPJ</label>
+                    <span id="cpfTypeBadge" class="text-xs text-muted" style="font-size:0.68rem;"></span>
+                </div>
+                <input type="text" name="cpf" id="cpf" class="input-glass" 
+                       value="{{ client.cpf if client else '' }}" 
+                       placeholder="000.000.000-00 ou 00.000.000/0001-00" maxlength="18">
             </div>
+
+            <!-- Celular / WhatsApp -->
             <div class="form-group mb-0">
-                <label for="phone">Celular / WhatsApp *</label>
-                <input type="text" name="phone" id="phone" class="input-glass" value="{{ client.phone if client else '' }}" required placeholder="Ex: (11) 99999-9999">
+                <div class="d-flex justify-between align-center mb-1">
+                    <label for="phone" class="mb-0">Celular / WhatsApp *</label>
+                    <span id="phoneValidBadge" class="text-xs text-muted" style="font-size:0.68rem;"></span>
+                </div>
+                <input type="text" name="phone" id="phone" class="input-glass" 
+                       value="{{ client.phone if client else '' }}" required 
+                       placeholder="(11) 99999-9999" maxlength="15">
             </div>
+
+            <!-- E-mail -->
             <div class="form-group mb-0">
-                <label for="email">E-mail</label>
-                <input type="email" name="email" id="email" class="input-glass" value="{{ client.email if client else '' }}" placeholder="exemplo@email.com">
+                <label for="email">E-mail de Contato</label>
+                <input type="email" name="email" id="email" class="input-glass" 
+                       value="{{ client.email if client else '' }}" 
+                       placeholder="contato@empresa.com.br">
             </div>
-            <div class="form-group mb-0">
-                <label for="segment"><i class="fa-solid fa-briefcase text-warning"></i> Segmento do Lead</label>
-                <input type="text" name="segment" id="segment" class="input-glass" value="{{ client.segment or client.category if client else '' }}" placeholder="Ex: Padaria, Academia, Moda, Farmácia...">
-            </div>
-            <div class="form-group mb-0">
-                <label for="instagram"><i class="fa-brands fa-instagram" style="color: #E1306C;"></i> Instagram</label>
-                <input type="text" name="instagram" id="instagram" class="input-glass" value="{{ client.instagram if client else '' }}" placeholder="Ex: @empresa ou instagram.com/empresa">
-            </div>
+
+            <!-- Segmento do Lead com Sugestões e Datalist -->
             <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="segment"><i class="fa-solid fa-briefcase text-warning"></i> Segmento / Ramo de Atuação</label>
+                <input type="text" name="segment" id="segment" list="segmentSuggestions" class="input-glass" 
+                       value="{{ client.segment or client.category if client else '' }}" 
+                       placeholder="Digite ou clique nas sugestões abaixo...">
+                <datalist id="segmentSuggestions">
+                    <option value="Restaurante &amp; Alimentação">
+                    <option value="Padaria &amp; Confeitaria">
+                    <option value="Varejo &amp; Mercado">
+                    <option value="Clínica Médica &amp; Odonto">
+                    <option value="Estética &amp; Salão de Beleza">
+                    <option value="Imobiliária &amp; Corretores">
+                    <option value="Tecnologia &amp; Software">
+                    <option value="Advocacia &amp; Jurídico">
+                    <option value="Oficina &amp; Automotivo">
+                    <option value="Construção Civil &amp; Reformas">
+                    <option value="Moda &amp; Vestuário">
+                    <option value="Academia &amp; Fitness">
+                    <option value="Educação &amp; Cursos">
+                </datalist>
+
+                <!-- Tags Rápidas de Segmento -->
+                <div class="segment-quick-tags">
+                    <span class="text-xs text-muted me-1 align-center d-inline-flex" style="font-size:0.7rem;">Sugestões:</span>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Restaurante')">Restaurante</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Padaria')">Padaria</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Varejo')">Varejo</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Saúde / Clínica')">Saúde / Clínica</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Estética')">Estética</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Imobiliária')">Imobiliária</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Tecnologia')">Tecnologia</button>
+                    <button type="button" class="segment-pill" onclick="selectSegment('Automotivo')">Automotivo</button>
+                </div>
+            </div>
+
+            <!-- Instagram -->
+            <div class="form-group mb-0">
+                <label for="instagram"><i class="fa-brands fa-instagram" style="color: #E1306C;"></i> Instagram (@perfil)</label>
+                <input type="text" name="instagram" id="instagram" class="input-glass" 
+                       value="{{ client.instagram if client else '' }}" 
+                       placeholder="Ex: @empresa ou instagram.com/empresa">
+            </div>
+
+            <!-- Website -->
+            <div class="form-group mb-0">
                 <label for="website"><i class="fa-solid fa-globe text-primary"></i> Site / Website</label>
-                <input type="text" name="website" id="website" class="input-glass" value="{{ client.website if client else '' }}" placeholder="Ex: https://www.empresa.com.br">
+                <input type="text" name="website" id="website" class="input-glass" 
+                       value="{{ client.website if client else '' }}" 
+                       placeholder="Ex: https://www.empresa.com.br">
             </div>
+
+            <!-- Data de Nascimento -->
             <div class="form-group mb-0">
-                <label for="birth_date">Data de Nascimento</label>
-                <input type="date" name="birth_date" id="birth_date" class="input-glass" value="{{ client.birth_date.strftime('%Y-%m-%d') if client and client.birth_date else '' }}">
+                <label for="birth_date">Data de Nascimento / Fundação</label>
+                <input type="date" name="birth_date" id="birth_date" class="input-glass" 
+                       value="{{ client.birth_date.strftime('%Y-%m-%d') if client and client.birth_date else '' }}">
             </div>
+
+            <!-- CEP com Busca Automática ViaCEP -->
             <div class="form-group mb-0">
-                <label for="cep">CEP</label>
-                <input type="text" name="cep" id="cep" class="input-glass" value="{{ client.cep if client else '' }}" placeholder="00000-000">
+                <div class="d-flex justify-between align-center mb-1">
+                    <label for="cep" class="mb-0">CEP (Busca Automática)</label>
+                    <span id="cepFeedback" class="text-xs"></span>
+                </div>
+                <div style="position: relative;">
+                    <input type="text" name="cep" id="cep" class="input-glass" 
+                           value="{{ client.cep if client else '' }}" 
+                           placeholder="00000-000" maxlength="9">
+                </div>
             </div>
+
+            <!-- Endereço Completo -->
             <div class="form-group mb-0" style="grid-column: span 2;">
                 <label for="address">Endereço Completo</label>
-                <input type="text" name="address" id="address" class="input-glass" value="{{ client.address if client else '' }}" placeholder="Rua, Número, Bairro, Cidade, UF">
+                <input type="text" name="address" id="address" class="input-glass" 
+                       value="{{ client.address if client else '' }}" 
+                       placeholder="Rua, Número, Bairro, Cidade - UF">
             </div>
 
-            <!-- Quadro com Mapinha do Google Maps -->
+            <!-- Google Maps Embed -->
             <div class="form-group mb-0" style="grid-column: span 2;">
                 <div class="d-flex justify-between align-center mb-1">
                     <label class="d-flex align-center gap-2 mb-0" style="font-size: 0.8rem; color: #94a3b8;">
@@ -66,25 +234,27 @@
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir no Google Maps
                     </a>
                 </div>
-                <div id="map_container" class="rounded-md overflow-hidden border border-glass" style="height: 230px; width: 100%; position: relative; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 8px;">
+                <div id="map_container" class="rounded-md overflow-hidden border border-glass" style="height: 220px; width: 100%; position: relative; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 8px;">
                     <iframe id="map_iframe" src="" width="100%" height="100%" style="border: 0; display: none; border-radius: 8px;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
                     <div id="map_placeholder" class="d-flex flex-col justify-center align-center h-100 p-3 text-center text-muted" style="height: 100%;">
                         <i class="fa-solid fa-map-pin text-primary mb-2 opacity-50" style="font-size: 2rem;"></i>
-                        <span class="text-sm">Digite o endereço acima para carregar o mapa.</span>
+                        <span class="text-sm">Digite o CEP ou endereço acima para carregar o mapa automaticamente.</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 2. Estratégicos -->
-    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
-        <h4 class="card-title w-100 text-warning">
-            <i class="fa-solid fa-bullseye"></i> 2. Estratégicos e Comportamentais
-        </h4>
-        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+    <!-- 2. Estratégicos & Funil -->
+    <div class="form-section-card max-w-lg m-0 mb-4">
+        <div class="form-section-header">
+            <h4 class="form-section-title text-warning">
+                <i class="fa-solid fa-bullseye"></i> 2. Estratégia de Vendas &amp; Funil
+            </h4>
+        </div>
+        <div class="grid grid-cols-2 gap-4 w-100">
             <div class="form-group mb-0">
-                <label for="status">Status no Funil CRM</label>
+                <label for="status">Etapa Atual no Funil CRM</label>
                 <select name="status" id="status" class="input-glass">
                     <option value="lead" {{ 'selected' if client and client.status == 'lead' }}>Novo Lead</option>
                     <option value="contato" {{ 'selected' if client and client.status == 'contato' }}>Em Contato</option>
@@ -112,11 +282,11 @@
                 </select>
             </div>
             <div class="form-group mb-0">
-                <label for="referred_by_id">Vendedor Referência</label>
+                <label for="referred_by_id">Vendedor Responsável</label>
                 <select name="referred_by_id" id="referred_by_id" class="input-glass">
-                    <option value="">Nenhum</option>
+                    <option value="">Nenhum atribuído</option>
                     {% for user in users %}
-                    <option value="{{ user.id }}" {{ 'selected' if client and client.referred_by_id == user.id }}>{{ user.username }}</option>
+                    <option value="{{ user.id }}" {{ 'selected' if client and (client.assigned_to == user.id or client.referred_by_id == user.id) }}>{{ user.username }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -138,19 +308,22 @@
                     <option value="indicacao" {{ 'selected' if client and client.lead_source == 'indicacao' }}>Indicação</option>
                 </select>
             </div>
-        </div>
-        <div class="form-group mt-4 mb-0 w-100">
-            <label for="notes">Anotações / Histórico Geral</label>
-            <textarea name="notes" id="notes" class="input-glass" rows="4" placeholder="Detalhes de venda, comportamento, etc">{{ client.notes if client else '' }}</textarea>
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label for="notes">Anotações &amp; Histórico de Atendimento</label>
+                <textarea name="notes" id="notes" class="input-glass" rows="4" 
+                          placeholder="Detalhes da negociação, preferências, comportamento de compra...">{{ client.notes if client else '' }}</textarea>
+            </div>
         </div>
     </div>
 
-    <!-- 3. Fidelidade -->
-    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
-        <h4 class="card-title w-100 text-success">
-            <i class="fa-solid fa-medal"></i> 3. Fidelidade e Engajamento
-        </h4>
-        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+    <!-- 3. Fidelidade & Tier -->
+    <div class="form-section-card max-w-lg m-0 mb-4">
+        <div class="form-section-header">
+            <h4 class="form-section-title text-success">
+                <i class="fa-solid fa-medal"></i> 3. Nível (Tier) &amp; Fidelidade
+            </h4>
+        </div>
+        <div class="grid grid-cols-2 gap-4 w-100">
             <div class="form-group mb-0">
                 <label for="tier">Nível (Tier)</label>
                 <select name="tier" id="tier" class="input-glass">
@@ -162,94 +335,226 @@
             </div>
             <div class="form-group mb-0">
                 <label for="loyalty_points">Saldo de Pontos</label>
-                <input type="number" step="0.01" name="loyalty_points" id="loyalty_points" class="input-glass" value="{{ client.loyalty_points if client else '0' }}">
+                <input type="number" step="0.01" name="loyalty_points" id="loyalty_points" class="input-glass" 
+                       value="{{ client.loyalty_points if client else '0' }}">
             </div>
             <div class="form-group mb-0" style="grid-column: span 2;">
-                <label for="badges">Selos / Badges (separados por vírgula)</label>
-                <input type="text" name="badges" id="badges" class="input-glass" value="{{ client.badges if client else '' }}" placeholder="Eco-friendly, Early Adopter, etc">
+                <label for="badges">Selos / Tags Especiais (separados por vírgula)</label>
+                <input type="text" name="badges" id="badges" class="input-glass" 
+                       value="{{ client.badges if client else '' }}" 
+                       placeholder="Ex: outbound_gmaps, cliente_recorrente, alta_prioridade">
             </div>
         </div>
     </div>
 
-    <!-- 4. LGPD -->
-    <div class="header-glass max-w-lg mb-4 flex-col align-start m-0" style="border-color: rgba(244, 63, 94, 0.4);">
-        <h4 class="card-title w-100 text-danger">
-            <i class="fa-solid fa-scale-balanced"></i> 4. Conformidade (LGPD)
-        </h4>
-        <div class="grid grid-cols-2 gap-4 w-100 mt-2">
+    <!-- 4. Conformidade LGPD -->
+    <div class="form-section-card max-w-lg m-0 mb-4" style="border-color: rgba(244, 63, 94, 0.3);">
+        <div class="form-section-header">
+            <h4 class="form-section-title text-danger">
+                <i class="fa-solid fa-shield-halved"></i> 4. Conformidade &amp; Consentimento (LGPD)
+            </h4>
+        </div>
+        <div class="grid grid-cols-2 gap-4 w-100">
             <div class="form-group mb-0" style="grid-column: span 2;">
                 <label class="d-flex align-center gap-2" style="cursor: pointer; text-transform: none; letter-spacing: normal;">
                     <input type="checkbox" name="opt_in" value="1" {{ 'checked' if client and client.opt_in }}>
-                    <span class="text-main">Status de Consentimento (Opt-in)</span>
+                    <span class="text-main font-semibold">Consentimento Ativo de Comunicação (Opt-in)</span>
                 </label>
-                <div class="text-xs text-muted mt-1">Marque se o cliente aceitou os termos de uso de dados.</div>
+                <div class="text-xs text-muted mt-1">Marque se o contato autorizou o recebimento de mensagens e ofertas via WhatsApp/E-mail.</div>
             </div>
             <div class="form-group mb-0">
-                <label for="consent_channel">Canal de Consentimento</label>
-                <input type="text" name="consent_channel" id="consent_channel" class="input-glass" value="{{ client.consent_channel if client else '' }}" placeholder="Ex: Assinatura PDV, Site">
+                <label for="consent_channel">Canal do Consentimento</label>
+                <input type="text" name="consent_channel" id="consent_channel" class="input-glass" 
+                       value="{{ client.consent_channel if client else '' }}" placeholder="Ex: Formulário Site, Balcão PDV, WhatsApp">
             </div>
             <div class="form-group mb-0">
                 <label for="data_usage_purpose">Finalidade do Uso</label>
-                <input type="text" name="data_usage_purpose" id="data_usage_purpose" class="input-glass" value="{{ client.data_usage_purpose if client else '' }}" placeholder="Ex: Marketing e NF-e">
+                <input type="text" name="data_usage_purpose" id="data_usage_purpose" class="input-glass" 
+                       value="{{ client.data_usage_purpose if client else '' }}" placeholder="Ex: Atendimento comercial e avisos de pedidos">
             </div>
             {% if client and client.opt_in_date %}
             <div class="form-group mb-0 w-100" style="grid-column: span 2;">
-                <div class="text-xs text-success"><i class="fa-solid fa-check"></i> Consentimento registrado em {{ client.opt_in_date.strftime('%d/%m/%Y %H:%M') }}</div>
+                <div class="text-xs text-success font-semibold">
+                    <i class="fa-solid fa-check-circle"></i> Consentimento registrado em {{ client.opt_in_date.strftime('%d/%m/%Y às %H:%M') }}
+                </div>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Submit -->
+    <!-- Botões de Ação -->
     <div class="max-w-lg d-flex flex-wrap gap-3 mt-4 mb-4">
         <button type="submit" class="btn-primary w-auto flex-1">
             <i class="fa-solid fa-floppy-disk"></i> Salvar Registro do Cliente
         </button>
-        <a href="{{ url_for('crm.list_clients') }}" class="btn-primary btn-outline w-auto flex-1 text-center">
+        <a href="{{ url_for('crm.list_clients') }}" class="btn-secondary w-auto flex-1 text-center">
             Cancelar
         </a>
     </div>
 </form>
 
 <script>
+// Selecionar sugestão rápida de segmento
+function selectSegment(val) {
+    const input = document.getElementById('segment');
+    if (input) {
+        input.value = val;
+        input.focus();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // ── Máscara e Validação de CPF / CNPJ ───────────────────────
     const cpfInput = document.getElementById('cpf');
-    if (cpfInput) {
-        function formatCpfCnpj(value) {
-            // Remove tudo que não for dígito
-            let v = value.replace(/\D/g, '');
-            if (v.length > 14) {
-                v = v.substring(0, 14);
-            }
+    const cpfBadge = document.getElementById('cpfTypeBadge');
 
-            if (v.length <= 11) {
-                // Formato CPF: 000.000.000-00
-                v = v.replace(/(\d{3})(\d)/, '$1.$2');
-                v = v.replace(/(\d{3})(\d)/, '$1.$2');
-                v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-            } else {
-                // Formato CNPJ: 00.000.000/0000-00
-                v = v.replace(/^(\d{2})(\d)/, '$1.$2');
-                v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
-                v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
-                v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    function formatCpfCnpj(value) {
+        let v = value.replace(/\D/g, '');
+        if (v.length > 14) v = v.substring(0, 14);
+
+        if (v.length <= 11) {
+            // Formato CPF: 000.000.000-00
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            if (cpfBadge) {
+                cpfBadge.textContent = v.length === 14 ? '✓ CPF' : (v.length > 0 ? 'CPF em digitação...' : '');
+                cpfBadge.style.color = v.length === 14 ? '#10b981' : '#94a3b8';
             }
-            return v;
+        } else {
+            // Formato CNPJ: 00.000.000/0000-00
+            v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+            v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+            v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+            v = v.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+            if (cpfBadge) {
+                cpfBadge.textContent = v.length === 18 ? '✓ CNPJ' : 'CNPJ em digitação...';
+                cpfBadge.style.color = v.length === 18 ? '#10b981' : '#94a3b8';
+            }
         }
+        return v;
+    }
 
+    if (cpfInput) {
         cpfInput.addEventListener('input', function() {
             this.value = formatCpfCnpj(this.value);
         });
-
-        // Formata valor inicial se houver
         if (cpfInput.value) {
             cpfInput.value = formatCpfCnpj(cpfInput.value);
         }
     }
 
-    // Google Maps Embed dinâmico
-    const addressInput = document.getElementById('address');
+    // ── Máscara Inteligente de Telefone / Celular ──────────────
+    const phoneInput = document.getElementById('phone');
+    const phoneBadge = document.getElementById('phoneValidBadge');
+
+    function formatPhone(value) {
+        let v = value.replace(/\D/g, '');
+        if (v.length > 11) v = v.substring(0, 11);
+
+        if (v.length <= 10) {
+            // Formato fixo: (XX) XXXX-XXXX
+            v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+            v = v.replace(/(\d{4})(\d{1,4})$/, '$1-$2');
+        } else {
+            // Formato móvel: (XX) 9XXXX-XXXX
+            v = v.replace(/^(\d{2})(\d)/, '($1) $2');
+            v = v.replace(/(\d{5})(\d{1,4})$/, '$1-$2');
+        }
+
+        if (phoneBadge) {
+            const raw = value.replace(/\D/g, '');
+            if (raw.length === 11) {
+                phoneBadge.textContent = '✓ Celular válido';
+                phoneBadge.style.color = '#10b981';
+            } else if (raw.length === 10) {
+                phoneBadge.textContent = '✓ Fixo válido';
+                phoneBadge.style.color = '#38bdf8';
+            } else if (raw.length > 0) {
+                phoneBadge.textContent = 'Incompleto';
+                phoneBadge.style.color = '#94a3b8';
+            } else {
+                phoneBadge.textContent = '';
+            }
+        }
+        return v;
+    }
+
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function() {
+            this.value = formatPhone(this.value);
+        });
+        if (phoneInput.value) {
+            phoneInput.value = formatPhone(phoneInput.value);
+        }
+    }
+
+    // ── Auto-complete de CEP via ViaCEP API ────────────────────
     const cepInput = document.getElementById('cep');
+    const cepFeedback = document.getElementById('cepFeedback');
+    const addressInput = document.getElementById('address');
+
+    function formatCep(value) {
+        let v = value.replace(/\D/g, '');
+        if (v.length > 8) v = v.substring(0, 8);
+        return v.replace(/^(\d{5})(\d)/, '$1-$2');
+    }
+
+    async function lookupCep(rawCep) {
+        const clean = rawCep.replace(/\D/g, '');
+        if (clean.length !== 8) return;
+
+        if (cepFeedback) {
+            cepFeedback.innerHTML = '<span class="text-primary"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</span>';
+        }
+
+        try {
+            const resp = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+            const data = await resp.json();
+
+            if (data.erro) {
+                if (cepFeedback) {
+                    cepFeedback.innerHTML = '<span class="text-danger"><i class="fa-solid fa-xmark"></i> Não encontrado</span>';
+                }
+            } else {
+                if (cepFeedback) {
+                    cepFeedback.innerHTML = `<span class="text-success"><i class="fa-solid fa-check"></i> ${data.localidade}/${data.uf}</span>`;
+                }
+                // Preenche o endereço mantendo número se já houver
+                if (addressInput) {
+                    const rua = data.logradouro || '';
+                    const bairro = data.bairro || '';
+                    const cidade = data.localidade || '';
+                    const uf = data.uf || '';
+
+                    let newAddr = '';
+                    if (rua) newAddr += rua;
+                    if (bairro) newAddr += (newAddr ? `, ${bairro}` : bairro);
+                    if (cidade) newAddr += (newAddr ? ` - ${cidade}` : cidade);
+                    if (uf) newAddr += `/${uf}`;
+
+                    addressInput.value = newAddr;
+                    updateGoogleMap();
+                }
+            }
+        } catch (e) {
+            if (cepFeedback) {
+                cepFeedback.innerHTML = '<span class="text-warning">Erro ao consultar</span>';
+            }
+        }
+    }
+
+    if (cepInput) {
+        cepInput.addEventListener('input', function() {
+            this.value = formatCep(this.value);
+            const digits = this.value.replace(/\D/g, '');
+            if (digits.length === 8) {
+                lookupCep(digits);
+            }
+        });
+    }
+
+    // ── Google Maps Embed dinâmico ────────────────────────────
     const mapIframe = document.getElementById('map_iframe');
     const mapPlaceholder = document.getElementById('map_placeholder');
     const btnOpenMaps = document.getElementById('btn_open_google_maps');
@@ -259,13 +564,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!mapIframe) return;
 
         const addr = (addressInput ? addressInput.value.trim() : '');
-        const cep = (cepInput ? cepInput.value.trim() : '');
+        const cepVal = (cepInput ? cepInput.value.trim() : '');
         
         let query = addr;
-        if (!query && cep) {
-            query = `CEP ${cep}, Brasil`;
-        } else if (query && cep && !query.includes(cep)) {
-            query = `${query}, CEP ${cep}`;
+        if (!query && cepVal) {
+            query = `CEP ${cepVal}, Brasil`;
+        } else if (query && cepVal && !query.includes(cepVal)) {
+            query = `${query}, CEP ${cepVal}`;
         }
 
         if (query && query.length >= 4) {
@@ -296,14 +601,6 @@ document.addEventListener('DOMContentLoaded', function() {
             mapDebounceTimer = setTimeout(updateGoogleMap, 600);
         });
         addressInput.addEventListener('change', updateGoogleMap);
-    }
-
-    if (cepInput) {
-        cepInput.addEventListener('input', function() {
-            clearTimeout(mapDebounceTimer);
-            mapDebounceTimer = setTimeout(updateGoogleMap, 600);
-        });
-        cepInput.addEventListener('change', updateGoogleMap);
     }
 
     // Atualiza imediatamente na carga da página

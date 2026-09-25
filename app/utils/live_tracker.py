@@ -134,9 +134,30 @@ class LiveTracker:
 
         # Checa status do WAHA
         waha_online = False
+        waha_status_text = 'Offline'
         try:
-            ok, _ = WahaAPI.get_connection_state()
-            waha_online = bool(ok)
+            ok, state_info = WahaAPI.get_connection_state()
+            if ok and isinstance(state_info, dict):
+                inst_info = state_info.get('instance') or {}
+                raw_waha = inst_info.get('waha_status') or inst_info.get('state')
+                if raw_waha == 'WORKING' or inst_info.get('state') == 'open':
+                    waha_online = True
+                    waha_status_text = 'Conectado (Online)'
+                elif raw_waha == 'SCAN_QR_CODE':
+                    waha_online = False
+                    waha_status_text = 'Aguardando QR Code'
+                elif raw_waha == 'STARTING':
+                    waha_online = False
+                    waha_status_text = 'Iniciando Sessão...'
+                elif raw_waha == 'not_found':
+                    waha_online = False
+                    waha_status_text = 'Sessão Não Criada'
+                else:
+                    waha_online = False
+                    waha_status_text = raw_waha or 'Aguardando'
+            else:
+                waha_online = False
+                waha_status_text = 'Desconectado'
         except Exception:
             pass
 
@@ -166,7 +187,7 @@ class LiveTracker:
         is_bot_active = True if bot_enabled is None else str(bot_enabled).lower() in ['true', '1', 'yes']
 
         return {
-            "waha": {"online": waha_online},
+            "waha": {"online": waha_online, "status_text": waha_status_text},
             "ollama": ollama_status,
             "redis": {
                 "online": redis_online,

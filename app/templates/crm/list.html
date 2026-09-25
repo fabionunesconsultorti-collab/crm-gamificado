@@ -1,61 +1,457 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<style>
+/* ── Estilos da Gestão de Clientes e Leads ── */
+.status-chips-bar {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+.status-chip:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+.status-chip.active {
+    background: var(--nav-active-bg, rgba(99, 102, 241, 0.18));
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.status-chip-count {
+    padding: 0.15rem 0.45rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+}
+.status-chip.active .status-chip-count {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+/* Painel de Busca e Filtros */
+.filter-card {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.2s;
+}
+.filter-card:focus-within {
+    border-color: rgba(99, 102, 241, 0.35);
+}
+.search-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 260px;
+}
+.search-icon-inside {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+.search-input-field {
+    width: 100%;
+    padding: 0.65rem 1rem 0.65rem 2.6rem !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    font-size: 0.88rem !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text-main) !important;
+    transition: all 0.2s ease;
+}
+.search-input-field:focus {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--glass-border);
+}
+.filter-select {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text-main) !important;
+    cursor: pointer;
+}
+.filter-select option {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+/* Avatar do Cliente */
+.client-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #fff;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Badges e tags */
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.tag-segment {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.tag-gmaps {
+    background: rgba(2, 132, 199, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(2, 132, 199, 0.3);
+}
+.tag-tier {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+</style>
+{% endblock %}
+
 {% block topbar_actions %}
-<a href="{{ url_for('crm.import_csv') }}" class="btn-primary btn-outline btn-sm w-auto">
-    <i class="fa-solid fa-file-import"></i> Importar CSV
-</a>
-<a href="{{ url_for('crm.new_client') }}" class="btn-primary btn-sm w-auto">
-    <i class="fa-solid fa-plus"></i> Novo Cliente
-</a>
+<div class="d-flex align-center gap-2" style="flex-wrap: wrap;">
+    <a href="{{ url_for('crm.kanban') }}" class="btn-secondary btn-sm w-auto" title="Visualizar em formato de Funil Kanban">
+        <i class="fa-solid fa-table-columns text-primary"></i> Ver Funil Kanban
+    </a>
+    <a href="{{ url_for('crm.import_csv') }}" class="btn-secondary btn-sm w-auto" title="Importar contatos de planilha CSV">
+        <i class="fa-solid fa-file-import"></i> Importar CSV
+    </a>
+    <a href="{{ url_for('crm.new_client') }}" class="btn-primary btn-sm w-auto">
+        <i class="fa-solid fa-user-plus"></i> Novo Cliente
+    </a>
+</div>
 {% endblock %}
 
 {% block content %}
 
-<div class="header-glass p-0 mb-4" style="overflow: hidden; display: block;">
+<!-- ── Barra de Chips Rápidos de Status ── -->
+<div class="status-chips-bar">
+    <a href="{{ url_for('crm.list_clients', q=current_filters.q, segment=current_filters.segment, seller_id=current_filters.seller_id) }}" 
+       class="status-chip {% if not current_filters.status %}active{% endif %}">
+        <i class="fa-solid fa-users"></i> Todos os Leads
+        <span class="status-chip-count">{{ status_counts.all }}</span>
+    </a>
+    <a href="{{ url_for('crm.list_clients', status='lead', q=current_filters.q, segment=current_filters.segment) }}" 
+       class="status-chip {% if current_filters.status == 'lead' %}active{% endif %}">
+        <i class="fa-solid fa-user-clock text-primary"></i> Novos Leads
+        <span class="status-chip-count">{{ status_counts.lead }}</span>
+    </a>
+    <a href="{{ url_for('crm.list_clients', status='contato', q=current_filters.q, segment=current_filters.segment) }}" 
+       class="status-chip {% if current_filters.status == 'contato' %}active{% endif %}">
+        <i class="fa-solid fa-comments text-warning"></i> Em Contato
+        <span class="status-chip-count">{{ status_counts.contato }}</span>
+    </a>
+    <a href="{{ url_for('crm.list_clients', status='proposta', q=current_filters.q, segment=current_filters.segment) }}" 
+       class="status-chip {% if current_filters.status == 'proposta' %}active{% endif %}">
+        <i class="fa-solid fa-file-invoice-dollar text-info"></i> Proposta Enviada
+        <span class="status-chip-count">{{ status_counts.proposta }}</span>
+    </a>
+    <a href="{{ url_for('crm.list_clients', status='fechado', q=current_filters.q, segment=current_filters.segment) }}" 
+       class="status-chip {% if current_filters.status == 'fechado' %}active{% endif %}">
+        <i class="fa-solid fa-trophy text-success"></i> Vendas Fechadas
+        <span class="status-chip-count">{{ status_counts.fechado }}</span>
+    </a>
+    <a href="{{ url_for('crm.list_clients', status='perdido', q=current_filters.q, segment=current_filters.segment) }}" 
+       class="status-chip {% if current_filters.status == 'perdido' %}active{% endif %}">
+        <i class="fa-solid fa-circle-xmark text-danger"></i> Perdidos
+        <span class="status-chip-count">{{ status_counts.perdido }}</span>
+    </a>
+</div>
+
+<!-- ── Painel de Busca Inteligente e Filtro por Atributos ── -->
+<div class="filter-card">
+    <form method="get" action="{{ url_for('crm.list_clients') }}" id="filterForm">
+        <!-- Mantém o status se ativo nos chips -->
+        {% if current_filters.status %}
+        <input type="hidden" name="status" value="{{ current_filters.status }}">
+        {% endif %}
+
+        <div class="d-flex align-center gap-3" style="flex-wrap: wrap;">
+            <!-- Campo de Busca Inteligente -->
+            <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass search-icon-inside"></i>
+                <input type="text" name="q" id="smartSearchInput" class="search-input-field" 
+                       placeholder="Buscar por Nome, Telefone, E-mail, CPF, Segmento, Instagram, Observações..." 
+                       value="{{ current_filters.q }}" autocomplete="off">
+            </div>
+
+            <!-- Botões de Ação do Filtro -->
+            <div class="d-flex align-center gap-2">
+                <button type="submit" class="btn-primary btn-sm">
+                    <i class="fa-solid fa-filter"></i> Filtrar
+                </button>
+                <button type="button" class="btn-secondary btn-sm" id="btnToggleFilters" onclick="toggleAdvancedFilters()">
+                    <i class="fa-solid fa-sliders"></i> Atributos
+                </button>
+                {% if has_active_filters %}
+                <a href="{{ url_for('crm.list_clients') }}" class="btn-secondary btn-sm" style="color: #f87171;" title="Limpar todos os filtros">
+                    <i class="fa-solid fa-xmark"></i> Limpar
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Grade de Filtros de Atributos (Expansível / Rápida) -->
+        <div class="filters-grid" id="advancedFiltersGrid" style="display: {{ 'grid' if (current_filters.segment or current_filters.seller_id or current_filters.store_id or current_filters.tier or current_filters.source or current_filters.date_range) else 'none' }};">
+            <!-- Filtro de Etapa/Status -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Etapa do Funil</label>
+                <select name="status" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Todas as Etapas</option>
+                    <option value="lead" {{ 'selected' if current_filters.status == 'lead' }}>Novo Lead</option>
+                    <option value="contato" {{ 'selected' if current_filters.status == 'contato' }}>Em Contato</option>
+                    <option value="proposta" {{ 'selected' if current_filters.status == 'proposta' }}>Proposta Enviada</option>
+                    <option value="fechado" {{ 'selected' if current_filters.status == 'fechado' }}>Fechado (Venda!)</option>
+                    <option value="perdido" {{ 'selected' if current_filters.status == 'perdido' }}>Perdido</option>
+                </select>
+            </div>
+
+            <!-- Filtro de Segmento -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Segmento / Ramo</label>
+                <select name="segment" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Todos os Segmentos</option>
+                    {% for seg in all_segments %}
+                    <option value="{{ seg }}" {{ 'selected' if current_filters.segment == seg }}>{{ seg }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro de Vendedor / Responsável -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Vendedor Responsável</label>
+                <select name="seller_id" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Todos os Vendedores</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {{ 'selected' if current_filters.seller_id == u.id|string }}>{{ u.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro de Origem do Lead -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Origem do Cadastro</label>
+                <select name="source" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Todas as Origens</option>
+                    <option value="gmaps" {{ 'selected' if current_filters.source == 'gmaps' }}>📍 Google Maps (Outbound)</option>
+                    <option value="loja_fisica" {{ 'selected' if current_filters.source == 'loja_fisica' }}>🏪 Loja Física</option>
+                    <option value="ecommerce" {{ 'selected' if current_filters.source == 'ecommerce' }}>🛒 E-commerce</option>
+                    <option value="instagram" {{ 'selected' if current_filters.source == 'instagram' }}>📸 Instagram</option>
+                    <option value="indicacao" {{ 'selected' if current_filters.source == 'indicacao' }}>🤝 Indicação</option>
+                </select>
+            </div>
+
+            <!-- Filtro de Nível (Tier) -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Nível (Tier)</label>
+                <select name="tier" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Todos os Níveis</option>
+                    <option value="bronze" {{ 'selected' if current_filters.tier == 'bronze' }}>🥉 Bronze</option>
+                    <option value="prata" {{ 'selected' if current_filters.tier == 'prata' }}>🥈 Prata</option>
+                    <option value="ouro" {{ 'selected' if current_filters.tier == 'ouro' }}>🥇 Ouro</option>
+                    <option value="vip" {{ 'selected' if current_filters.tier == 'vip' }}>💎 VIP</option>
+                </select>
+            </div>
+
+            <!-- Filtro de Período -->
+            <div>
+                <label class="text-xs text-muted font-semibold mb-1 d-block">Data de Cadastro</label>
+                <select name="date_range" class="filter-select w-100" onchange="document.getElementById('filterForm').submit()">
+                    <option value="">Qualquer data</option>
+                    <option value="today" {{ 'selected' if current_filters.date_range == 'today' }}>Hoje</option>
+                    <option value="7days" {{ 'selected' if current_filters.date_range == '7days' }}>Últimos 7 dias</option>
+                    <option value="30days" {{ 'selected' if current_filters.date_range == '30days' }}>Últimos 30 dias</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Indicador de Resultados -->
+        <div class="d-flex justify-between align-center mt-3 pt-2 text-xs text-muted" style="border-top: 1px dashed var(--glass-border);">
+            <div>
+                <span>Exibindo <strong><span id="displayedCount">{{ clients | length }}</span></strong> de <strong>{{ total_count }}</strong> clientes registrados.</span>
+                {% if has_active_filters %}
+                <span class="badge badge-primary ms-2" style="font-size:0.68rem;">Filtros Ativos</span>
+                {% endif %}
+            </div>
+            <div id="liveFilterFeedback" style="display:none;" class="text-info font-semibold">
+                <i class="fa-solid fa-bolt"></i> Filtro em tempo real ativo
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Tabela Enriquecida de Clientes e Leads ── -->
+<div class="card table-card mb-4">
     <div class="table-responsive">
-        <table class="table-glass">
+        <table class="table-glass" id="clientsTable">
             <thead>
                 <tr>
-                    <th>Nome</th>
-                    <th>Segmento</th>
-                    <th>Telefone</th>
-                    <th>E-mail</th>
-                    <th>Status</th>
-                    <th>Ações</th>
+                    <th style="width: 28%;">Cliente / Lead</th>
+                    <th style="width: 16%;">Segmento</th>
+                    <th style="width: 18%;">Contato</th>
+                    <th style="width: 15%;">Responsável</th>
+                    <th style="width: 11%;">Status Funil</th>
+                    <th style="width: 12%; text-align: right;">Ações</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="clientsTableBody">
                 {% for client in clients %}
-                <tr>
+                {% set avatar_color = '#6366f1' if client.status == 'lead' else ('#f59e0b' if client.status == 'contato' else ('#3b82f6' if client.status == 'proposta' else ('#10b981' if client.status == 'fechado' else '#ef4444'))) %}
+                <tr class="client-row" 
+                    data-name="{{ client.name | lower }}" 
+                    data-phone="{{ client.phone or '' }}" 
+                    data-email="{{ client.email or '' | lower }}" 
+                    data-cpf="{{ client.cpf or '' }}" 
+                    data-segment="{{ client.display_segment | lower }}"
+                    data-status="{{ client.status }}"
+                    data-seller="{{ client.assigned_user.username | lower if client.assigned_user else (client.referred_by.username | lower if client.referred_by else '') }}"
+                    data-tier="{{ client.tier or '' }}"
+                    data-notes="{{ client.notes or '' | lower }}">
+                    
+                    <!-- Cliente / Lead com Avatar -->
                     <td>
-                        <div class="font-semibold">{{ client.name }}</div>
-                        {% if client.cpf %}
-                        <div class="text-xs text-muted" style="font-size:0.75rem;">{{ client.cpf }}</div>
-                        {% endif %}
+                        <div class="d-flex align-center gap-2">
+                            <div class="client-avatar" style="background: {{ avatar_color }};">
+                                {{ client.name[0] | upper if client.name else '?' }}
+                            </div>
+                            <div>
+                                <div class="font-semibold text-main d-flex align-center gap-1">
+                                    <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="text-main" style="text-decoration: none;" title="Ver detalhes do cliente">
+                                        {{ client.name }}
+                                    </a>
+                                    {% if client.badges and 'outbound_gmaps' in client.badges %}
+                                    <span class="tag-badge tag-gmaps" title="Lead capturado via Google Maps">
+                                        <i class="fa-solid fa-map-pin"></i> Maps
+                                    </span>
+                                    {% endif %}
+                                    {% if client.tier == 'vip' %}
+                                    <span class="tag-badge tag-tier" title="Cliente VIP">💎 VIP</span>
+                                    {% elif client.tier == 'ouro' %}
+                                    <span class="tag-badge tag-tier" title="Cliente Ouro">🥇 Ouro</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-xs text-muted d-flex align-center gap-2 mt-1">
+                                    {% if client.cpf %}
+                                    <span><i class="fa-solid fa-id-card opacity-50"></i> {{ client.cpf }}</span>
+                                    {% endif %}
+                                    {% if client.created_at %}
+                                    <span title="Data de cadastro"><i class="fa-regular fa-calendar opacity-50"></i> {{ client.created_at.strftime('%d/%m/%Y') }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                     </td>
+
+                    <!-- Segmento -->
                     <td>
                         {% if client.display_segment %}
-                        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.72rem; padding: 0.2rem 0.5rem;">
+                        <span class="tag-badge tag-segment">
                             <i class="fa-solid fa-briefcase"></i> {{ client.display_segment }}
                         </span>
                         {% else %}
-                        <span class="text-muted text-xs">-</span>
+                        <span class="text-muted text-xs">&mdash;</span>
                         {% endif %}
                     </td>
-                    <td>{{ client.phone }}</td>
-                    <td>{{ client.email or '-' }}</td>
+
+                    <!-- Contato -->
+                    <td>
+                        <div class="d-flex flex-col gap-1">
+                            {% if client.phone %}
+                            <div class="text-sm font-semibold">
+                                <a href="https://wa.me/55{{ client.phone | replace('(', '') | replace(')', '') | replace('-', '') | replace(' ', '') }}" 
+                                   target="_blank" rel="noopener noreferrer" 
+                                   class="text-main d-inline-flex align-center gap-1" style="text-decoration:none;" title="Conversar no WhatsApp">
+                                    <i class="fa-brands fa-whatsapp text-success"></i> {{ client.phone }}
+                                </a>
+                            </div>
+                            {% endif %}
+                            {% if client.email %}
+                            <div class="text-xs text-muted" title="{{ client.email }}">
+                                <i class="fa-regular fa-envelope opacity-50"></i> {{ client.email | truncate(25) }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Responsável / Loja -->
+                    <td>
+                        <div class="text-sm text-main font-semibold">
+                            <i class="fa-solid fa-user-tie text-muted" style="font-size:0.75rem;"></i>
+                            {{ client.assigned_user.username if client.assigned_user else (client.referred_by.username if client.referred_by else 'Não atribuído') }}
+                        </div>
+                        {% if client.preferred_store %}
+                        <div class="text-xs text-muted mt-1">
+                            <i class="fa-solid fa-store opacity-50"></i> {{ client.preferred_store.name }}
+                        </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Status no Funil -->
                     <td>
                         <span class="badge 
                             {% if client.status == 'fechado' %} badge-success
                             {% elif client.status == 'perdido' %} badge-danger
                             {% elif client.status == 'lead' %} badge-primary
+                            {% elif client.status == 'proposta' %} badge-secondary
                             {% else %} badge-warning
                             {% endif %}">
                             {{ client.status | upper }}
                         </span>
                     </td>
-                    <td>
-                        <div class="d-flex gap-2 align-center">
+
+                    <!-- Ações Rápidas -->
+                    <td style="text-align: right;">
+                        <div class="d-flex gap-1 justify-center align-center" style="justify-content: flex-end;">
                             {% if client.instagram %}
                             <a href="{{ client.instagram_url }}" target="_blank" rel="noopener noreferrer" class="icon-btn" style="color: #E1306C;" title="Abrir Instagram ({{ client.instagram }})">
                                 <i class="fa-brands fa-instagram"></i>
@@ -66,27 +462,127 @@
                                 <i class="fa-solid fa-globe"></i>
                             </a>
                             {% endif %}
-                            <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn" title="Editar">
+                            <a href="{{ url_for('crm.message_client', id=client.id) }}" class="icon-btn text-success" title="Enviar Mensagem WhatsApp">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>
+                            <a href="{{ url_for('crm.edit_client', id=client.id) }}" class="icon-btn text-primary" title="Editar Informações">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <form action="{{ url_for('crm.delete_client', id=client.id) }}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este cliente?')">
+                            <form action="{{ url_for('crm.delete_client', id=client.id) }}" method="post" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir o cliente {{ client.name }}?')">
                                 <button type="submit" class="icon-btn text-danger" title="Excluir">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>
-                            <a href="{{ url_for('crm.message_client', id=client.id) }}" class="icon-btn text-success" title="Enviar Mensagem / WA">
-                                <i class="fa-brands fa-whatsapp"></i>
-                            </a>
                         </div>
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="6" class="p-4 text-center text-muted">Nenhum cliente cadastrado ainda.</td>
+                <tr id="noClientsRow">
+                    <td colspan="6" class="p-4 text-center text-muted">
+                        <div class="p-3">
+                            <i class="fa-solid fa-users-slash text-muted opacity-40 mb-2" style="font-size:2.5rem; display:block;"></i>
+                            <div class="font-semibold text-main mb-1">Nenhum cliente ou lead encontrado</div>
+                            <div class="text-xs text-muted mb-3">Tente ajustar seus termos de pesquisa ou limpar os filtros de atributos.</div>
+                            {% if has_active_filters %}
+                            <a href="{{ url_for('crm.list_clients') }}" class="btn-secondary btn-sm d-inline-flex">
+                                <i class="fa-solid fa-rotate-left"></i> Limpar Filtros Ativos
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('crm.new_client') }}" class="btn-primary btn-sm d-inline-flex">
+                                <i class="fa-solid fa-plus"></i> Cadastrar Primeiro Lead
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+// Alternar visualização dos filtros avançados
+function toggleAdvancedFilters() {
+    const grid = document.getElementById('advancedFiltersGrid');
+    if (!grid) return;
+    const isHidden = (grid.style.display === 'none' || grid.style.display === '');
+    grid.style.display = isHidden ? 'grid' : 'none';
+}
+
+// Filtro instantâneo no cliente enquanto digita (Live Search)
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('smartSearchInput');
+    const tableBody   = document.getElementById('clientsTableBody');
+    const countEl     = document.getElementById('displayedCount');
+    const liveFb      = document.getElementById('liveFilterFeedback');
+    const rows        = tableBody ? tableBody.querySelectorAll('.client-row') : [];
+
+    if (!searchInput || rows.length === 0) return;
+
+    let debounceTimeout = null;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(() => {
+            const query = searchInput.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            if (query.length > 0) {
+                if (liveFb) liveFb.style.display = 'inline';
+            } else {
+                if (liveFb) liveFb.style.display = 'none';
+            }
+
+            rows.forEach(row => {
+                const name    = row.dataset.name || '';
+                const phone   = row.dataset.phone || '';
+                const email   = row.dataset.email || '';
+                const cpf     = row.dataset.cpf || '';
+                const segment = row.dataset.segment || '';
+                const seller  = row.dataset.seller || '';
+                const notes   = row.dataset.notes || '';
+
+                const matches = (
+                    name.includes(query) ||
+                    phone.includes(query) ||
+                    email.includes(query) ||
+                    cpf.includes(query) ||
+                    segment.includes(query) ||
+                    seller.includes(query) ||
+                    notes.includes(query)
+                );
+
+                if (matches) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (countEl) countEl.textContent = visibleCount;
+
+            // Se nenhum resultado for visível, exibe linha temporária de vazio
+            let noResultRow = document.getElementById('instantNoResultRow');
+            if (visibleCount === 0 && query.length > 0) {
+                if (!noResultRow) {
+                    noResultRow = document.createElement('tr');
+                    noResultRow.id = 'instantNoResultRow';
+                    noResultRow.innerHTML = `
+                        <td colspan="6" class="p-4 text-center text-muted">
+                            <i class="fa-solid fa-magnifying-glass text-muted opacity-40 mb-2" style="font-size:2rem; display:block;"></i>
+                            <div class="font-semibold text-main mb-1">Nenhum resultado para "${query}"</div>
+                            <div class="text-xs text-muted">Verifique a ortografia ou pressione Enter para pesquisar no servidor.</div>
+                        </td>
+                    `;
+                    tableBody.appendChild(noResultRow);
+                }
+            } else if (noResultRow) {
+                noResultRow.remove();
+            }
+        }, 150);
+    });
+});
+</script>
 {% endblock %}

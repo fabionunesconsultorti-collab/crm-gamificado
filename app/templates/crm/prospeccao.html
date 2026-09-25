@@ -2,26 +2,117 @@
 
 {% block extra_css %}
 <style>
+    /* ── Prospecção Ativa: Grid Principal e Proporções ────────── */
     .prospect-grid {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 1.5rem;
+        gap: 1.15rem;
+        align-items: start;
+        width: 100%;
+        box-sizing: border-box;
     }
     @media (min-width: 1024px) {
         .prospect-grid {
-            grid-template-columns: 380px 1fr;
+            grid-template-columns: 300px minmax(0, 1fr);
+        }
+    }
+    @media (min-width: 1400px) {
+        .prospect-grid {
+            grid-template-columns: 320px minmax(0, 1fr);
         }
     }
 
+    /* ── KPI Summary Cards ────────────────────────────────────── */
+    .prospect-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.85rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .kpi-card {
+        background: var(--card-bg, #1e293b);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 0.75rem 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        transition: transform 0.15s, border-color 0.2s;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary-color, #6366f1);
+    }
+    .kpi-icon-wrap {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        flex-shrink: 0;
+    }
+    .kpi-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+    .kpi-val {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--text-main, #f8fafc);
+        line-height: 1.2;
+    }
+    .kpi-label {
+        font-size: 0.68rem;
+        color: var(--text-muted, #94a3b8);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ── Sugestões Rápidas de Nicho (Quick Chips) ─────────────── */
+    .quick-chips-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        margin-top: 0.45rem;
+    }
+    .quick-chip {
+        font-size: 0.68rem;
+        padding: 0.2rem 0.48rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        line-height: 1.2;
+        outline: none;
+    }
+    .quick-chip:hover {
+        background: rgba(99, 102, 241, 0.18);
+        color: #818cf8;
+        border-color: rgba(99, 102, 241, 0.4);
+        transform: translateY(-1px);
+    }
+
+    /* ── Badges de Status ─────────────────────────────────────── */
     .badge-status {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
-        font-size: 0.75rem;
+        gap: 0.3rem;
+        font-size: 0.68rem;
         font-weight: 600;
-        padding: 0.25rem 0.65rem;
-        border-radius: 9999px;
+        padding: 0.15rem 0.45rem;
+        border-radius: 5px;
         text-transform: capitalize;
+        white-space: nowrap;
+        line-height: 1.2;
     }
     .badge-status.queued {
         background: rgba(234, 179, 8, 0.15);
@@ -43,24 +134,33 @@
         color: #f87171;
         border: 1px solid rgba(239, 68, 68, 0.3);
     }
+    .badge-status.cancelled {
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
 
     .metric-pill {
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
+        gap: 0.2rem;
         background: rgba(255, 255, 255, 0.05);
-        padding: 0.2rem 0.5rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-weight: 500;
+        padding: 0.12rem 0.35rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--text-main, #f8fafc);
+        border: 1px solid var(--glass-border);
+        white-space: nowrap;
     }
 
     .pulsing-dot {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background-color: currentColor;
         animation: pulse 1.5s infinite;
+        display: inline-block;
     }
     @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
@@ -68,27 +168,28 @@
     }
 
     .tips-box {
-        background: rgba(30, 41, 59, 0.5);
-        border: 1px dashed rgba(255, 255, 255, 0.15);
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px dashed rgba(255, 255, 255, 0.12);
         border-radius: 8px;
-        padding: 0.85rem;
-        font-size: 0.8rem;
+        padding: 0.65rem 0.75rem;
+        font-size: 0.72rem;
         color: var(--text-muted);
+        line-height: 1.35;
     }
     .tips-box ul {
-        margin: 0.5rem 0 0 1.2rem;
+        margin: 0.35rem 0 0 1rem;
         padding: 0;
     }
     .tips-box li {
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.2rem;
     }
 
-    /* Live Progress Card Styles */
+    /* ── Live Progress Card ───────────────────────────────────── */
     .live-progress-card {
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.06));
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.08));
         border: 1px solid rgba(99, 102, 241, 0.35);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(12px);
         border-radius: 12px;
         position: relative;
         overflow: hidden;
@@ -96,7 +197,7 @@
     .live-progress-bar-bg {
         background: rgba(0, 0, 0, 0.35);
         border-radius: 9999px;
-        height: 12px;
+        height: 8px;
         overflow: hidden;
         position: relative;
     }
@@ -105,7 +206,7 @@
         background: linear-gradient(90deg, #6366f1, #3b82f6, #10b981);
         border-radius: 9999px;
         transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
+        box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
     }
     .stepper-step {
         opacity: 0.45;
@@ -115,76 +216,233 @@
         opacity: 1;
         color: #818cf8;
         font-weight: 600;
-        transform: scale(1.05);
+        transform: scale(1.04);
     }
     .stepper-step.done {
         opacity: 0.9;
         color: #34d399;
     }
+
+    /* ── Tabela com Layout Travado e Proporcional ─────────────── */
+    .prospect-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+    }
+    .prospect-table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.76rem;
+    }
+    .prospect-table th {
+        padding: 0.65rem 0.5rem;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border-bottom: 1px solid var(--glass-border);
+        background: rgba(255, 255, 255, 0.02);
+        white-space: nowrap;
+    }
+    .prospect-table td {
+        padding: 0.65rem 0.5rem;
+        border-bottom: 1px solid var(--glass-border);
+        vertical-align: middle;
+        transition: background 0.15s;
+        overflow: hidden;
+    }
+    .prospect-table tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Botões de Ação na Tabela */
+    .btn-act-funil {
+        padding: 0.2rem 0.45rem;
+        border-radius: 5px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-decoration: none;
+        background: rgba(245, 158, 11, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        white-space: nowrap;
+    }
+    .btn-act-funil:hover {
+        background: rgba(245, 158, 11, 0.25);
+        color: #fde047;
+        transform: translateY(-1px);
+    }
+    .btn-act-lista {
+        padding: 0.2rem 0.45rem;
+        border-radius: 5px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-decoration: none;
+        background: rgba(99, 102, 241, 0.15);
+        color: #a5b4fc;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        white-space: nowrap;
+    }
+    .btn-act-lista:hover {
+        background: rgba(99, 102, 241, 0.25);
+        color: #c7d2fe;
+        transform: translateY(-1px);
+    }
+    .btn-act-cancel {
+        padding: 0.2rem 0.5rem;
+        border-radius: 5px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+    .btn-act-cancel:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+        border-color: rgba(239, 68, 68, 0.6);
+        transform: translateY(-1px);
+    }
+    .btn-act-cancel:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 {% endblock %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2" style="flex-wrap: wrap;">
+    {% if is_online %}
+        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.75rem; padding: 0.35rem 0.7rem;">
+            <i class="fa-solid fa-circle-check"></i> Scraper Online :8080
+        </span>
+    {% else %}
+        <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.75rem; padding: 0.35rem 0.7rem;" title="Container 'crm-maps-scraper-1' na porta 8080">
+            <i class="fa-solid fa-triangle-exclamation"></i> Scraper Offline
+        </span>
+    {% endif %}
+    <a href="{{ url_for('crm.kanban') }}" class="btn-secondary btn-sm w-auto" title="Ver leads no Funil de Vendas">
+        <i class="fa-solid fa-filter text-warning"></i> Funil Kanban
+    </a>
+    <a href="{{ url_for('crm.list_clients') }}" class="btn-secondary btn-sm w-auto" title="Ver todos os clientes cadastrados">
+        <i class="fa-solid fa-users text-primary"></i> Lista de Clientes
+    </a>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="header-container mb-4 d-flex justify-between align-center flex-wrap gap-2">
-    <div>
-        <h1 class="page-title d-flex align-center gap-2">
-            <i class="fa-solid fa-map-location-dot text-warning"></i> Prospecção Ativa (Google Maps)
-        </h1>
-        <p class="text-sm text-muted">
-            Gere leads qualificados B2B extraindo nomes, telefones, e-mails e endereços diretamente do Google Maps para o seu funil de vendas.
-        </p>
+<!-- ── Resumo de Métricas (KPIs no Topo) ──────────────────── -->
+<div class="prospect-kpi-grid mb-3">
+    <div class="kpi-card">
+        <div class="kpi-icon-wrap" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-magnifying-glass-location"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ jobs|length }}</span>
+            <span class="kpi-label">Buscas Realizadas</span>
+        </div>
     </div>
-    <div class="d-flex align-center gap-2">
-        {% if is_online %}
-            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
-                <i class="fa-solid fa-circle-check"></i> Scraper Docker Online (Porta 8080)
+    <div class="kpi-card">
+        <div class="kpi-icon-wrap" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;">
+            <i class="fa-solid fa-earth-americas"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ total_scraped }}</span>
+            <span class="kpi-label">Locais Minerados</span>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">+{{ total_imported }}</span>
+            <span class="kpi-label">Leads Inseridos no Funil</span>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon-wrap" style="background: {{ 'rgba(16, 185, 129, 0.15)' if is_online else 'rgba(239, 68, 68, 0.15)' }}; color: {{ '#34d399' if is_online else '#f87171' }};">
+            <i class="fa-solid {{ 'fa-server' if is_online else 'fa-plug-circle-xmark' }}"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val" style="font-size: 0.95rem; color: {{ '#34d399' if is_online else '#f87171' }};">
+                {{ 'Docker Conectado' if is_online else 'Motor Offline' }}
             </span>
-        {% else %}
-            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);" title="Certifique-se de que o container 'crm-maps-scraper-1' está ativo na porta 8080">
-                <i class="fa-solid fa-triangle-exclamation"></i> Scraper Docker Offline
-            </span>
-        {% endif %}
-        <a href="{{ url_for('crm.kanban') }}" class="btn-secondary text-sm">
-            <i class="fa-solid fa-filter"></i> Ver Funil Kanban
-        </a>
+            <span class="kpi-label">{{ 'Serviço ativo na porta 8080' if is_online else 'Verifique o Docker local' }}</span>
+        </div>
     </div>
 </div>
 
+<!-- ── Layout Principal: Formulário à Esquerda + Tabela à Direita ── -->
 <div class="prospect-grid">
+
     <!-- Card do Formulário de Nova Busca -->
-    <div class="card-glass p-4" style="height: fit-content;">
-        <h3 class="font-semibold text-base mb-3 d-flex align-center gap-2">
-            <i class="fa-solid fa-magnifying-glass-location text-primary"></i> Nova Busca de Leads
-        </h3>
+    <div class="card p-3 p-md-4" style="box-sizing: border-box;">
+        <div class="d-flex align-center gap-2 mb-3 pb-2" style="border-bottom: 1px solid var(--glass-border);">
+            <i class="fa-solid fa-crosshairs text-primary" style="font-size: 1.05rem;"></i>
+            <h3 class="font-semibold text-sm m-0 text-main">Nova Busca de Leads</h3>
+        </div>
 
         <form id="prospectForm" method="POST" action="{{ url_for('crm.prospeccao_start') }}">
             <div class="form-group mb-3">
                 <label for="query" class="text-xs font-semibold mb-1 d-block">
                     Segmento & Localidade <span class="text-danger">*</span>
                 </label>
-                <input type="text" name="query" id="query" class="input-glass w-100" 
-                       placeholder="Ex: Academias em Sumaré SP" required autofocus>
-                <small class="text-xs text-muted mt-1 d-block">
-                    Dica: Seja específico (nicho + cidade/bairro). Ex: <em>"Oficinas mecânicas Americana SP"</em> ou <em>"Clínicas odontológicas Campinas"</em>.
+                <div style="position: relative;">
+                    <input type="text" name="query" id="query" class="input-glass w-100" 
+                           placeholder="Ex: Academias em Sumaré SP" required autofocus
+                           style="padding-right: 2rem;">
+                    <i class="fa-solid fa-map-pin text-muted" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.8rem;"></i>
+                </div>
+                
+                <!-- Chips Rápidos de Sugestão -->
+                <div class="quick-chips-wrap">
+                    <button type="button" class="quick-chip" onclick="fillQuery('Academias em Nova Odessa SP')">Academias</button>
+                    <button type="button" class="quick-chip" onclick="fillQuery('Lanchonetes em Americana SP')">Lanches</button>
+                    <button type="button" class="quick-chip" onclick="fillQuery('Clínicas Odontológicas em Sumaré SP')">Odonto</button>
+                    <button type="button" class="quick-chip" onclick="fillQuery('Auto Peças em Campinas SP')">Auto Peças</button>
+                    <button type="button" class="quick-chip" onclick="fillQuery('Salões de Beleza em Paulínia SP')">Salões</button>
+                </div>
+                <small class="text-xs text-muted mt-1 d-block" style="font-size: 0.68rem;">
+                    Dica: Especifique nicho + município para leads mais assertivos.
                 </small>
             </div>
 
             <div class="form-group mb-3">
                 <label for="depth" class="text-xs font-semibold mb-1 d-block">
-                    Profundidade da Busca (Páginas)
+                    Profundidade da Busca
                 </label>
                 <select name="depth" id="depth" class="input-glass w-100">
-                    <option value="1" selected>1 página (~15 a 20 empresas) - Rápido (Recomendado)</option>
+                    <option value="1" selected>1 página (~15 a 20 empresas) - Rápido</option>
                     <option value="2">2 páginas (~30 a 40 empresas)</option>
                     <option value="3">3 páginas (~50 a 60 empresas)</option>
-                    <option value="5">5 páginas (~80 a 100 empresas) - Busca Ampla</option>
+                    <option value="5">5 páginas (~80 a 100 empresas) - Ampla</option>
                 </select>
             </div>
 
             <div class="form-group mb-3">
-                <label class="d-flex align-center gap-2 cursor-pointer text-sm">
-                    <input type="checkbox" name="extract_emails" id="extract_emails" value="true" checked>
-                    <span>Extrair e-mails e contatos adicionais dos websites</span>
+                <label class="d-flex align-center gap-2 cursor-pointer text-xs" style="line-height: 1.3;">
+                    <input type="checkbox" name="extract_emails" id="extract_emails" value="true" checked style="accent-color: var(--primary-color);">
+                    <span>Extrair e-mails e contatos adicionais</span>
                 </label>
             </div>
 
@@ -193,46 +451,56 @@
             </button>
         </form>
 
-        <div class="tips-box mt-4">
-            <strong class="text-warning"><i class="fa-solid fa-shield-halved"></i> Boas Práticas Anti-Bloqueio:</strong>
+        <div class="tips-box mt-3">
+            <strong class="text-warning d-flex align-center gap-1" style="font-size: 0.72rem;">
+                <i class="fa-solid fa-shield-halved"></i> Boas Práticas Anti-Bloqueio:
+            </strong>
             <ul>
-                <li>Evite disparar várias buscas simultâneas para o mesmo IP.</li>
-                <li>Utilize profundidade 1 ou 2 para obter dados em menos de 1 minuto com segurança.</li>
-                <li>Os números são automaticamente convertidos para o formato nacional <code>+55 (DDD) 9XXXX-XXXX</code>.</li>
-                <li>Leads duplicados não sobrescrevem contatos já existentes na base.</li>
+                <li>Evite buscas concorrentes no mesmo IP em janela de 1 min.</li>
+                <li>Telefones formatados no padrão E.164 <code>+55...</code>.</li>
+                <li>Leads duplicados não sobrescrevem contatos no CRM.</li>
             </ul>
         </div>
     </div>
 
     <!-- Seção de Histórico e Monitoramento em Tempo Real -->
-    <div class="card-glass p-4">
-        <div class="d-flex justify-between align-center mb-3">
-            <h3 class="font-semibold text-base d-flex align-center gap-2">
-                <i class="fa-solid fa-list-check text-primary"></i> Histórico & Monitoramento de Prospecções
-            </h3>
-            <span class="text-xs text-muted" id="pollIndicator">
-                <i class="fa-solid fa-rotate fa-spin" style="display:none;" id="pollSpinner"></i> Atualização em tempo real ativa
+    <div class="card p-3 p-md-4" style="min-width: 0; box-sizing: border-box; overflow: hidden;">
+        <div class="d-flex justify-between align-center mb-3 pb-2 flex-wrap gap-2" style="border-bottom: 1px solid var(--glass-border);">
+            <div class="d-flex align-center gap-2">
+                <i class="fa-solid fa-list-check text-primary" style="font-size: 1.05rem;"></i>
+                <h3 class="font-semibold text-sm m-0 text-main">Histórico & Monitoramento de Prospecções</h3>
+            </div>
+            <span class="text-xs text-muted" id="pollIndicator" style="font-size: 0.72rem;">
+                <i class="fa-solid fa-rotate fa-spin text-primary" style="display:none;" id="pollSpinner"></i> Atualização em tempo real ativa
             </span>
         </div>
 
         <!-- PAINEL VISUAL DE PROGRESSÃO AO VIVO (Exibido para busca em andamento ou inspecionada) -->
-        <div id="liveProgressContainer" class="live-progress-card p-4 mb-4" style="display: none;">
+        <div id="liveProgressContainer" class="live-progress-card p-3 mb-3" style="display: none;">
             <div class="d-flex justify-between align-center mb-2 flex-wrap gap-2">
                 <div class="d-flex align-center gap-2">
                     <span class="pulsing-dot" id="liveDot" style="color: #6366f1;"></span>
-                    <strong class="text-sm font-semibold" id="liveJobTitle">Prospecção em Andamento</strong>
-                    <span class="badge text-xs" id="liveJobBadge" style="background: rgba(99, 102, 241, 0.25); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4);">
+                    <strong class="text-xs font-semibold" id="liveJobTitle">Prospecção em Andamento</strong>
+                    <span class="badge text-xs" id="liveJobBadge" style="background: rgba(99, 102, 241, 0.25); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 0.65rem;">
                         <i class="fa-solid fa-satellite-dish fa-fade"></i> Minerando
                     </span>
                 </div>
-                <div class="d-flex align-center gap-3">
-                    <span class="text-xs text-muted" id="liveJobElapsed">
+                <div class="d-flex align-center gap-2">
+                    <button type="button" 
+                            id="liveBtnCancel" 
+                            onclick="handleCancelJob(activeJobId)" 
+                            title="Cancelar esta prospecção em andamento" 
+                            class="btn-act-cancel" 
+                            style="display: none; padding: 0.22rem 0.55rem; font-size: 0.7rem;">
+                        <i class="fa-solid fa-ban"></i> Cancelar Prospecção
+                    </button>
+                    <span class="text-xs text-muted" id="liveJobElapsed" style="font-size: 0.72rem;">
                         <i class="fa-regular fa-clock"></i> 0s decorridos
                     </span>
-                    <span id="liveJobPercent" class="font-bold text-primary" style="font-size: 1.1rem; min-width: 45px; text-align: right;">
+                    <span id="liveJobPercent" class="font-bold text-primary" style="font-size: 1.05rem; min-width: 40px; text-align: right;">
                         0%
                     </span>
-                    <button type="button" onclick="closeProgressCard()" title="Fechar painel" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.2rem; font-size: 0.9rem;">
+                    <button type="button" onclick="closeProgressCard()" title="Fechar painel" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.15rem 0.3rem; font-size: 0.85rem;">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
@@ -244,42 +512,42 @@
             </div>
 
             <!-- Etapa Atual Detalhada -->
-            <div class="d-flex justify-between align-center text-xs flex-wrap gap-2 mt-2">
+            <div class="d-flex justify-between align-center text-xs flex-wrap gap-2 mt-1">
                 <div class="d-flex align-center gap-2" id="liveJobStepDesc">
                     <i class="fa-solid fa-spinner fa-spin text-primary" id="liveStepIcon"></i>
-                    <span class="font-semibold text-light" id="liveStepText">Iniciando conexão com o Google Maps...</span>
+                    <span class="font-semibold text-light" id="liveStepText" style="font-size: 0.72rem;">Iniciando conexão com o Google Maps...</span>
                 </div>
-                <div class="text-muted" id="liveJobMeta">
+                <div class="text-muted" id="liveJobMeta" style="font-size: 0.7rem;">
                     Termo: <strong class="text-light" id="liveJobQuery">-</strong>
                 </div>
             </div>
 
             <!-- Stepper Visual com Ícones das Fases -->
-            <div class="stepper-grid mt-3 pt-3 d-flex justify-between text-xs flex-wrap gap-2" style="border-top: 1px solid rgba(255,255,255,0.08);">
+            <div class="stepper-grid mt-2 pt-2 d-flex justify-between text-xs flex-wrap gap-1" style="border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.68rem;">
                 <div class="stepper-step text-center flex-1" id="step-1">
-                    <i class="fa-solid fa-satellite d-block mb-1 text-base"></i>
+                    <i class="fa-solid fa-satellite d-block mb-1"></i>
                     <span>1. Início</span>
                 </div>
                 <div class="stepper-step text-center flex-1" id="step-2">
-                    <i class="fa-solid fa-map-location-dot d-block mb-1 text-base"></i>
+                    <i class="fa-solid fa-map-location-dot d-block mb-1"></i>
                     <span>2. Google Maps</span>
                 </div>
                 <div class="stepper-step text-center flex-1" id="step-3">
-                    <i class="fa-solid fa-address-book d-block mb-1 text-base"></i>
+                    <i class="fa-solid fa-address-book d-block mb-1"></i>
                     <span>3. Extração</span>
                 </div>
                 <div class="stepper-step text-center flex-1" id="step-4">
-                    <i class="fa-solid fa-broom-ball d-block mb-1 text-base"></i>
-                    <span>4. Higienização E.164</span>
+                    <i class="fa-solid fa-broom-ball d-block mb-1"></i>
+                    <span>4. E.164</span>
                 </div>
                 <div class="stepper-step text-center flex-1" id="step-5">
-                    <i class="fa-solid fa-trophy d-block mb-1 text-base"></i>
-                    <span>5. Funil Kanban</span>
+                    <i class="fa-solid fa-trophy d-block mb-1"></i>
+                    <span>5. Funil</span>
                 </div>
             </div>
 
             <!-- Botão de Ação Imediata ao Concluir -->
-            <div id="liveSuccessActions" class="mt-3 pt-2 d-flex justify-between align-center" style="display: none; border-top: 1px solid rgba(16, 185, 129, 0.3);">
+            <div id="liveSuccessActions" class="mt-2 pt-2 d-flex justify-between align-center flex-wrap gap-2" style="display: none; border-top: 1px solid rgba(16, 185, 129, 0.3);">
                 <span class="text-xs text-success font-semibold" id="liveSuccessMsg">
                     <i class="fa-solid fa-circle-check"></i> Prospecção finalizada com sucesso!
                 </span>
@@ -291,17 +559,25 @@
             </div>
         </div>
 
-        <!-- TABELA DE JOBS -->
-        <div class="table-responsive">
-            <table class="table-glass w-100" id="jobsTable">
+        <!-- TABELA DE JOBS COM LARGURA RIGOROSA E TOTALMENTE VISÍVEL -->
+        <div class="prospect-table-wrap">
+            <table class="prospect-table" id="jobsTable">
+                <colgroup>
+                    <col style="width: 65px;">
+                    <col style="width: 175px;">
+                    <col style="width: 120px;">
+                    <col style="width: 95px;">
+                    <col style="width: 60px;">
+                    <col style="width: 105px;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>ID / Data</th>
                         <th>Termo Pesquisado</th>
-                        <th style="min-width: 220px;">Progresso / Status</th>
-                        <th>Minerados / Novos</th>
-                        <th>Solicitante</th>
-                        <th>Ações</th>
+                        <th>Status</th>
+                        <th>Minerados</th>
+                        <th>Usuário</th>
+                        <th style="text-align: right;">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="jobsTbody">
@@ -309,17 +585,23 @@
                         {% for job in jobs %}
                         <tr id="job-row-{{ job.id }}" data-job-id="{{ job.id }}" data-status="{{ job.status }}" data-progress="{{ job.progress or 0 }}">
                             <td>
-                                <strong class="text-xs">#{{ job.id }}</strong><br>
-                                <span class="text-xs text-muted">{{ job.created_at.strftime('%d/%m/%Y %H:%M') if job.created_at else '-' }}</span>
-                            </td>
-                            <td>
-                                <span class="font-semibold text-sm">{{ job.query_term }}</span><br>
-                                <span class="text-xs text-muted">
-                                    Profundidade: {{ job.depth }} | E-mails: {{ 'Sim' if job.extract_emails else 'Não' }}
+                                <strong class="text-xs text-main">#{{ job.id }}</strong><br>
+                                <span class="text-xs text-muted" style="font-size: 0.65rem;">
+                                    {{ job.created_at.strftime('%d/%m/%y %H:%M') if job.created_at else '-' }}
                                 </span>
                             </td>
                             <td>
-                                <div id="status-container-{{ job.id }}">
+                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; font-weight: 600; line-height: 1.25;" title="{{ job.query_term }}">
+                                    {{ job.query_term }}
+                                </div>
+                                <div class="text-xs text-muted mt-1 d-flex align-center gap-1" style="font-size: 0.65rem;">
+                                    <span><i class="fa-solid fa-layer-group opacity-60"></i> {{ job.depth }} pág</span>
+                                    <span>&bull;</span>
+                                    <span><i class="fa-solid fa-envelope opacity-60"></i> {{ 'E-mails' if job.extract_emails else 'Sem e-mails' }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div id="status-container-{{ job.id }}" style="max-width: 100%; overflow: hidden;">
                                     {% if job.status == 'processing' %}
                                         <div class="d-flex flex-column gap-1">
                                             <div class="d-flex justify-between align-center">
@@ -328,64 +610,89 @@
                                                 </span>
                                                 <span class="text-xs font-semibold text-primary" id="table-percent-{{ job.id }}">{{ job.progress or 10 }}%</span>
                                             </div>
-                                            <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 4px; overflow: hidden; width: 100%;">
+                                            <div style="background: rgba(0,0,0,0.3); height: 5px; border-radius: 4px; overflow: hidden; width: 100%;">
                                                 <div id="table-bar-{{ job.id }}" style="width: {{ job.progress or 10 }}%; height: 100%; background: linear-gradient(90deg, #6366f1, #3b82f6); transition: width 0.3s ease;"></div>
                                             </div>
-                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.7rem;">{{ job.current_step or 'Em andamento...' }}</span>
+                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="{{ job.current_step or 'Em andamento...' }}">
+                                                {{ job.current_step or 'Em andamento...' }}
+                                            </span>
                                         </div>
                                     {% elif job.status == 'queued' %}
                                         <div class="d-flex flex-column gap-1">
                                             <span class="badge-status queued" id="badge-{{ job.id }}">
                                                 <span class="pulsing-dot"></span> Na Fila
                                             </span>
-                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.7rem;">Aguardando início...</span>
+                                            <span class="text-xs text-muted" id="table-step-{{ job.id }}" style="font-size: 0.65rem;">Aguardando...</span>
                                         </div>
                                     {% elif job.status == 'completed' %}
                                         <div class="d-flex flex-column gap-1">
                                             <span class="badge-status completed" id="badge-{{ job.id }}">
-                                                <i class="fa-solid fa-check"></i> Concluído (100%)
+                                                <i class="fa-solid fa-check"></i> Concluído
                                             </span>
-                                            <span class="text-xs text-muted" style="font-size: 0.7rem;">{{ job.current_step or 'Leads importados' }}</span>
+                                            <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="{{ job.current_step or 'Leads importados' }}">
+                                                {{ job.current_step or 'Leads importados' }}
+                                            </span>
+                                        </div>
+                                    {% elif job.status == 'cancelled' %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge-status cancelled" id="badge-{{ job.id }}">
+                                                <i class="fa-solid fa-ban"></i> Cancelado
+                                            </span>
+                                            <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="{{ job.current_step or 'Cancelado pelo usuário' }}">
+                                                {{ job.current_step or 'Cancelado pelo usuário' }}
+                                            </span>
                                         </div>
                                     {% else %}
                                         <div class="d-flex flex-column gap-1">
                                             <span class="badge-status failed" id="badge-{{ job.id }}">
                                                 <i class="fa-solid fa-triangle-exclamation"></i> Falhou
                                             </span>
-                                            <span class="text-xs text-muted" style="font-size: 0.7rem;">{{ job.error_message or 'Erro desconhecido' }}</span>
+                                            <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="{{ job.error_message or 'Erro desconhecido' }}">
+                                                {{ job.error_message or 'Erro desconhecido' }}
+                                            </span>
                                         </div>
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
                                 <div class="d-flex align-center gap-1">
-                                    <span class="metric-pill" title="Total encontrado no Google Maps" id="metric-scraped-{{ job.id }}">
-                                        <i class="fa-solid fa-globe text-muted"></i> {{ job.total_scraped }}
+                                    <span class="metric-pill" title="Total no Maps" id="metric-scraped-{{ job.id }}">
+                                        <i class="fa-solid fa-globe text-muted" style="font-size: 0.6rem;"></i> {{ job.total_scraped }}
                                     </span>
-                                    <span>/</span>
-                                    <span class="metric-pill" style="color: #34d399;" title="Novos leads inseridos no CRM" id="metric-imported-{{ job.id }}">
-                                        <i class="fa-solid fa-user-plus"></i> +{{ job.total_imported }}
+                                    <span class="metric-pill" style="color: #34d399;" title="Novos no CRM" id="metric-imported-{{ job.id }}">
+                                        <i class="fa-solid fa-user-plus" style="font-size: 0.6rem;"></i> +{{ job.total_imported }}
                                     </span>
                                 </div>
                             </td>
                             <td>
-                                <span class="text-xs">{{ job.created_by.username if job.created_by else 'Sistema' }}</span>
+                                <span class="text-xs text-muted" style="font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="{{ job.created_by.username if job.created_by else 'Sistema' }}">
+                                    {{ job.created_by.username if job.created_by else 'Sistema' }}
+                                </span>
                             </td>
-                            <td>
-                                <div class="d-flex align-center gap-1" id="actions-{{ job.id }}">
+                            <td style="text-align: right;">
+                                <div class="d-flex align-center justify-end gap-1" id="actions-{{ job.id }}">
+                                    {% if job.status in ['queued', 'processing'] %}
+                                    <button type="button" 
+                                            class="btn-act-cancel" 
+                                            id="btn-cancel-{{ job.id }}" 
+                                            onclick="handleCancelJob({{ job.id }})" 
+                                            title="Cancelar esta prospecção">
+                                        <i class="fa-solid fa-ban"></i> Cancelar
+                                    </button>
+                                    {% endif %}
                                     {% if job.total_imported > 0 or job.status == 'completed' %}
                                     <a href="{{ url_for('crm.kanban') }}?badge=job_{{ job.id }}" 
-                                       class="btn-secondary text-xs px-2 py-1" 
+                                       class="btn-act-funil" 
                                        title="Ver leads no Funil Kanban">
-                                        <i class="fa-solid fa-filter text-warning"></i> Funil
+                                        <i class="fa-solid fa-filter"></i> Funil
                                     </a>
                                     <a href="{{ url_for('crm.list_clients') }}?badge=job_{{ job.id }}" 
-                                       class="btn-secondary text-xs px-2 py-1" 
+                                       class="btn-act-lista" 
                                        title="Ver lista de clientes">
-                                        <i class="fa-solid fa-users text-primary"></i> Lista
+                                        <i class="fa-solid fa-users"></i> Lista
                                     </a>
-                                    {% else %}
-                                    <span class="text-xs text-muted">-</span>
+                                    {% elif job.status not in ['queued', 'processing'] %}
+                                    <span class="text-xs text-muted opacity-40">-</span>
                                     {% endif %}
                                 </div>
                             </td>
@@ -394,8 +701,8 @@
                     {% else %}
                         <tr id="emptyRow">
                             <td colspan="6" class="text-center text-muted py-4">
-                                <i class="fa-solid fa-folder-open text-lg mb-1 d-block"></i>
-                                Nenhuma prospecção realizada ainda. Digite um segmento e localidade acima para começar!
+                                <i class="fa-solid fa-folder-open text-lg mb-2 d-block opacity-40"></i>
+                                Nenhuma prospecção realizada ainda. Digite um segmento e localidade para começar!
                             </td>
                         </tr>
                     {% endif %}
@@ -404,14 +711,27 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
     // Polling dinâmico para monitoramento da progressão em tempo real
     const POLLING_INTERVAL = 2000;
     let pollTimer = null;
     let activeJobId = null;
+
+    function fillQuery(text) {
+        const input = document.getElementById('query');
+        if (input) {
+            input.value = text;
+            input.focus();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    function closeProgressCard() {
+        const container = document.getElementById('liveProgressContainer');
+        if (container) container.style.display = 'none';
+    }
 
     async function checkActiveJobs() {
         const spinner = document.getElementById('pollSpinner');
@@ -440,7 +760,6 @@
             } else {
                 // Nenhum job ativo no momento
                 if (activeJobId) {
-                    // O job que estava ativo concluiu! Busca seu estado final
                     const finishedJobId = activeJobId;
                     activeJobId = null;
                     fetchIndividualJob(finishedJobId);
@@ -470,7 +789,22 @@
         const progress = Math.max(5, Math.min(100, job.progress || 10));
         document.getElementById('liveJobPercent').textContent = `${progress}%`;
         document.getElementById('liveProgressBar').style.width = `${progress}%`;
+        document.getElementById('liveProgressBar').style.background = 'linear-gradient(90deg, #6366f1, #3b82f6, #10b981)';
+        document.getElementById('liveStepIcon').className = 'fa-solid fa-spinner fa-spin text-primary';
+        document.getElementById('liveDot').style.color = '#6366f1';
         document.getElementById('liveStepText').textContent = job.current_step || 'Processando busca...';
+
+        // Botão Cancelar no card
+        const liveBtnCancel = document.getElementById('liveBtnCancel');
+        if (liveBtnCancel) {
+            if (job.status === 'processing' || job.status === 'queued') {
+                liveBtnCancel.style.display = 'inline-flex';
+                liveBtnCancel.disabled = false;
+                liveBtnCancel.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelar Prospecção';
+            } else {
+                liveBtnCancel.style.display = 'none';
+            }
+        }
 
         // Atualização do Stepper
         updateStepper(progress);
@@ -488,10 +822,32 @@
         }
     }
 
+    function renderCancelledCard(job) {
+        const container = document.getElementById('liveProgressContainer');
+        if (!container) return;
+
+        container.style.display = 'block';
+
+        const liveBtnCancel = document.getElementById('liveBtnCancel');
+        if (liveBtnCancel) liveBtnCancel.style.display = 'none';
+
+        document.getElementById('liveJobTitle').textContent = `Cancelado: "${job.query || job.query_term}"`;
+        document.getElementById('liveJobBadge').className = 'badge text-xs';
+        document.getElementById('liveJobBadge').style = 'background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.65rem;';
+        document.getElementById('liveJobBadge').innerHTML = '<i class="fa-solid fa-ban"></i> Cancelado';
+        
+        document.getElementById('liveStepIcon').className = 'fa-solid fa-ban text-danger';
+        document.getElementById('liveStepText').textContent = 'Prospecção cancelada com sucesso pelo usuário.';
+        document.getElementById('liveProgressBar').style.background = 'linear-gradient(90deg, #ef4444, #f87171)';
+        document.getElementById('liveDot').style.color = '#ef4444';
+
+        const actionsDiv = document.getElementById('liveSuccessActions');
+        if (actionsDiv) actionsDiv.style.display = 'none';
+    }
+
     function hideLiveProgressCard() {
         const container = document.getElementById('liveProgressContainer');
         if (container && container.style.display !== 'none' && !activeJobId) {
-            // Se não há jobs ativos e não foi marcado recentemente, esconde
             container.style.display = 'none';
         }
     }
@@ -505,7 +861,6 @@
 
         if (!s1) return;
 
-        // Reset
         [s1, s2, s3, s4, s5].forEach(s => { s.className = 'stepper-step text-center flex-1'; });
 
         if (progress >= 10) s1.className += (progress > 20 ? ' done' : ' active');
@@ -527,11 +882,16 @@
                     }
                     if (data.job.status === 'completed') {
                         renderLiveProgressCard(data.job);
-                        // Suavemente oculta o banner de destaque após 10 segundos
                         setTimeout(() => {
                             const c = document.getElementById('liveProgressContainer');
                             if (c && !activeJobId) c.style.display = 'none';
-                        }, 10000);
+                        }, 8000);
+                    } else if (data.job.status === 'cancelled') {
+                        renderCancelledCard(data.job);
+                        setTimeout(() => {
+                            const c = document.getElementById('liveProgressContainer');
+                            if (c && !activeJobId) c.style.display = 'none';
+                        }, 4000);
                     }
                 }
             }
@@ -555,10 +915,10 @@
                             </span>
                             <span class="text-xs font-semibold text-primary">${job.progress}%</span>
                         </div>
-                        <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 4px; overflow: hidden; width: 100%;">
+                        <div style="background: rgba(0,0,0,0.3); height: 5px; border-radius: 4px; overflow: hidden; width: 100%;">
                             <div style="width: ${job.progress}%; height: 100%; background: linear-gradient(90deg, #6366f1, #3b82f6); transition: width 0.3s ease;"></div>
                         </div>
-                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.current_step || 'Em andamento...'}</span>
+                        <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="${job.current_step || 'Em andamento...'}">${job.current_step || 'Em andamento...'}</span>
                     </div>
                 `;
             } else if (job.status === 'queued') {
@@ -567,16 +927,25 @@
                         <span class="badge-status queued">
                             <span class="pulsing-dot"></span> Na Fila
                         </span>
-                        <span class="text-xs text-muted" style="font-size: 0.7rem;">Aguardando início...</span>
+                        <span class="text-xs text-muted" style="font-size: 0.65rem;">Aguardando...</span>
                     </div>
                 `;
             } else if (job.status === 'completed') {
                 statusContainer.innerHTML = `
                     <div class="d-flex flex-column gap-1">
                         <span class="badge-status completed">
-                            <i class="fa-solid fa-check"></i> Concluído (100%)
+                            <i class="fa-solid fa-check"></i> Concluído
                         </span>
-                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.current_step || 'Leads importados'}</span>
+                        <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="${job.current_step || 'Leads importados'}">${job.current_step || 'Leads importados'}</span>
+                    </div>
+                `;
+            } else if (job.status === 'cancelled') {
+                statusContainer.innerHTML = `
+                    <div class="d-flex flex-column gap-1">
+                        <span class="badge-status cancelled">
+                            <i class="fa-solid fa-ban"></i> Cancelado
+                        </span>
+                        <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="${job.current_step || 'Cancelado pelo usuário'}">${job.current_step || 'Cancelado pelo usuário'}</span>
                     </div>
                 `;
             } else {
@@ -585,7 +954,7 @@
                         <span class="badge-status failed">
                             <i class="fa-solid fa-triangle-exclamation"></i> Falhou
                         </span>
-                        <span class="text-xs text-muted" style="font-size: 0.7rem;">${job.error_message || 'Erro no processamento'}</span>
+                        <span class="text-xs text-muted" style="font-size: 0.65rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;" title="${job.error_message || 'Erro no processamento'}">${job.error_message || 'Erro no processamento'}</span>
                     </div>
                 `;
             }
@@ -594,27 +963,151 @@
         // Métricas
         const scrapedPill = document.getElementById(`metric-scraped-${job.id}`);
         if (scrapedPill) {
-            scrapedPill.innerHTML = `<i class="fa-solid fa-globe text-muted"></i> ${job.total_scraped || 0}`;
+            scrapedPill.innerHTML = `<i class="fa-solid fa-globe text-muted" style="font-size: 0.6rem;"></i> ${job.total_scraped || 0}`;
         }
         const importedPill = document.getElementById(`metric-imported-${job.id}`);
         if (importedPill) {
-            importedPill.innerHTML = `<i class="fa-solid fa-user-plus"></i> +${job.total_imported || 0}`;
+            importedPill.innerHTML = `<i class="fa-solid fa-user-plus" style="font-size: 0.6rem;"></i> +${job.total_imported || 0}`;
         }
 
         // Ações
         const actionsTd = document.getElementById(`actions-${job.id}`);
-        if (actionsTd && (job.total_imported > 0 || job.status === 'completed')) {
-            actionsTd.innerHTML = `
-                <div class="d-flex align-center gap-1">
-                    <a href="/crm/kanban?badge=job_${job.id}" class="btn-secondary text-xs px-2 py-1" title="Ver leads no Funil Kanban">
-                        <i class="fa-solid fa-filter text-warning"></i> Funil
-                    </a>
-                    <a href="/crm/clients?badge=job_${job.id}" class="btn-secondary text-xs px-2 py-1" title="Ver lista de clientes">
-                        <i class="fa-solid fa-users text-primary"></i> Lista
-                    </a>
-                </div>
-            `;
+        if (actionsTd) {
+            if (job.status === 'processing' || job.status === 'queued') {
+                actionsTd.innerHTML = `
+                    <div class="d-flex align-center justify-end gap-1">
+                        <button type="button" 
+                                class="btn-act-cancel" 
+                                id="btn-cancel-${job.id}" 
+                                onclick="handleCancelJob(${job.id})" 
+                                title="Cancelar esta prospecção">
+                            <i class="fa-solid fa-ban"></i> Cancelar
+                        </button>
+                    </div>
+                `;
+            } else if (job.total_imported > 0 || job.status === 'completed') {
+                actionsTd.innerHTML = `
+                    <div class="d-flex align-center justify-end gap-1">
+                        <a href="/crm/kanban?badge=job_${job.id}" class="btn-act-funil" title="Ver leads no Funil Kanban">
+                            <i class="fa-solid fa-filter"></i> Funil
+                        </a>
+                        <a href="/crm/clients?badge=job_${job.id}" class="btn-act-lista" title="Ver lista de clientes">
+                            <i class="fa-solid fa-users"></i> Lista
+                        </a>
+                    </div>
+                `;
+            } else {
+                actionsTd.innerHTML = `
+                    <div class="d-flex align-center justify-end gap-1">
+                        <span class="text-xs text-muted opacity-40">-</span>
+                    </div>
+                `;
+            }
         }
+    }
+
+    async function handleCancelJob(jobId) {
+        if (!jobId) return;
+
+        if (!confirm(`Deseja realmente cancelar a prospecção #${jobId}?`)) {
+            return;
+        }
+
+        const rowBtn = document.getElementById(`btn-cancel-${jobId}`);
+        const liveBtn = document.getElementById('liveBtnCancel');
+
+        if (rowBtn) {
+            rowBtn.disabled = true;
+            rowBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelando...';
+        }
+        if (liveBtn && activeJobId === jobId) {
+            liveBtn.disabled = true;
+            liveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cancelando...';
+        }
+
+        try {
+            const resp = await fetch(`/crm/prospeccao/job/${jobId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await resp.json();
+
+            if (resp.ok && data.ok) {
+                showToast(data.message || 'Prospecção cancelada com sucesso.', 'success');
+
+                const row = document.getElementById(`job-row-${jobId}`);
+                if (row && data.job) {
+                    updateTableRow(row, data.job);
+                }
+
+                if (activeJobId === jobId) {
+                    activeJobId = null;
+                    if (data.job) renderCancelledCard(data.job);
+                    setTimeout(() => {
+                        closeProgressCard();
+                    }, 3500);
+                }
+
+                // Atualiza lista de ativos
+                checkActiveJobs();
+            } else {
+                showToast(data.message || data.error || 'Erro ao cancelar prospecção.', 'error');
+                if (rowBtn) {
+                    rowBtn.disabled = false;
+                    rowBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelar';
+                }
+                if (liveBtn) {
+                    liveBtn.disabled = false;
+                    liveBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelar Prospecção';
+                }
+            }
+        } catch (err) {
+            console.error("Erro na requisição de cancelamento:", err);
+            showToast('Erro de comunicação ao tentar cancelar a prospecção.', 'error');
+            if (rowBtn) {
+                rowBtn.disabled = false;
+                rowBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelar';
+            }
+            if (liveBtn) {
+                liveBtn.disabled = false;
+                liveBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancelar Prospecção';
+            }
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.style = 'position: fixed; top: 1.5rem; right: 1.5rem; z-index: 99999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        const isSuccess = type === 'success';
+        const isError = type === 'error';
+        const bg = isSuccess ? 'rgba(16, 185, 129, 0.95)' : isError ? 'rgba(239, 68, 68, 0.95)' : 'rgba(99, 102, 241, 0.95)';
+        const icon = isSuccess ? 'fa-circle-check' : isError ? 'fa-triangle-exclamation' : 'fa-circle-info';
+        
+        toast.style = `background: ${bg}; color: #ffffff; padding: 0.65rem 1rem; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; pointer-events: auto; transition: all 0.3s ease; transform: translateY(-10px); opacity: 0;`;
+        toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+        
+        container.appendChild(toast);
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateY(0)';
+            toast.style.opacity = '1';
+        });
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+            setTimeout(() => toast.remove(), 350);
+        }, 4000);
     }
 
     // Inicia verificação na carga inicial

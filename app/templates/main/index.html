@@ -1,47 +1,61 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('crm.new_client') }}" class="btn-primary btn-sm">
+        <i class="fa-solid fa-user-plus"></i> Novo Cliente
+    </a>
+    <a href="{{ url_for('crm.kanban') }}" class="btn-primary btn-outline btn-sm">
+        <i class="fa-solid fa-table-columns"></i> Funil Kanban
+    </a>
+</div>
+{% endblock %}
+
 {% block content %}
-<!-- ── STAT CARDS ─────────────────────────────────────────────────────── -->
+<!-- ── STAT / KPI CARDS ────────────────────────────────────────────────── -->
 <div class="grid grid-cols-auto-fit gap-3 mb-4">
-    <div class="stat-card">
-        <div class="stat-icon text-primary" style="background: rgba(99,102,241,0.15);">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99,102,241,0.15); color: #818cf8;">
             <i class="fa-solid fa-users"></i>
         </div>
-        <div class="stat-info">
-            <div class="stat-value">{{ stats.total_clients }}</div>
-            <div class="stat-label">Total de Clientes</div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ stats.total_clients }}</span>
+            <span class="kpi-label">Total de Clientes</span>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon text-success" style="background: rgba(16,185,129,0.15);">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16,185,129,0.15); color: #34d399;">
             <i class="fa-solid fa-trophy"></i>
         </div>
-        <div class="stat-info">
-            <div class="stat-value">{{ stats.fechados }}</div>
-            <div class="stat-label">Vendas Fechadas</div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ stats.fechados }}</span>
+            <span class="kpi-label">Vendas Fechadas</span>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon" style="background: rgba(59,130,246,0.15); color: #3b82f6;">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(59,130,246,0.15); color: #60a5fa;">
             <i class="fa-solid fa-file-signature"></i>
         </div>
-        <div class="stat-info">
-            <div class="stat-value">{{ stats.propostas }}</div>
-            <div class="stat-label">Propostas Ativas</div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ stats.propostas }}</span>
+            <span class="kpi-label">Propostas Ativas</span>
         </div>
     </div>
 
-    <div class="stat-card">
-        <div class="stat-icon text-warning" style="background: rgba(245,158,11,0.15);">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245,158,11,0.15); color: #fbbf24;">
             <i class="fa-solid fa-star"></i>
         </div>
-        <div class="stat-info w-100">
-            <div class="stat-value text-warning">{{ current_user.performance_points }} XP</div>
-            <div class="stat-label">Minha Pontuação</div>
-            <div class="w-100 mt-2 rounded-full" style="height:4px;background:rgba(255,255,255,0.1);">
-                <div class="h-100 rounded-full" style="width:{{ [current_user.performance_points % 200 / 2, 100] | min }}%;background:#f59e0b;transition:width 1s;"></div>
+        <div class="kpi-info w-100">
+            <div class="d-flex justify-between align-center">
+                <span class="kpi-val" style="color: #f59e0b;">{{ current_user.performance_points }} XP</span>
+                <span class="badge badge-warning" style="font-size: 0.65rem;">Nível {{ (current_user.performance_points // 100) + 1 }}</span>
+            </div>
+            <span class="kpi-label">Minha Pontuação</span>
+            <div class="w-100 mt-2 rounded-full" style="height:5px; background:rgba(255,255,255,0.1); overflow:hidden;">
+                <div class="h-100 rounded-full" style="width:{{ [current_user.performance_points % 200 / 2, 100] | min }}%; background:#f59e0b; transition:width 1s;"></div>
             </div>
         </div>
     </div>
@@ -51,66 +65,89 @@
 <div class="grid grid-main-layout gap-4">
 
     <!-- Recent Logs -->
-    <div class="header-glass flex-col align-start m-0">
-        <h4 class="card-title w-100">
-            <i class="fa-solid fa-clock-rotate-left text-primary"></i>
-            Atividades Recentes
-        </h4>
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-primary"></i> Atividades Recentes
+                </h4>
+                <div class="text-xs text-muted mt-1">Últimas ações e movimentações registradas na plataforma</div>
+            </div>
+            <a href="{{ url_for('admin.logs') }}" class="btn-primary btn-outline btn-xs" title="Ver todos os logs">
+                Ver todos
+            </a>
+        </div>
+
         {% if recent_logs %}
         <div class="w-100">
             {% for log in recent_logs %}
             <div class="log-item">
-                <div class="avatar avatar-md">
+                <div class="avatar avatar-md flex-shrink-0" style="background: {% if log.user and log.user.role == 'admin' %}var(--primary-color){% elif log.user and log.user.role == 'gerente' %}#f59e0b{% else %}#475569{% endif %};">
                     {{ log.user.username[0] | upper if log.user else '?' }}
                 </div>
-                <div class="flex-1 w-100" style="overflow: hidden;">
-                    <div class="text-sm nowrap" style="text-overflow: ellipsis; overflow: hidden;">{{ log.action }}</div>
-                    <div class="text-xs text-muted mt-2">
-                        {{ log.user.username if log.user else 'Sistema' }} &mdash;
-                        {{ log.timestamp.strftime('%d/%m %H:%M') }}
+                <div class="flex-1 w-100" style="overflow: hidden; min-width: 0;">
+                    <div class="text-sm font-semibold text-main nowrap" style="text-overflow: ellipsis; overflow: hidden;">
+                        {{ log.action }}
+                    </div>
+                    <div class="text-xs text-muted mt-1 d-flex align-center gap-2">
+                        <span><i class="fa-solid fa-user text-xs opacity-75"></i> {{ log.user.username if log.user else 'Sistema' }}</span>
+                        <span>&bull;</span>
+                        <span><i class="fa-regular fa-clock text-xs opacity-75"></i> {{ log.timestamp.strftime('%d/%m %H:%M') }}</span>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted text-center p-4 w-100">
-            Nenhuma atividade registrada ainda.
-        </p>
+        <div class="text-muted text-center p-5 w-100">
+            <i class="fa-regular fa-calendar-xmark text-3xl mb-2 d-block opacity-40"></i>
+            Nenhuma atividade recente registrada ainda.
+        </div>
         {% endif %}
     </div>
 
     <!-- Right column -->
-    <div class="d-flex flex-col gap-3">
+    <div class="d-flex flex-col gap-4">
 
         <!-- Quick Actions -->
-        <div class="header-glass flex-col align-start m-0">
-            <h4 class="card-title w-100">
-                <i class="fa-solid fa-bolt text-warning"></i> Ações Rápidas
-            </h4>
+        <div class="card">
+            <div class="card-header">
+                <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                    <i class="fa-solid fa-bolt text-warning"></i> Ações Rápidas
+                </h4>
+            </div>
             <div class="d-flex flex-col gap-2 w-100">
-                <a href="{{ url_for('crm.new_client') }}" class="btn-primary flex-1">
+                <a href="{{ url_for('crm.new_client') }}" class="btn-primary">
                     <i class="fa-solid fa-user-plus"></i> Novo Cliente
                 </a>
-                <a href="{{ url_for('crm.kanban') }}" class="btn-primary btn-outline flex-1">
+                <a href="{{ url_for('crm.kanban') }}" class="btn-primary btn-outline">
                     <i class="fa-solid fa-filter"></i> Ver Funil Kanban
                 </a>
-                <a href="{{ url_for('crm.import_csv') }}" class="btn-primary btn-outline flex-1">
+                <a href="{{ url_for('crm.prospeccao') }}" class="btn-primary btn-outline">
+                    <i class="fa-solid fa-crosshairs"></i> Prospecção Ativa
+                </a>
+                <a href="{{ url_for('crm.import_csv') }}" class="btn-primary btn-outline">
                     <i class="fa-solid fa-file-import"></i> Importar CSV
                 </a>
                 {% if current_user.role in ['admin', 'gerente'] %}
-                <a href="{{ url_for('admin.settings') }}" class="btn-primary btn-outline flex-1">
-                    <i class="fa-solid fa-gear"></i> Configurações
+                <a href="{{ url_for('admin.settings') }}" class="btn-primary btn-outline">
+                    <i class="fa-solid fa-gear"></i> Configurações do Sistema
                 </a>
                 {% endif %}
             </div>
         </div>
 
         <!-- Funnel mini-chart -->
-        <div class="header-glass flex-col align-start m-0">
-            <h4 class="card-title w-100">
-                <i class="fa-solid fa-filter" style="color:#3b82f6;"></i> Funil Resumido
-            </h4>
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                        <i class="fa-solid fa-filter text-primary"></i> Funil Resumido
+                    </h4>
+                    <div class="text-xs text-muted mt-1">Distribuição de leads por estágio do funil</div>
+                </div>
+            </div>
+
             {% set funnel = [
                 ('Leads',    stats.leads,    '#6366f1'),
                 ('Contato',  stats.contatos, '#f59e0b'),
@@ -119,17 +156,19 @@
                 ('Perdido',  stats.perdidos, '#ef4444')
             ] %}
             {% set max_val = [stats.leads, stats.contatos, stats.propostas, stats.fechados, stats.perdidos, 1] | max %}
-            {% for label, count, color in funnel %}
-            <div class="w-100 mb-2">
-                <div class="d-flex justify-between text-sm mb-1">
-                    <span class="text-muted">{{ label }}</span>
-                    <span class="font-semibold" style="color:{{ color }};">{{ count }}</span>
+            <div class="d-flex flex-col gap-3 w-100">
+                {% for label, count, color in funnel %}
+                <div class="w-100">
+                    <div class="d-flex justify-between text-sm mb-1">
+                        <span class="text-muted font-semibold">{{ label }}</span>
+                        <span class="font-bold" style="color:{{ color }};">{{ count }}</span>
+                    </div>
+                    <div class="w-100 rounded-full" style="height:7px; background:rgba(255,255,255,0.08); overflow:hidden;">
+                        <div class="h-100 rounded-full" style="width:{{ (count / max_val * 100) | round }}%; background:{{ color }}; transition:width 1s;"></div>
+                    </div>
                 </div>
-                <div class="h-100 rounded-full" style="height:6px;background:rgba(255,255,255,0.08);overflow:hidden;">
-                    <div class="h-100 rounded-full" style="width:{{ (count / max_val * 100) | round }}%;background:{{ color }};transition:width 1s;"></div>
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
 
     </div>

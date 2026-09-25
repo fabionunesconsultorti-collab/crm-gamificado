@@ -1,63 +1,89 @@
 {% extends "base.html" %}
 
+{% block topbar_actions %}
+<a href="javascript:history.back()" class="btn-primary btn-outline btn-sm">
+    <i class="fa-solid fa-arrow-left"></i> Voltar
+</a>
+{% endblock %}
+
 {% block content %}
-<div class="header-glass mb-4 justify-between">
-    <h3 class="m-0"><i class="fa-brands fa-whatsapp text-success"></i> {{ title }}</h3>
-    <a href="javascript:history.back()" class="nav-link p-0 m-0 w-auto">
-        <i class="fa-solid fa-arrow-left nav-icon"></i> Voltar
-    </a>
+<div class="d-flex flex-col align-center w-100">
+    <!-- Card do Destinatário -->
+    <div class="card w-100 mb-4" style="max-width: 650px;">
+        <div class="d-flex align-center gap-4 w-100">
+            <div class="avatar avatar-lg flex-shrink-0" style="font-size: 1.5rem; background: #10b981; color: white;">
+                <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="d-flex align-center justify-between flex-wrap gap-2">
+                    <h4 class="m-0 text-main font-bold">{{ client.name }}</h4>
+                    <span class="badge badge-success">
+                        <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp Direto
+                    </span>
+                </div>
+                <div class="text-sm text-muted mt-1 font-mono">
+                    <i class="fa-solid fa-phone text-xs me-1"></i> {{ client.phone }}
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                    <span class="badge badge-secondary" style="font-size: 0.7rem;">Nível: {{ client.tier | title }}</span>
+                    <span class="badge badge-primary" style="font-size: 0.7rem;">Estágio: {{ client.status | title }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário de Mensagem -->
+    <form action="" method="post" class="w-100" style="max-width: 650px;">
+        <div class="card mb-4">
+            <div class="card-header">
+                <div>
+                    <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-success"></i> Compor Mensagem
+                    </h4>
+                    <div class="text-xs text-muted mt-1">Selecione um modelo salvo ou escreva uma mensagem personalizada</div>
+                </div>
+            </div>
+            
+            <div class="form-group w-100 mb-3">
+                <label for="template_id"><i class="fa-solid fa-file-lines text-muted me-1"></i> Modelo de Mensagem (Opcional)</label>
+                <select id="template_id" class="input-glass" onchange="updateText()">
+                    <option value="">-- Mensagem Avulsa (Em branco) --</option>
+                    {% for t in templates %}
+                    <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group w-100 mb-0">
+                <label for="final_text"><i class="fa-solid fa-align-left text-muted me-1"></i> Texto da Mensagem</label>
+                <textarea name="final_text" id="final_text" class="input-glass" rows="8" placeholder="Digite aqui a sua mensagem..." style="resize:vertical;" required></textarea>
+                <div class="text-xs text-muted mt-2">
+                    <i class="fa-solid fa-circle-info me-1"></i> Você será redirecionado para o WhatsApp Web ou aplicativo com o texto preenchido.
+                </div>
+            </div>
+
+            <div class="card-footer p-0 pt-3 mt-4">
+                <button type="submit" class="btn-primary w-100 py-3 d-flex align-center justify-center gap-2" style="background: #25D366; color: #0f172a; font-weight: 700;">
+                    <i class="fa-brands fa-whatsapp text-lg"></i> GERAR LINK & ABRIR WHATSAPP
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
+{% endblock %}
 
-<div class="header-glass max-w-lg mb-4 flex-col align-start m-0">
-    <div class="d-flex align-start gap-4 w-100">
-        <div class="avatar avatar-lg flex-shrink-0" style="font-size: 1.5rem; background:#34d399;">
-            <i class="fa-solid fa-user"></i>
-        </div>
-        <div class="flex-1">
-            <h4 class="m-0 text-main">{{ client.name }}</h4>
-            <div class="text-sm text-muted mt-1">Celular: {{ client.phone }}</div>
-            <div class="text-xs text-warning mt-1">Nível: {{ client.tier | title }} &middot; Status: {{ client.status | title }}</div>
-        </div>
-    </div>
-</div>
-
-<form action="" method="post" class="w-100 max-w-lg">
-    <div class="header-glass flex-col align-start m-0 mb-4">
-        
-        <div class="form-group w-100">
-            <label for="template_id">Escolha um Template</label>
-            <select id="template_id" class="input-glass" onchange="updateText()">
-                <option value="">-- Mensagem Avulsa (Em branco) --</option>
-                {% for t in templates %}
-                <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-group w-100 mb-0">
-            <label for="final_text">Mensagem Pronta (Edite se necessário)</label>
-            <textarea name="final_text" id="final_text" class="input-glass" rows="8" placeholder="Digite aqui a sua mensagem e as informações enviadas não ficarão salvas como um evento padrão." style="resize:vertical;" required></textarea>
-        </div>
-    </div>
-
-    <div class="d-flex gap-3 max-w-lg mb-4">
-        <button type="submit" class="btn-primary flex-1" style="background:#25D366; color:#0f172a;">
-            <i class="fa-solid fa-paper-plane"></i> GERAR LINK WHATSAPP
-        </button>
-    </div>
-</form>
-
+{% block extra_js %}
 <script>
-    function updateText() {
-        const select = document.getElementById('template_id');
-        const selectedOption = select.options[select.selectedIndex];
-        const textArea = document.getElementById('final_text');
-        
-        if (selectedOption && selectedOption.dataset.text) {
-            textArea.value = selectedOption.dataset.text;
-        } else {
-            textArea.value = '';
-        }
+function updateText() {
+    const select = document.getElementById('template_id');
+    const selectedOption = select.options[select.selectedIndex];
+    const textArea = document.getElementById('final_text');
+    
+    if (selectedOption && selectedOption.dataset.text) {
+        textArea.value = selectedOption.dataset.text;
+    } else {
+        textArea.value = '';
     }
+}
 </script>
 {% endblock %}
