@@ -737,23 +737,24 @@ def ai_models():
     return jsonify(result)
 
 
-# ── Base de Conhecimento RAG ──────────────────────────────────────────────────
 @bp.route('/knowledge', methods=['GET'])
 @login_required
 @admin_required
 def knowledge():
-    """Painel interativo para gerenciamento e treinamento da base de conhecimento do bot."""
+    """Painel interativo para gerenciamento e calibração avançada da base de conhecimento (RAG)."""
     docs = KnowledgeDoc.query.order_by(KnowledgeDoc.created_at.desc()).all()
     
     total_docs = len(docs)
     active_docs = len([d for d in docs if d.is_active])
     total_chunks = sum((d.chunks_count or 0) for d in docs if d.is_active)
     
-    # Checagem rápida de status do ChromaDB e Ollama
+    # Checagem de status do ChromaDB e Ollama
     chroma_ok = RAGEngine.get_collection() is not None
     ollama_info = AIHandler.get_available_models()
     
-    # Parâmetros atuais do bot
+    # Parâmetros de calibração dinâmica do RAG e Telemetria
+    rag_configs = RAGEngine.get_all_configs()
+    telemetry = RAGEngine.get_telemetry_metrics()
     ai_cfg = AIHandler.get_config()
 
     return render_template(
@@ -764,6 +765,8 @@ def knowledge():
         total_chunks=total_chunks,
         chroma_ok=chroma_ok,
         ollama_info=ollama_info,
+        rag_configs=rag_configs,
+        telemetry=telemetry,
         ai_cfg=ai_cfg
     )
 
@@ -993,6 +996,78 @@ def knowledge_test_search():
         'ai_error': ai_error,
         'model_used': cfg.get('ollama_model') if cfg['provider'] == 'ollama' else cfg['provider']
     })
+
+
+@bp.route('/knowledge/calibrate', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_calibrate():
+    """Salva os parâmetros operacionais e hiperparâmetros do RAG em tempo real."""
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    
+    allowed_keys = {
+        'rag_chunk_size': 'Tamanho máximo de cada chunk textual',
+        'rag_chunk_overlap': 'Sobreposição entre blocos adjacentes (overlap)',
+        'rag_split_strategy': 'Estratégia de divisão (paragraph, sentence, fixed)',
+        'rag_search_mode': 'Modo de busca (hybrid, dense, sparse)',
+        'rag_hybrid_alpha': 'Peso de fusão Alpha entre Dense e BM25',
+        'rag_top_k': 'Quantidade inicial de candidatos recuperados',
+        'rag_min_similarity': 'Limiar mínimo de proximidade para aceitar candidatos',
+        'rag_reranker_enabled': 'Ativação do Reranker de segunda camada',
+        'rag_top_n': 'Quantidade final de blocos enviados ao LLM',
+        'rag_rerank_min_score': 'Score de corte mínimo exigido pelo Reranker',
+        'whatsapp_bot_temperature': 'Temperatura do LLM para respostas do bot',
+        'whatsapp_bot_max_tokens': 'Tokens máximos na resposta do WhatsApp'
+    }
+
+    saved_keys = []
+    for k, desc in allowed_keys.items():
+        if k in data and data[k] is not None:
+            val = str(data[k]).strip()
+            Setting.set_val(k, val, desc)
+            saved_keys.append(k)
+
+    db.session.commit()
+    
+    if request.is_json:
+        return jsonify({
+            'ok': True,
+            'message': 'Parâmetros de calibração RAG salvos e aplicados com sucesso!',
+            'configs': RAGEngine.get_all_configs(),
+            'saved_keys': saved_keys
+        })
+
+    flash('⚙️ Parâmetros de calibração do RAG atualizados com sucesso!', 'success')
+    return redirect(url_for('admin.knowledge') + '?tab=tab-calibrate')
+
+
+@bp.route('/knowledge/calibrate/reset', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_calibrate_reset():
+    """Restaura todos os hiperparâmetros do RAG para os padrões industriais recomendados."""
+    for k, v in RAGEngine.DEFAULTS.items():
+        Setting.set_val(k, v)
+    db.session.commit()
+
+    if request.is_json:
+        return jsonify({
+            'ok': True,
+            'message': 'Padrões recomendados restaurados com sucesso!',
+            'configs': RAGEngine.get_all_configs()
+        })
+
+    flash('🔄 Configurações do RAG restauradas para os padrões recomendados!', 'info')
+    return redirect(url_for('admin.knowledge') + '?tab=tab-calibrate')
+
+
+@bp.route('/knowledge/telemetry', methods=['GET'])
+@login_required
+@admin_required
+def knowledge_telemetry():
+    """Retorna métricas ao vivo de telemetria do RAG em formato JSON."""
+    metrics = RAGEngine.get_telemetry_metrics()
+    return jsonify(metrics)
 
 
 # ══════════════════════════════════════════════════════════════════

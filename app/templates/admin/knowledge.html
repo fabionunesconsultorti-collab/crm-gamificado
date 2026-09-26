@@ -244,6 +244,12 @@
         <button type="button" class="nav-tab-btn" onclick="switchTab('tab-simulator', this)">
             <i class="fa-solid fa-flask text-warning"></i> 4. Simulador & Teste Semântico
         </button>
+        <button type="button" class="nav-tab-btn" onclick="switchTab('tab-calibrate', this)">
+            <i class="fa-solid fa-sliders text-info"></i> 5. Calibração RAG (Control Panel)
+        </button>
+        <button type="button" class="nav-tab-btn" onclick="switchTab('tab-telemetry', this)">
+            <i class="fa-solid fa-chart-line text-success"></i> 6. Métricas & Telemetria
+        </button>
     </div>
 
     <!-- ABA 1: FAQ RÁPIDO -->
@@ -418,6 +424,387 @@
         </div>
     </div>
 
+    <!-- ABA 5: CALIBRAÇÃO RAG (RAG CONTROL PANEL) -->
+    <div id="tab-calibrate" class="tab-content-panel mb-4">
+        <div class="card-glass" style="border-color: rgba(56, 189, 248, 0.35); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+            <div class="d-flex flex-wrap align-center justify-between gap-3 mb-4 pb-3 border-bottom" style="border-color: rgba(255, 255, 255, 0.08);">
+                <div>
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;">
+                            <i class="fa-solid fa-sliders"></i> RAG CONTROL PANEL
+                        </span>
+                        <span class="text-xs text-muted">Ajuste de Hiperparâmetros em Tempo Real</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-1">Painel de Calibração e Engenharia de RAG</h3>
+                    <p class="text-xs text-muted mb-0">Calibre o fatiamento, equilíbrio de busca híbrida, reranking e guardrails cognitivos sem necessidade de deploy ou restart.</p>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <button type="button" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="border-radius: 8px;" onclick="resetRAGCalibration()">
+                        <i class="fa-solid fa-rotate-left"></i> Restaurar Padrões
+                    </button>
+                    <button type="button" class="btn-gradient-blue text-xs p-2 px-3 d-inline-flex align-center gap-2" style="border-radius: 8px;" onclick="saveRAGCalibration()">
+                        <i class="fa-solid fa-floppy-disk"></i> Salvar Calibração
+                    </button>
+                </div>
+            </div>
+
+            <form id="form-rag-calibrate">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- 1. GERENCIAMENTO DE CHUNKING -->
+                    <div class="card-glass" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <div class="d-flex align-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-white m-0 d-flex align-center gap-2">
+                                <span style="color: #38bdf8;"><i class="fa-solid fa-puzzle-piece"></i></span>
+                                1. Gerenciamento de Chunking
+                            </h4>
+                            <span class="badge badge-info text-xs">Divisão de Texto</span>
+                        </div>
+                        <p class="text-xs text-muted mb-3" style="font-size: 0.76rem; line-height: 1.4;">
+                            Define a granularidade dos blocos indexados no banco vetorial. Blocos equilibrados evitam diluição de contexto e perda de sentido.
+                        </p>
+
+                        <!-- Chunk Size Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-between align-center mb-1">
+                                <label class="text-xs font-semibold text-gray-300 m-0">Tamanho do Bloco (Chunk Size):</label>
+                                <span id="disp_chunk_size" class="badge text-xs font-bold" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">
+                                    {{ rag_configs.rag_chunk_size }} caracteres
+                                </span>
+                            </div>
+                            <input type="range" name="rag_chunk_size" id="rag_chunk_size"
+                                   min="150" max="1500" step="50" value="{{ rag_configs.rag_chunk_size }}"
+                                   class="w-100" style="accent-color: #38bdf8;"
+                                   oninput="document.getElementById('disp_chunk_size').textContent = this.value + ' caracteres'">
+                            <div class="d-flex justify-between text-xs text-muted" style="font-size: 0.68rem;">
+                                <span>150 (Micro)</span>
+                                <span>450 (Recomendado)</span>
+                                <span>1500 (Amplo)</span>
+                            </div>
+                        </div>
+
+                        <!-- Chunk Overlap Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-between align-center mb-1">
+                                <label class="text-xs font-semibold text-gray-300 m-0">Sobreposição de Borda (Overlap):</label>
+                                <span id="disp_chunk_overlap" class="badge text-xs font-bold" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">
+                                    {{ rag_configs.rag_chunk_overlap }} caracteres
+                                </span>
+                            </div>
+                            <input type="range" name="rag_chunk_overlap" id="rag_chunk_overlap"
+                                   min="0" max="250" step="10" value="{{ rag_configs.rag_chunk_overlap }}"
+                                   class="w-100" style="accent-color: #c084fc;"
+                                   oninput="document.getElementById('disp_chunk_overlap').textContent = this.value + ' caracteres'">
+                            <div class="d-flex justify-between text-xs text-muted" style="font-size: 0.68rem;">
+                                <span>0 (Sem sobreposição)</span>
+                                <span>80 (Ideal ~18%)</span>
+                                <span>250 (Alto)</span>
+                            </div>
+                        </div>
+
+                        <!-- Estratégia de Divisão -->
+                        <div class="mb-1">
+                            <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Estratégia de Corte Primária:</label>
+                            <select name="rag_split_strategy" id="rag_split_strategy" class="input-glass w-100 text-xs">
+                                <option value="paragraph" {% if rag_configs.rag_split_strategy == 'paragraph' %}selected{% endif %}>Parágrafos (\n\n) - Mantém coesão textual</option>
+                                <option value="sentence" {% if rag_configs.rag_split_strategy == 'sentence' %}selected{% endif %}>Sentenças Completas (.) - Fatiamento por frases</option>
+                                <option value="fixed" {% if rag_configs.rag_split_strategy == 'fixed' %}selected{% endif %}>Janela Rígida (Tamanho Fixo) - Corte mecânico</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 2. RETRIEVAL & BUSCA HÍBRIDA -->
+                    <div class="card-glass" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <div class="d-flex align-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-white m-0 d-flex align-center gap-2">
+                                <span style="color: #10b981;"><i class="fa-solid fa-magnifying-glass-chart"></i></span>
+                                2. Retrieval & Busca Híbrida
+                            </h4>
+                            <span class="badge badge-success text-xs">Dense + BM25</span>
+                        </div>
+                        <p class="text-xs text-muted mb-3" style="font-size: 0.76rem; line-height: 1.4;">
+                            Harmoniza o entendimento semântico contextual (Dense) com a precisão de termos exatos e códigos comerciais (BM25).
+                        </p>
+
+                        <!-- Modo de Busca -->
+                        <div class="mb-3">
+                            <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Modo do Motor de Busca:</label>
+                            <select name="rag_search_mode" id="rag_search_mode" class="input-glass w-100 text-xs font-semibold" onchange="toggleAlphaVisibility()">
+                                <option value="hybrid" {% if rag_configs.rag_search_mode == 'hybrid' %}selected{% endif %}>🟢 Busca Híbrida (Dense Semântico + BM25 Lexical)</option>
+                                <option value="dense" {% if rag_configs.rag_search_mode == 'dense' %}selected{% endif %}>🔵 Apenas Semântica (Embeddings Cosseno)</option>
+                                <option value="sparse" {% if rag_configs.rag_search_mode == 'sparse' %}selected{% endif %}>🟡 Apenas Palavras-Chave (BM25 Puro)</option>
+                            </select>
+                        </div>
+
+                        <!-- Alpha Slider (Peso Híbrido) -->
+                        <div class="mb-3" id="box_hybrid_alpha">
+                            <div class="d-flex justify-between align-center mb-1">
+                                <label class="text-xs font-semibold text-gray-300 m-0">Equilíbrio Alpha (α):</label>
+                                <span id="disp_alpha" class="badge text-xs font-bold" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">
+                                    α = {{ rag_configs.rag_hybrid_alpha }}
+                                </span>
+                            </div>
+                            <input type="range" name="rag_hybrid_alpha" id="rag_hybrid_alpha"
+                                   min="0.0" max="1.0" step="0.05" value="{{ rag_configs.rag_hybrid_alpha }}"
+                                   class="w-100" style="accent-color: #10b981;"
+                                   oninput="updateAlphaLabel(this.value)">
+                            <div class="d-flex justify-between text-xs text-muted" style="font-size: 0.68rem;">
+                                <span>0.0 (BM25 Puro)</span>
+                                <span id="alpha_subtext" class="text-success font-semibold">70% Vetorial / 30% BM25</span>
+                                <span>1.0 (Vetorial Puro)</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 mb-1">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Top-K Inicial:</label>
+                                <select name="rag_top_k" id="rag_top_k" class="input-glass w-100 text-xs">
+                                    <option value="4" {% if rag_configs.rag_top_k == 4 %}selected{% endif %}>4 candidatos</option>
+                                    <option value="6" {% if rag_configs.rag_top_k == 6 %}selected{% endif %}>6 candidatos</option>
+                                    <option value="8" {% if rag_configs.rag_top_k == 8 %}selected{% endif %}>8 candidatos (Recomendado)</option>
+                                    <option value="12" {% if rag_configs.rag_top_k == 12 %}selected{% endif %}>12 candidatos</option>
+                                    <option value="16" {% if rag_configs.rag_top_k == 16 %}selected{% endif %}>16 candidatos (Amplo)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Similaridade Mínima:</label>
+                                <select name="rag_min_similarity" id="rag_min_similarity" class="input-glass w-100 text-xs">
+                                    <option value="0.35" {% if rag_configs.rag_min_similarity == 0.35 %}selected{% endif %}>0.35 (Mais tolerante)</option>
+                                    <option value="0.45" {% if rag_configs.rag_min_similarity == 0.45 %}selected{% endif %}>0.45 (Ideal comercial)</option>
+                                    <option value="0.55" {% if rag_configs.rag_min_similarity == 0.55 %}selected{% endif %}>0.55 (Rigoroso)</option>
+                                    <option value="0.65" {% if rag_configs.rag_min_similarity == 0.65 %}selected{% endif %}>0.65 (Ultra estrito)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. RERANKING (RECLASSIFICAÇÃO) -->
+                    <div class="card-glass" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <div class="d-flex align-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-white m-0 d-flex align-center gap-2">
+                                <span style="color: #fbbf24;"><i class="fa-solid fa-arrows-down-to-line"></i></span>
+                                3. Reranking (Cross-Encoder)
+                            </h4>
+                            <span class="badge text-xs" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24;">Segunda Camada</span>
+                        </div>
+                        <p class="text-xs text-muted mb-3" style="font-size: 0.76rem; line-height: 1.4;">
+                            Reavalia a lista inicial do Top-K, eliminando blocos irrelevantes antes do envio ao modelo, reduzindo o consumo de tokens e a latência.
+                        </p>
+
+                        <!-- Toggle Ativação Reranker -->
+                        <div class="mb-3">
+                            <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Status do Reranker:</label>
+                            <select name="rag_reranker_enabled" id="rag_reranker_enabled" class="input-glass w-100 text-xs font-semibold">
+                                <option value="true" {% if rag_configs.rag_reranker_enabled %}selected{% endif %}>🟢 Ativado (Reclassificar e refinar contexto)</option>
+                                <option value="false" {% if not rag_configs.rag_reranker_enabled %}selected{% endif %}>⚪ Desativado (Passar Top-K direto ao modelo)</option>
+                            </select>
+                        </div>
+
+                        <!-- Top-N Final e Corte de Rerank -->
+                        <div class="grid grid-cols-2 gap-2 mb-1">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Top-N Final (para o LLM):</label>
+                                <select name="rag_top_n" id="rag_top_n" class="input-glass w-100 text-xs">
+                                    <option value="1" {% if rag_configs.rag_top_n == 1 %}selected{% endif %}>1 chunk (Ultra cirúrgico)</option>
+                                    <option value="2" {% if rag_configs.rag_top_n == 2 %}selected{% endif %}>2 chunks (Econômico)</option>
+                                    <option value="3" {% if rag_configs.rag_top_n == 3 %}selected{% endif %}>3 chunks (Recomendado)</option>
+                                    <option value="4" {% if rag_configs.rag_top_n == 4 %}selected{% endif %}>4 chunks (Mais contexto)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Corte Mínimo Reranker:</label>
+                                <select name="rag_rerank_min_score" id="rag_rerank_min_score" class="input-glass w-100 text-xs">
+                                    <option value="0.45" {% if rag_configs.rag_rerank_min_score == 0.45 %}selected{% endif %}>0.45 (Tolerante)</option>
+                                    <option value="0.55" {% if rag_configs.rag_rerank_min_score == 0.55 %}selected{% endif %}>0.55 (Recomendado)</option>
+                                    <option value="0.65" {% if rag_configs.rag_rerank_min_score == 0.65 %}selected{% endif %}>0.65 (Estrito)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. COMPORTAMENTO DO LLM & GUARDRAILS -->
+                    <div class="card-glass" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <div class="d-flex align-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-white m-0 d-flex align-center gap-2">
+                                <span style="color: #f87171;"><i class="fa-solid fa-shield-halved"></i></span>
+                                4. Hiperparâmetros do LLM & Guardrails
+                            </h4>
+                            <span class="badge text-xs" style="background: rgba(248, 113, 113, 0.2); color: #f87171;">Inferência</span>
+                        </div>
+                        <p class="text-xs text-muted mb-3" style="font-size: 0.76rem; line-height: 1.4;">
+                            Regula a previsibilidade da resposta no WhatsApp, travando alucinações e limitando o tamanho da mensagem para leitura móvel.
+                        </p>
+
+                        <!-- Temperatura Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-between align-center mb-1">
+                                <label class="text-xs font-semibold text-gray-300 m-0">Temperatura / Precisão:</label>
+                                <span id="disp_bot_temp" class="badge text-xs font-bold" style="background: rgba(248, 113, 113, 0.2); color: #f87171;">
+                                    {{ rag_configs.whatsapp_bot_temperature }}
+                                </span>
+                            </div>
+                            <input type="range" name="whatsapp_bot_temperature" id="whatsapp_bot_temperature"
+                                   min="0.05" max="0.75" step="0.05" value="{{ rag_configs.whatsapp_bot_temperature }}"
+                                   class="w-100" style="accent-color: #f87171;"
+                                   oninput="document.getElementById('disp_bot_temp').textContent = this.value">
+                            <div class="d-flex justify-between text-xs text-muted" style="font-size: 0.68rem;">
+                                <span>0.05 (Factual puro)</span>
+                                <span>0.25 (Ideal Atendimento)</span>
+                                <span>0.75 (Criativo)</span>
+                            </div>
+                        </div>
+
+                        <!-- Max Tokens Select -->
+                        <div class="mb-1">
+                            <label class="text-xs font-semibold text-gray-300 mb-1 d-block">Tamanho Máximo de Resposta (Max Tokens):</label>
+                            <select name="whatsapp_bot_max_tokens" id="whatsapp_bot_max_tokens" class="input-glass w-100 text-xs">
+                                <option value="140" {% if rag_configs.whatsapp_bot_max_tokens == 140 %}selected{% endif %}>~140 tokens (Ultra conciso / 1 frase direta)</option>
+                                <option value="200" {% if rag_configs.whatsapp_bot_max_tokens == 200 %}selected{% endif %}>~200 tokens (Ideal WhatsApp / 2 a 3 frases)</option>
+                                <option value="280" {% if rag_configs.whatsapp_bot_max_tokens == 280 %}selected{% endif %}>~280 tokens (Médio explicativo)</option>
+                                <option value="400" {% if rag_configs.whatsapp_bot_max_tokens == 400 %}selected{% endif %}>~400 tokens (Detalhado amplo)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-center justify-between mt-4 pt-3 border-top" style="border-color: rgba(255, 255, 255, 0.08);">
+                    <div class="text-xs text-muted">
+                        <i class="fa-solid fa-bolt text-warning me-1"></i> As alterações entram em vigor imediatamente na próxima mensagem recebida.
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <span id="calib-feedback" class="text-xs font-semibold text-success" style="display: none;"></span>
+                        <button type="button" class="btn-gradient-blue text-sm py-2 px-4" onclick="saveRAGCalibration()">
+                            <i class="fa-solid fa-check"></i> Salvar Calibração
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ABA 6: MÉTRICAS & TELEMETRIA EM TEMPO REAL -->
+    <div id="tab-telemetry" class="tab-content-panel mb-4">
+        <div class="card-glass" style="border-color: rgba(16, 185, 129, 0.35);">
+            <div class="d-flex flex-wrap align-center justify-between gap-3 mb-4 pb-3 border-bottom" style="border-color: rgba(255, 255, 255, 0.08);">
+                <div>
+                    <div class="d-flex align-center gap-2 mb-1">
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 700;">
+                            <i class="fa-solid fa-chart-line"></i> TELEMETRIA OPERACIONAL
+                        </span>
+                        <span class="text-xs text-muted">Tríade de Avaliação de RAG em Produção</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-1">Métricas de Performance e Qualidade do RAG</h3>
+                    <p class="text-xs text-muted mb-0">Monitore latência de busca, relevância do contexto recuperado e taxa de acerto/fallback em tempo real.</p>
+                </div>
+                <div>
+                    <button type="button" class="btn-secondary text-xs p-2 px-3 d-inline-flex align-center gap-2" style="border-radius: 8px;" onclick="refreshTelemetry()">
+                        <i class="fa-solid fa-arrows-rotate"></i> Atualizar Métricas
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4 KPI Cards da Telemetria -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                <div class="k-stat-card">
+                    <div class="k-stat-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                        <i class="fa-solid fa-stopwatch"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-muted">Latência Média</div>
+                        <div class="text-2xl font-bold text-white" id="tel-latency">{{ telemetry.avg_latency_ms }} ms</div>
+                        <div class="text-xs text-muted">Embedding + ChromaDB</div>
+                    </div>
+                </div>
+
+                <div class="k-stat-card">
+                    <div class="k-stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-muted">Taxa de Acerto (Hit Rate)</div>
+                        <div class="text-2xl font-bold text-white" id="tel-hitrate">{{ telemetry.hit_rate_pct }}%</div>
+                        <div class="text-xs text-muted">Respostas com contexto oficial</div>
+                    </div>
+                </div>
+
+                <div class="k-stat-card">
+                    <div class="k-stat-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                        <i class="fa-solid fa-shield-check"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-muted">Ancoragem / Relevância</div>
+                        <div class="text-2xl font-bold text-white" id="tel-relevance">{{ telemetry.avg_relevance_pct }}%</div>
+                        <div class="text-xs text-muted">Score médio dos Top Chunks</div>
+                    </div>
+                </div>
+
+                <div class="k-stat-card">
+                    <div class="k-stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-muted">Consultas Auditadas</div>
+                        <div class="text-2xl font-bold text-white" id="tel-total">{{ telemetry.total_queries }}</div>
+                        <div class="text-xs text-muted">Buffer circular ativo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Auditoria das Últimas Consultas -->
+            <div class="card-glass" style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.06);">
+                <div class="d-flex align-center justify-between mb-3">
+                    <h4 class="text-sm font-bold text-white m-0 d-flex align-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-muted"></i>
+                        Registro das Últimas Consultas RAG
+                    </h4>
+                    <span class="text-xs text-muted">Histórico recente</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table-glass w-100 text-xs">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Hora</th>
+                                <th>Consulta / Pergunta do Lead</th>
+                                <th style="width: 100px;">Candidatos</th>
+                                <th style="width: 100px;">Retornados</th>
+                                <th style="width: 100px;">Top Score</th>
+                                <th style="width: 100px;">Latência</th>
+                                <th style="width: 90px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tel-history-tbody">
+                            {% if telemetry.history %}
+                                {% for item in telemetry.history %}
+                                <tr>
+                                    <td class="text-muted">{{ item.timestamp }}</td>
+                                    <td class="font-semibold text-white">{{ item.query }}</td>
+                                    <td>{{ item.candidates }}</td>
+                                    <td><span class="badge badge-info">{{ item.returned }}</span></td>
+                                    <td><span class="text-success font-bold">{{ (item.top_score * 100)|int }}%</span></td>
+                                    <td class="text-muted">{{ item.latency_ms }} ms</td>
+                                    <td>
+                                        {% if item.status == 'hit' %}
+                                            <span class="badge badge-success">Hit</span>
+                                        {% else %}
+                                            <span class="badge badge-warning">Fallback</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        Nenhuma consulta registrada recentemente. Envie mensagens no WhatsApp ou use o simulador para gerar telemetria.
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- LISTA DE DOCUMENTOS CADASTRADOS -->
     <div class="card-glass">
         <div class="d-flex flex-wrap align-center justify-between gap-3 mb-3">
@@ -512,8 +899,139 @@ function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
     
-    document.getElementById(tabId).classList.add('active');
-    btn.classList.add('active');
+    const target = document.getElementById(tabId);
+    if (target) {
+        target.classList.add('active');
+    }
+    if (btn) {
+        btn.classList.add('active');
+    } else {
+        const foundBtn = document.querySelector(`.nav-tab-btn[onclick*="${tabId}"]`);
+        if (foundBtn) foundBtn.classList.add('active');
+    }
+
+    // Atualiza a URL sem recarregar
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabId);
+    window.history.replaceState({}, '', url);
+}
+
+// Inicializa a aba ativa correta baseada no query param ?tab=
+document.addEventListener("DOMContentLoaded", function() {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && document.getElementById(tabParam)) {
+        switchTab(tabParam);
+    }
+    toggleAlphaVisibility();
+});
+
+function updateAlphaLabel(val) {
+    const num = parseFloat(val);
+    document.getElementById('disp_alpha').textContent = `α = ${num.toFixed(2)}`;
+    const pctDense = Math.round(num * 100);
+    const pctBM25 = 100 - pctDense;
+    document.getElementById('alpha_subtext').textContent = `${pctDense}% Vetorial / ${pctBM25}% BM25`;
+}
+
+function toggleAlphaVisibility() {
+    const mode = document.getElementById('rag_search_mode').value;
+    const box = document.getElementById('box_hybrid_alpha');
+    if (box) {
+        if (mode === 'hybrid') {
+            box.style.opacity = '1';
+            box.style.pointerEvents = 'auto';
+        } else {
+            box.style.opacity = '0.4';
+            box.style.pointerEvents = 'none';
+        }
+    }
+}
+
+async function saveRAGCalibration() {
+    const form = document.getElementById('form-rag-calibrate');
+    const formData = new FormData(form);
+    const payload = {};
+    formData.forEach((val, key) => { payload[key] = val; });
+
+    const feedback = document.getElementById('calib-feedback');
+    feedback.style.display = 'inline';
+    feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando calibração...';
+    feedback.className = 'text-xs font-semibold text-info';
+
+    try {
+        const resp = await fetch("{{ url_for('admin.knowledge_calibrate') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const res = await resp.json();
+
+        if (res.ok) {
+            feedback.innerHTML = '<i class="fa-solid fa-check"></i> Calibração salva com sucesso e ativa!';
+            feedback.className = 'text-xs font-semibold text-success';
+            setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+        } else {
+            feedback.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Erro ao salvar calibração.';
+            feedback.className = 'text-xs font-semibold text-danger';
+        }
+    } catch (err) {
+        feedback.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Falha de rede: ' + err;
+        feedback.className = 'text-xs font-semibold text-danger';
+    }
+}
+
+async function resetRAGCalibration() {
+    if (!confirm('Deseja restaurar todos os parâmetros do RAG para as recomendações industriais de fábrica?')) {
+        return;
+    }
+
+    try {
+        const resp = await fetch("{{ url_for('admin.knowledge_calibrate_reset') }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        });
+        const res = await resp.json();
+        if (res.ok) {
+            alert('Configurações do RAG restauradas com sucesso! Recarregando...');
+            window.location.search = '?tab=tab-calibrate';
+        }
+    } catch (e) {
+        alert('Erro ao restaurar: ' + e);
+    }
+}
+
+async function refreshTelemetry() {
+    try {
+        const resp = await fetch("{{ url_for('admin.knowledge_telemetry') }}");
+        const data = await resp.json();
+
+        document.getElementById('tel-latency').textContent = `${data.avg_latency_ms} ms`;
+        document.getElementById('tel-hitrate').textContent = `${data.hit_rate_pct}%`;
+        document.getElementById('tel-relevance').textContent = `${data.avg_relevance_pct}%`;
+        document.getElementById('tel-total').textContent = data.total_queries;
+
+        const tbody = document.getElementById('tel-history-tbody');
+        if (data.history && data.history.length > 0) {
+            tbody.innerHTML = data.history.map(item => `
+                <tr>
+                    <td class="text-muted">${item.timestamp}</td>
+                    <td class="font-semibold text-white">${item.query}</td>
+                    <td>${item.candidates}</td>
+                    <td><span class="badge badge-info">${item.returned}</span></td>
+                    <td><span class="text-success font-bold">${Math.round(item.top_score * 100)}%</span></td>
+                    <td class="text-muted">${item.latency_ms} ms</td>
+                    <td>
+                        <span class="badge ${item.status === 'hit' ? 'badge-success' : 'badge-warning'}">
+                            ${item.status === 'hit' ? 'Hit' : 'Fallback'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        console.error("Erro ao carregar telemetria:", e);
+    }
 }
 
 async function runSimulation() {
@@ -558,18 +1076,35 @@ async function runSimulation() {
                 data.snippets.forEach(s => {
                     const box = document.createElement('div');
                     box.className = 'snippet-box';
+                    const hybridScore = Math.round((s.score || 0) * 100);
+                    const denseScore = s.dense_score !== undefined ? Math.round(s.dense_score * 100) : null;
+                    const bm25Score = s.bm25_score !== undefined ? Math.round(s.bm25_score * 100) : null;
+                    const rerankScore = s.rerank_score !== undefined ? Math.round(s.rerank_score * 100) : null;
+
+                    let scoresHtml = `<span class="badge badge-info" style="font-size: 0.65rem;">Score: ${hybridScore}%</span>`;
+                    if (denseScore !== null || bm25Score !== null) {
+                        scoresHtml += `
+                            <span class="text-xs text-muted ms-1" style="font-size: 0.62rem;">
+                                (Dense: ${denseScore !== null ? denseScore + '%' : '-'} | BM25: ${bm25Score !== null ? bm25Score + '%' : '-'} ${rerankScore ? '| Rerank: ' + rerankScore + '%' : ''})
+                            </span>
+                        `;
+                    }
+
                     box.innerHTML = `
-                        <div class="d-flex justify-between align-center mb-1">
+                        <div class="d-flex justify-between align-center mb-1 flex-wrap gap-1">
                             <strong class="text-white text-xs">${s.title}</strong>
-                            <span class="badge badge-info" style="font-size: 0.65rem;">Relevância: ${(s.score * 100).toFixed(0)}%</span>
+                            <div>${scoresHtml}</div>
                         </div>
-                        <div class="text-xs text-muted" style="white-space: pre-wrap;">${s.text}</div>
+                        <div class="text-xs text-muted" style="white-space: pre-wrap; font-size: 0.78rem;">${s.text}</div>
                     `;
                     snippetsContainer.appendChild(box);
                 });
             } else {
                 snippetsContainer.innerHTML = '<div class="text-xs text-muted p-3 text-center">Nenhum trecho com similaridade suficiente foi encontrado no ChromaDB para esta pergunta. O bot usará seu conhecimento geral ou fallback.</div>';
             }
+
+            // Atualiza telemetria automaticamente após o teste
+            refreshTelemetry();
         } else {
             alert(data.error || 'Erro ao processar simulação.');
         }

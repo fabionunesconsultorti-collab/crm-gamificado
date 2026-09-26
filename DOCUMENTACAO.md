@@ -1074,7 +1074,111 @@ O procedimento pode ser acionado em 1 clique em dois locais estratégicos:
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global e Procedimento Automatizado de Recuperação e Reinício de Captura WhatsApp (WAHA).*
+## 26. Painel Avançado de Calibração e Treinamento RAG (Control Panel & Hybrid Engine)
+
+### 26.1 Arquitetura e Objetivo
+Para permitir que equipes de engenharia, produto e operações calibrem e aprimorem o comportamento do assistente virtual WhatsApp em tempo real sem necessidade de alterações no código-fonte ou redeploys, foi desenvolvida a suíte avançada de **RAG Control Panel** e o novo motor híbrido em `app/utils/rag_engine.py` e `/admin/knowledge`.
+
+O pipeline opera em três camadas coordenadas:
+1. **Recuperação Densa (Dense Vector):** Embeddings semânticos gerados localmente via Ollama com o modelo `nomic-embed-text` (dimensão 768) indexados e consultados com similaridade cosseno no ChromaDB.
+2. **Recuperação Léxica (BM25 com Stopwords):** Algoritmo Okapi BM25 implementado com remoção de stopwords em língua portuguesa para casamento exato de códigos, termos técnicos e valores monetários.
+3. **Fusão Híbrida com Peso Alpha ($0.0 \le \alpha \le 1.0$):**
+   $$\text{Score}_{\text{Híbrido}} = \alpha \times \text{Score}_{\text{Dense}} + (1 - \alpha) \times \text{Score}_{\text{BM25}}$$
+4. **Segunda Camada (Reranker & Cutoff):** Reclassificação dos melhores candidatos recuperados e filtragem por limiar mínimo de confiança antes da injeção no prompt de contexto do LLM.
+
+```
+[ Usuário WhatsApp ] ──> [ Query ] 
+                             │
+            ┌────────────────┴────────────────┐
+            ▼                                 ▼
+   [ Embeddings Ollama ]             [ Tokenizador BM25 ]
+   (nomic-embed-text)               (Stopwords em PT-BR)
+            │                                 │
+            ▼                                 ▼
+   [ Busca ChromaDB ]                 [ Match Léxico ]
+      (Top-K Inicial)                 (Frequência Termo)
+            │                                 │
+            └────────────────┬────────────────┘
+                             ▼
+                [ Fusão Híbrida com Alpha ]
+                             │
+                             ▼
+              [ Reranking & Threshold Cutoff ]
+                             │
+                             ▼
+            [ Injeção de Contexto no LLM ]
+              (Llama 3.2 com Guardrails)
+```
+
+---
+
+### 26.2 Parâmetros Calibráveis no Painel (`/admin/knowledge`)
+
+Os parâmetros são persistidos na tabela `Setting` e aplicados instantaneamente (*hot-reload*) no motor RAG:
+
+| Categoria | Parâmetro | Padrão | Intervalo / Opções | Descrição & Efeito no Bot |
+| :--- | :--- | :---: | :---: | :--- |
+| **Chunking** | `rag_chunk_size` | `450` | `200` a `1500` chars | Tamanho de cada bloco de texto. Blocos menores aumentam a precisão tópica; blocos maiores preservam o contexto. |
+| **Chunking** | `rag_chunk_overlap` | `60` | `0` a `300` chars | Sobreposição entre blocos adjacentes para evitar quebra semântica de frases ou tabelas. |
+| **Chunking** | `rag_split_strategy` | `paragraph` | `paragraph`, `sentence`, `fixed` | Estratégia de corte: por parágrafo (`\n\n`), por pontuação de sentenças ou tamanho estrito. |
+| **Recuperação** | `rag_search_mode` | `hybrid` | `hybrid`, `dense`, `sparse` | Modo do buscador: Híbrido (Vetorial + BM25), Somente Vetorial ou Somente BM25. |
+| **Recuperação** | `rag_hybrid_alpha` | `0.70` | `0.00` a `1.00` | Peso da busca: `1.0` é 100% semântico e `0.0` é 100% léxico. O valor `0.70` equilibra significado e termos literais. |
+| **Recuperação** | `rag_top_k` | `6` | `1` a `20` | Quantidade inicial de fragmentos recuperados para a fase de reclassificação. |
+| **Reranking** | `rag_reranker_enabled` | `true` | `true` / `false` | Ativa a segunda camada de pontuação combinada e filtragem de ruído. |
+| **Reranking** | `rag_top_n` | `3` | `1` a `10` | Quantidade final de trechos repassados na memória de contexto do LLM. |
+| **Reranking** | `rag_rerank_min_score` | `0.40` | `0.00` a `1.00` | Nota mínima exigida. Fragmentos abaixo do corte são descartados para evitar alucinações. |
+| **LLM & Geração** | `whatsapp_bot_temperature` | `0.30` | `0.00` a `1.50` | Criatividade da resposta. Valores baixos (0.2–0.4) garantem respostas factuais e consistentes com a base. |
+| **LLM & Geração** | `rag_llm_max_tokens` | `400` | `100` a `1500` | Limite máximo de tokens gerados por resposta no WhatsApp. |
+| **Segurança** | `rag_guardrails_enabled` | `true` | `true` / `false` | Habilita verificação prévia de termos proibidos na pergunta ou na resposta. |
+| **Segurança** | `rag_guardrail_blacklist` | *Termos* | Lista separada por vírgula | Palavras ou temas bloqueados (ex: insultos, prompts de jailbreak, concorrência). |
+| **Segurança** | `rag_fallback_msg` | *Mensagem padrão* | Texto livre | Resposta amigável quando nenhum documento relevante for localizado na base. |
+
+---
+
+### 26.3 Endpoints da API de Calibração e Telemetria
+
+1. **`POST /admin/knowledge/calibrate`**
+   - **Autorização:** Usuário logado com perfil de Administrador.
+   - **Payload JSON:** Dicionário com chaves e valores a serem atualizados.
+   - **Resposta:**
+     ```json
+     {
+       "ok": true,
+       "message": "Parâmetros do RAG atualizados com sucesso!",
+       "configs": { ... }
+     }
+     ```
+
+2. **`POST /admin/knowledge/calibrate/reset`**
+   - Restaura instantaneamente todos os parâmetros de calibração para os valores padrões recomendados pela engenharia de IA.
+
+3. **`GET /admin/knowledge/telemetry`**
+   - Retorna métricas de performance da esteira RAG baseadas no histórico recente em memória (buffer circular com últimos 200 eventos):
+     - `total_queries`: Volume de buscas realizadas.
+     - `avg_latency_ms`: Tempo médio de resposta do pipeline RAG em milissegundos.
+     - `hit_rate_pct`: Porcentagem de consultas que obtiveram documentos acima do score mínimo.
+     - `avg_score`: Média dos scores retornados.
+     - `recent_queries`: Lista das últimas consultas executadas contendo query, timestamp, latência e melhor score obtido.
+
+---
+
+### 26.4 Interface do Painel (`/admin/knowledge`)
+
+A interface da Base de Conhecimento foi expandida com duas novas abas dedicadas:
+- **Aba 5 - Calibração RAG / Control Panel:**
+  - Controles deslizantes reativos (sliders) com atualização dinâmica de valores numéricos em tempo real.
+  - Seletores ergonômicos para Estratégia de Fatiamento e Modo de Busca.
+  - Alertas didáticos explicando o impacto operacional de cada ajuste.
+  - Botão de ação rápida **"Salvar Calibração"** e **"Restaurar Padrões Recomendados"**.
+  - Simulador integrado exibindo a decomposição visual de pontuação: **Score Híbrido**, **Dense**, **BM25** e **Rerank**.
+- **Aba 6 - Métricas & Telemetria em Tempo Real:**
+  - 4 KPI cards translúcidos: *Consultas Executadas*, *Latência Média (ms)*, *Taxa de Resolução (Hit Rate)* e *Score Médio*.
+  - Tabela de auditoria em tempo real das últimas buscas realizadas pelo bot.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global, Procedimento de Recuperação WAHA e Painel Avançado de Calibração e Treinamento RAG.*
+
 
 
 
