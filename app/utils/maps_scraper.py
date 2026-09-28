@@ -200,7 +200,16 @@ class MapsScraperClient:
 
         # Extração de campos essenciais com higienização de codificação UTF-8
         name = sanitize_encoding(clean.get("title") or clean.get("name") or clean.get("business_name") or "")
-        phone = clean.get("phone") or clean.get("phone_number") or clean.get("telephone") or ""
+        
+        # Suporta múltiplos formatos e listas de telefones retornados pelo scraper
+        raw_phone = clean.get("phone") or clean.get("phone_number") or clean.get("telephone")
+        if not raw_phone and clean.get("phones"):
+            phones_val = clean.get("phones")
+            if isinstance(phones_val, list) and phones_val:
+                raw_phone = " / ".join(str(p) for p in phones_val if p)
+            elif isinstance(phones_val, str):
+                raw_phone = phones_val
+        phone = str(raw_phone or "")
         email = clean.get("email") or clean.get("emails") or ""
         website = clean.get("website") or clean.get("web_site") or clean.get("domain") or ""
         address = sanitize_encoding(clean.get("address") or clean.get("full_address") or clean.get("street") or "")

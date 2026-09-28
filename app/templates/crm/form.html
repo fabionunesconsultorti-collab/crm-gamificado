@@ -82,8 +82,8 @@
     <span class="badge badge-primary">NOVO REGISTRO</span>
     {% endif %}
 
-    {% if client and client.phone %}
-    <a href="https://wa.me/55{{ client.phone | replace('(', '') | replace(')', '') | replace('-', '') | replace(' ', '') }}" 
+    {% if client and client.whatsapp_url %}
+    <a href="{{ client.whatsapp_url }}" 
        target="_blank" rel="noopener noreferrer" class="btn-primary btn-outline btn-sm" style="color:#25d366; border-color: rgba(37, 211, 102, 0.4);">
         <i class="fa-brands fa-whatsapp"></i> WhatsApp
     </a>

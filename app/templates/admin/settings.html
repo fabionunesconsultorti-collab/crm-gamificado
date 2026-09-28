@@ -2468,13 +2468,29 @@
                             <span class="bot-icon-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
                                 <i class="fa-solid fa-download"></i>
                             </span>
-                            1. Criar Cópia de Segurança Imediata (Backup Manual)
+                            1. Criar Cópia de Segurança Completa (Full System & AI Backup)
                         </h4>
                         <span class="badge bg-success text-xs px-2 py-1">1-Clique</span>
                     </div>
                     <p class="bot-card-subtitle">
-                        Gera um pacote completo e compactado com todas as 10 tabelas do sistema (Clientes, Mensagens, Usuários, etc). O arquivo é salvo localmente na pasta segura do servidor.
+                        Gera um pacote consolidado e protegido abrangendo: <strong>11 tabelas do banco de dados</strong>, <strong>Base de Conhecimento RAG (documentos + índice vetorial ChromaDB com todos os embeddings)</strong>, <strong>arquivos de mídia/branding (uploads/logo)</strong> e <strong>configurações do sistema (.env e parâmetros de IA)</strong>.
                     </p>
+
+                    <!-- Pilares do Backup -->
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge text-xs px-2 py-1" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3);">
+                            <i class="fa-solid fa-database me-1"></i> Banco de Dados (11 tabelas)
+                        </span>
+                        <span class="badge text-xs px-2 py-1" style="background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">
+                            <i class="fa-solid fa-brain me-1"></i> RAG & Vetores (ChromaDB)
+                        </span>
+                        <span class="badge text-xs px-2 py-1" style="background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3);">
+                            <i class="fa-solid fa-image me-1"></i> Mídias & Logos (Uploads)
+                        </span>
+                        <span class="badge text-xs px-2 py-1" style="background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">
+                            <i class="fa-solid fa-sliders me-1"></i> Configurações & .env
+                        </span>
+                    </div>
 
                     <form action="{{ url_for('admin.backup_create') }}" method="post" class="d-flex flex-col gap-3">
                         <div class="d-flex align-center gap-2 p-2 px-3 rounded-md" style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
@@ -2486,7 +2502,7 @@
                         </div>
 
                         <button type="submit" class="btn-save-bot w-100 justify-center text-center" style="justify-content: center;">
-                            <i class="fa-solid fa-cloud-arrow-down"></i> Gerar e Salvar Backup Completo Agora
+                            <i class="fa-solid fa-shield-halved"></i> Gerar e Salvar Backup Completo Agora
                         </button>
                     </form>
                 </div>
@@ -2498,16 +2514,16 @@
                             <span class="bot-icon-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
                                 <i class="fa-solid fa-rotate-left"></i>
                             </span>
-                            2. Restaurar Base de Dados a Partir de Arquivo
+                            2. Restaurar Sistema e Dados a Partir de Arquivo
                         </h4>
                         <span class="badge bg-danger text-xs px-2 py-1">Atenção</span>
                     </div>
                     <p class="bot-card-subtitle">
-                        Faça upload de um arquivo de backup compactado (<code>.json.gz</code> ou <code>.json</code>) gerado pelo sistema para sincronizar e restabelecer os dados no PostgreSQL.
+                        Faça upload de um arquivo de backup compactado (<code>.json.gz</code> ou <code>.json</code>) gerado pelo sistema para sincronizar e restabelecer o banco de dados, a base vetorial do RAG, mídias e configurações.
                     </p>
 
                     <form action="{{ url_for('admin.backup_restore') }}" method="post" enctype="multipart/form-data" class="d-flex flex-col gap-3"
-                          onsubmit="return confirm('ATENÇÃO: A restauração atualizará os registros do banco de dados com base no arquivo de backup selecionado. Deseja prosseguir com a restauração?');">
+                          onsubmit="return confirm('ATENÇÃO: A restauração atualizará os registros do banco de dados e os índices da IA com base no arquivo de backup selecionado. Deseja prosseguir com a restauração?');">
                         <div class="form-group mb-0">
                             <label for="backup_file" class="text-xs font-semibold mb-1 d-block text-gray-300">
                                 Selecione o arquivo de backup (.json.gz ou .json):
@@ -2517,11 +2533,11 @@
 
                         <div class="p-2 px-3 rounded-md" style="background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.3); font-size: 0.74rem; color: #fca5a5;">
                             <i class="fa-solid fa-shield-virus me-1"></i>
-                            <strong>Proteção Atômica:</strong> A restauração é executada dentro de uma transação protegida. Caso qualquer dado seja inválido, o sistema executa rollback total automático.
+                            <strong>Proteção Atômica & Sincronização IA:</strong> A restauração do banco é executada dentro de uma transação protegida com rollback automático em caso de erro, e o motor RAGEngine recarrega automaticamente a base vetorial.
                         </div>
 
                         <button type="submit" class="btn-secondary text-xs text-danger p-2 px-4 d-inline-flex align-center justify-center gap-2" style="border-color: rgba(239, 68, 68, 0.4); border-radius: 8px; font-weight: 700;">
-                            <i class="fa-solid fa-upload"></i> Enviar Arquivo e Restaurar Base de Dados
+                            <i class="fa-solid fa-upload"></i> Enviar Arquivo e Restaurar Sistema
                         </button>
                     </form>
                 </div>
@@ -2545,7 +2561,7 @@
                         <table class="w-100 text-xs" style="border-collapse: collapse; min-width: 500px;">
                             <thead>
                                 <tr style="border-bottom: 1px solid var(--glass-border); color: var(--text-muted); text-align: left;">
-                                    <th class="p-2">Arquivo / Data</th>
+                                    <th class="p-2">Arquivo / Conteúdo</th>
                                     <th class="p-2">Tamanho</th>
                                     <th class="p-2 text-right">Ações</th>
                                 </tr>
@@ -2554,8 +2570,30 @@
                                 {% for b in backups %}
                                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
                                     <td class="p-2">
-                                        <div class="font-semibold text-white d-flex align-center gap-1">
+                                        <div class="font-semibold text-white d-flex align-center gap-1 mb-1">
                                             <i class="fa-solid fa-file-zipper text-primary"></i> {{ b.filename }}
+                                        </div>
+                                        <div class="d-flex flex-wrap align-center gap-1 mb-1">
+                                            {% if b.total_records is not none %}
+                                            <span class="badge bg-primary text-xs" style="font-size: 0.68rem; padding: 2px 6px;">
+                                                <i class="fa-solid fa-database"></i> {{ b.total_records }} reg
+                                            </span>
+                                            {% endif %}
+                                            {% if b.has_rag %}
+                                            <span class="badge text-xs" style="font-size: 0.68rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.25); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4);">
+                                                <i class="fa-solid fa-brain"></i> RAG ({{ b.rag_docs_count }} docs)
+                                            </span>
+                                            {% endif %}
+                                            {% if b.has_uploads %}
+                                            <span class="badge text-xs" style="font-size: 0.68rem; padding: 2px 6px; background: rgba(236, 72, 153, 0.25); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.4);">
+                                                <i class="fa-solid fa-image"></i> Mídia
+                                            </span>
+                                            {% endif %}
+                                            {% if b.version and b.version != 'Legado' %}
+                                            <span class="badge text-xs" style="font-size: 0.68rem; padding: 2px 6px; background: rgba(16, 185, 129, 0.2); color: #34d399;">
+                                                {{ b.version }}
+                                            </span>
+                                            {% endif %}
                                         </div>
                                         <span class="text-xs text-muted" style="font-size: 0.7rem;">Criado em: {{ b.created_at }}</span>
                                     </td>
@@ -2571,7 +2609,7 @@
 
                                             <!-- Restaurar a partir deste backup local -->
                                             <form action="{{ url_for('admin.backup_restore') }}" method="post" style="display:inline;"
-                                                  onsubmit="return confirm('Deseja realmente restaurar a base de dados a partir do arquivo {{ b.filename }}?');">
+                                                  onsubmit="return confirm('Deseja realmente restaurar o sistema e dados a partir do arquivo {{ b.filename }}?');">
                                                 <input type="hidden" name="local_filename" value="{{ b.filename }}">
                                                 <button type="submit" class="btn-secondary text-xs p-1 px-2 text-warning" title="Restaurar a partir deste arquivo" style="border-radius: 6px;">
                                                     <i class="fa-solid fa-clock-rotate-left"></i>

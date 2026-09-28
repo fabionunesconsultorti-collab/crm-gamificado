@@ -423,7 +423,11 @@ def message_client(id):
     client = Client.query.get_or_404(id)
     if request.method == 'POST':
         text = request.form.get('final_text')
-        phone = ''.join(filter(str.isdigit, str(client.phone)))
+        from app.utils.lead_enricher import LeadEnricher
+        wa_url = LeadEnricher.to_whatsapp_url(client.phone, text=text)
+        if not wa_url:
+            flash('⚠️ Telefone do cliente não possui um número de WhatsApp válido cadastrado.', 'warning')
+            return redirect(url_for('crm.list_clients'))
         
         # Log it
         log = MessageLog(
@@ -438,7 +442,6 @@ def message_client(id):
         award_xp(current_user, 2, f"Envio WA para {client.name}")
         db.session.commit()
 
-        wa_url = f"https://wa.me/55{phone}?text={urllib.parse.quote(text.encode('utf-8'))}"
         # We redirect to the WA url. The user browser will open WA app/web.
         return redirect(wa_url)
 
@@ -487,11 +490,16 @@ def import_batch():
     count = 0
     from app.utils.encoding import sanitize_encoding
 
+    from app.utils.lead_enricher import LeadEnricher
+
     for row in data:
         raw_name = sanitize_encoding(row.get('name'))
-        phone = ''.join(filter(str.isdigit, str(row.get('phone', ''))))
-        if raw_name and phone:
-            existing = Client.query.filter_by(phone=phone).first()
+        raw_phone = str(row.get('phone', '')).strip()
+        phone_formatted = LeadEnricher.format_phone_display(raw_phone) if raw_phone else ''
+        phone_to_save = phone_formatted or LeadEnricher.clean_digits(raw_phone)
+
+        if raw_name and phone_to_save:
+            existing = LeadEnricher.find_client_by_phone(phone_to_save)
             if not existing:
                 segment_val = sanitize_encoding((row.get('segment') or row.get('category') or '').strip()) or None
                 website_val = (row.get('website') or '').strip() or None
@@ -502,7 +510,7 @@ def import_batch():
 
                 db.session.add(Client(
                     name=raw_name,
-                    phone=phone,
+                    phone=phone_to_save,
                     email=row.get('email') or None,
                     cpf=row.get('cpf') or None,
                     address=address_val,

@@ -3,27 +3,26 @@ import json
 from app import create_app, db
 from app.models import User, Setting, KnowledgeDoc
 from app.utils.rag_engine import RAGEngine
+from config import TestConfig
 
 class TestRAGAdvanced(unittest.TestCase):
     def setUp(self):
-        self.app = create_app()
-        self.app.config['TESTING'] = True
-        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        self.app.config['WTF_CSRF_ENABLED'] = False
+        self.app = create_app(TestConfig)
+        self.app_context = self.app.app_context()
+        self.app_context.push()
         self.client = self.app.test_client()
 
-        with self.app.app_context():
-            db.create_all()
-            # Cria admin de teste
-            self.admin = User(username='admin_rag', email='admin_rag@crm.com', role='admin')
-            self.admin.set_password('senha123')
-            db.session.add(self.admin)
-            db.session.commit()
+        db.create_all()
+        # Cria admin de teste
+        self.admin = User(username='admin_rag', email='admin_rag@crm.com', role='admin')
+        self.admin.set_password('senha123')
+        db.session.add(self.admin)
+        db.session.commit()
 
     def tearDown(self):
-        with self.app.app_context():
-            db.session.remove()
-            db.drop_all()
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
 
     def test_bm25_scoring(self):
         """Testa o cálculo léxico de BM25 em queries exatas."""

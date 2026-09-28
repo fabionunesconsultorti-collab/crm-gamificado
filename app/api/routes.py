@@ -55,10 +55,16 @@ def whatsapp_webhook():
         if is_from_me:
             return jsonify({"status": "ignored", "reason": "sent_by_me"}), 200
 
-        from_raw = payload.get('from', '')
-        if '@g.us' in from_raw or payload.get('participant') or payload.get('isGroup', False):
+        from_raw = str(payload.get('from', '')).strip()
+        # Filtro de canais e newsletters do WhatsApp
+        if '@newsletter' in from_raw or 'newsletter' in str(payload.get('from', '')).lower():
+            return jsonify({"status": "ignored", "reason": "newsletter"}), 200
+
+        # Filtro de grupos (IDs @g.us ou prefixo numérico universal 120363...)
+        if '@g.us' in from_raw or from_raw.startswith('120363') or payload.get('participant') or payload.get('isGroup', False):
             return jsonify({"status": "ignored", "reason": "group_message"}), 200
 
+        # Filtro de status e broadcasts
         if '@broadcast' in from_raw or from_raw == 'status@broadcast':
             return jsonify({"status": "ignored", "reason": "broadcast"}), 200
 

@@ -211,21 +211,57 @@ class AIHandler:
 
         prompt_sections = [base_prompt]
 
-        # 1. Recuperação Semântica via RAG
+        # 1. Recuperação Semântica via RAG com Expansão de Consulta do Lead (Query Augmentation)
         rag_context = ""
         rag_snippets_count = 0
         if include_rag and cfg['rag_enabled']:
             try:
                 from app.utils.rag_engine import RAGEngine
-                rag_context = RAGEngine.get_formatted_context(customer_message, top_k=cfg['rag_top_k'])
-                if rag_context:
-                    rag_snippets_count = rag_context.count('\n- [') + (1 if rag_context.startswith('- [') else 0)
-                    prompt_sections.append(
-                        "\n--- INFORMAÇÕES OFICIAIS DO NEGÓCIO (BASE DE CONHECIMENTO) ---\n"
-                        f"{rag_context}\n"
-                        "IMPORTANTE: Se a dúvida do cliente estiver relacionada às informações oficiais acima, "
-                        "baseie estritamente sua resposta nelas com precisão. Não invente preços, regras ou condições inexistentes."
-                    )
+
+                # Expansão de consulta: considera mensagens anteriores do lead para não perder o assunto em perguntas curtas
+                recent_user_queries = [
+                    turn.get('content', '') for turn in (chat_history or [])
+                    if isinstance(turn, dict) and turn.get('role') == 'user' and turn.get('content')
+                ][-2:]
+                
+                if recent_user_queries:
+                    augmented_rag_query = f"{' '.join(recent_user_queries)} {customer_message}".strip()
+                else:
+                    augmented_rag_query = customer_message.strip()
+
+                structured_context = RAGEngine.get_structured_context(augmented_rag_query, top_k=cfg['rag_top_k'])
+                skills_text = structured_context.get('skills_text', '').strip()
+                official_text = structured_context.get('official_text', '').strip()
+                snippets = structured_context.get('snippets', [])
+
+                if snippets:
+                    rag_snippets_count = len(snippets)
+                    
+                    # Block 1: Skills & Diretrizes de Atendimento Prioritárias (Conduta)
+                    if skills_text:
+                        prompt_sections.append(
+                            "\n================================================================================\n"
+                            "🎯 SKILLS & DIRETRIZES DE ATENDIMENTO PRIORITÁRIAS (CONDUTA E TÉCNICA DE VENDAS)\n"
+                            "================================================================================\n"
+                            f"{skills_text}\n"
+                            "================================================================================\n"
+                            "DIRETIVA DE POSTURA: Você DEVE aplicar rigorosamente a postura, tom de voz, escuta ativa e "
+                            "técnicas de contorno de objeções/fechamento especificadas nos SKILLS prioritários acima."
+                        )
+
+                    # Block 2: Informações Oficiais e FAQs do Negócio
+                    if official_text:
+                        prompt_sections.append(
+                            "\n================================================================================\n"
+                            "📚 INFORMAÇÕES OFICIAIS DO NEGÓCIO & FAQS ACUMULADOS (FONTE DA VERDADE)\n"
+                            "================================================================================\n"
+                            f"{official_text}\n"
+                            "================================================================================\n"
+                            "REGRAS DE OURO OBRIGATÓRIAS (FORÇAMENTO COGNITIVO DO RAG):\n"
+                            "1. As informações acima são a FONTE DA VERDADE ABSOLUTA sobre os serviços, planos e preços.\n"
+                            "2. É ESTRITAMENTE PROIBIDO inventar, deduzir ou especular qualquer regra ou preço inexistente.\n"
+                            "3. Se a dúvida do lead estiver respondida nos documentos, responda com precisão cirúrgica e concisão para WhatsApp."
+                        )
             except Exception as e:
                 print(f"[AIHandler] Aviso ao recuperar contexto RAG: {e}")
 

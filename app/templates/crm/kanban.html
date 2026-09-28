@@ -703,11 +703,12 @@
                     {% if client.phone %}
                     <div class="kcard-contact-item">
                         <i class="fa-solid fa-phone text-muted"></i>
-                        <span class="kcard-text">{{ client.phone }}</span>
-                        {% set wa_clean = client.phone | replace('+', '') | replace(' ', '') | replace('-', '') | replace('(', '') | replace(')', '') %}
-                        <a href="https://wa.me/{{ wa_clean }}" target="_blank" rel="noopener noreferrer" class="kcard-wa-icon" title="Abrir conversa no WhatsApp">
+                        <span class="kcard-text">{{ client.formatted_phone or client.phone }}</span>
+                        {% if client.whatsapp_url %}
+                        <a href="{{ client.whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="kcard-wa-icon" title="Abrir conversa no WhatsApp">
                             <i class="fa-brands fa-whatsapp"></i>
                         </a>
+                        {% endif %}
                     </div>
                     {% endif %}
 

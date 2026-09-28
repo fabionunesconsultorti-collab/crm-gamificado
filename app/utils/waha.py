@@ -99,17 +99,117 @@ class WahaAPI:
         return headers
 
     @staticmethod
+    def format_chat_id(phone_or_chat_id):
+        """
+        Converte qualquer telefone ou JID para um chatId válido e aceito pelo WAHA:
+        - Mantém JIDs já formatados (@c.us, @lid).
+        - Para números de telefone (com ou sem máscara), garante a inclusão do DDI 55 para o Brasil.
+        """
+        if not phone_or_chat_id:
+            return ""
+        raw = str(phone_or_chat_id).strip()
+        if '@' in raw:
+            return raw
+        
+        from app.utils.lead_enricher import LeadEnricher
+        e164 = LeadEnricher.to_e164(raw)
+        if e164:
+            return f"{e164}@c.us"
+        
+        clean = ''.join(filter(str.isdigit, raw))
+        if len(clean) in (10, 11):
+            return f"55{clean}@c.us"
+        return f"{clean}@c.us"
+
+    @staticmethod
+    def get_contact(contact_id, instance_id=None):
+        """
+        Consulta dados completos do contato na API do WAHA.
+        Resolve identificadores @lid para o @c.us correspondente e obtém o nome da agenda/perfil.
+        """
+        if not contact_id:
+            return None
+        cfg = WahaAPI.get_settings(instance_id)
+        if not WahaAPI.is_configured(instance_id):
+            return None
+
+        session = cfg['session_name'] or 'default'
+        cid = str(contact_id).strip()
+        url = f"{cfg['api_url']}/api/{session}/contacts/{cid}"
+        try:
+            resp = requests.get(url, headers=WahaAPI.get_headers(instance_id), timeout=6)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            logger.debug(f"[WahaAPI] Erro ao consultar contato {cid}: {e}")
+        return None
+
+    @staticmethod
+    def resolve_contact_phone(contact_id, instance_id=None):
+        """
+        Resolve qualquer contactId (inclusive @lid) para os dados cadastrais reais:
+        Retorna dicionário:
+        {
+            'phone': '(19) 99171-6657',
+            'clean_phone': '5519991716657',
+            'name': 'Pai azedo Elpídio',
+            'push_name': 'Dula',
+            'is_valid': True
+        }
+        """
+        from app.utils.lead_enricher import LeadEnricher
+
+        raw = str(contact_id or '').strip()
+        result = {
+            'phone': '',
+            'clean_phone': '',
+            'name': None,
+            'push_name': None,
+            'is_valid': False
+        }
+
+        if not raw:
+            return result
+
+        # Se for canal ou newsletter, descarta
+        if '@newsletter' in raw or '@broadcast' in raw or raw.startswith('120363'):
+            return result
+
+        # Se for um @lid ou identificador numérico longo de dispositivo (>13 dígitos)
+        is_lid = '@lid' in raw or (raw.isdigit() and len(raw) > 13)
+        if is_lid:
+            contact_data = WahaAPI.get_contact(raw, instance_id=instance_id)
+            if contact_data and isinstance(contact_data, dict):
+                real_id = contact_data.get('id') or ''
+                # O campo id costuma vir como '5519991716657@c.us'
+                if '@c.us' in real_id:
+                    clean = LeadEnricher.clean_digits(real_id)
+                    if LeadEnricher.is_valid_phone(clean):
+                        result['clean_phone'] = LeadEnricher.to_e164(clean)
+                        result['phone'] = LeadEnricher.format_phone_display(clean)
+                        result['name'] = contact_data.get('name') or contact_data.get('shortName')
+                        result['push_name'] = contact_data.get('pushname')
+                        result['is_valid'] = True
+                        return result
+            # Se não conseguiu resolver o LID pela API, não salva LID numérico como telefone
+            return result
+
+        # Se for JID padrão @c.us ou telefone numérico
+        clean = LeadEnricher.clean_digits(raw)
+        if LeadEnricher.is_valid_phone(clean):
+            result['clean_phone'] = LeadEnricher.to_e164(clean)
+            result['phone'] = LeadEnricher.format_phone_display(clean)
+            result['is_valid'] = True
+
+        return result
+
+    @staticmethod
     def send_text(phone_number, text, instance_id=None):
         cfg = WahaAPI.get_settings(instance_id)
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
-        raw_phone = str(phone_number).strip()
-        if '@' in raw_phone:
-            chat_id = raw_phone
-        else:
-            clean_phone = ''.join(filter(str.isdigit, raw_phone))
-            chat_id = f"{clean_phone}@c.us"
+        chat_id = WahaAPI.format_chat_id(phone_number)
         
         url = f"{cfg['api_url']}/api/sendText"
         payload = {
@@ -134,8 +234,7 @@ class WahaAPI:
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
-        raw = str(phone_or_chat_id)
-        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        chat_id = WahaAPI.format_chat_id(phone_or_chat_id)
         url = f"{cfg['api_url']}/api/startTyping"
         payload = {"session": cfg['session_name'], "chatId": chat_id}
 
@@ -152,8 +251,7 @@ class WahaAPI:
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
-        raw = str(phone_or_chat_id)
-        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        chat_id = WahaAPI.format_chat_id(phone_or_chat_id)
         url = f"{cfg['api_url']}/api/stopTyping"
         payload = {"session": cfg['session_name'], "chatId": chat_id}
 
@@ -170,8 +268,7 @@ class WahaAPI:
         if not WahaAPI.is_configured(instance_id):
             return False, "WAHA API não configurada."
 
-        raw = str(phone_or_chat_id)
-        chat_id = raw if '@' in raw else f"{''.join(filter(str.isdigit, raw))}@c.us"
+        chat_id = WahaAPI.format_chat_id(phone_or_chat_id)
         url = f"{cfg['api_url']}/api/sendSeen"
         payload = {"session": cfg['session_name'], "chatId": chat_id}
         if message_id:

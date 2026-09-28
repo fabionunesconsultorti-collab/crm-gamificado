@@ -40,25 +40,16 @@ BRAZIL_DDDS = {
     '98', '99'  # MA
 }
 
-def normalize_brazilian_phone(raw_phone: str) -> tuple[str | None, bool, bool]:
-    """
-    Normaliza e valida um telefone brasileiro para o padrão E.164 (55 + DDD + Número).
-    Retorna uma tupla: (telefone_normalizado, is_valido, is_celular).
-    Exemplos:
-      - "(19) 99876-5432" -> ("5519998765432", True, True)
-      - "+55 19 3876-5432" -> ("551938765432", True, False)
-      - "019998765432" -> ("5519998765432", True, True)
-      - "19 9876-5432" (móvel antigo sem nono dígito) -> ("5519998765432", True, True)
-    """
+def _normalize_single_phone(raw_phone: str, default_ddd: str = None) -> tuple[str | None, bool, bool]:
+    """Normaliza um único número de telefone brasileiro."""
     if not raw_phone:
         return None, False, False
 
-    # Remove todos os caracteres não numéricos
     digits = re.sub(r'\D', '', str(raw_phone))
     if not digits:
         return None, False, False
 
-    # Remove prefixo internacional 00 ou 0055 se presente
+    # Remove prefixos internacionais 00 ou 0055 se presente
     if digits.startswith('0055'):
         digits = digits[4:]
     elif digits.startswith('00'):
@@ -74,13 +65,16 @@ def normalize_brazilian_phone(raw_phone: str) -> tuple[str | None, bool, bool]:
     else:
         national = digits
 
+    # Se for número de 8 ou 9 dígitos sem DDD mas foi fornecido default_ddd
+    if len(national) in (8, 9) and default_ddd and default_ddd in BRAZIL_DDDS:
+        national = f"{default_ddd}{national}"
+
     # Validação do DDD (2 primeiros dígitos)
     if len(national) < 10:
         return None, False, False
 
     ddd = national[:2]
     if ddd not in BRAZIL_DDDS:
-        # Se os dígitos totais forem 12 ou 13 mas não começou com 55 testado acima
         if len(digits) in (12, 13) and digits[:2] == '55' and digits[2:4] in BRAZIL_DDDS:
             ddd = digits[2:4]
             national = digits[2:]
@@ -102,16 +96,61 @@ def normalize_brazilian_phone(raw_phone: str) -> tuple[str | None, bool, bool]:
         first_digit = local_number[0]
         # Celulares iniciam com 6, 7, 8 ou 9 no Brasil (antes da regra do 9º dígito obrigatório)
         if first_digit in ('6', '7', '8', '9'):
-            # Converte para padrão moderno de 9 dígitos
             modern_number = f"9{local_number}"
             return f"55{ddd}{modern_number}", True, True
-        # Fixo inicia com 2, 3, 4 ou 5
-        elif first_digit in ('2', '3', '4', '5'):
-            return f"55{ddd}{local_number}", True, False
         else:
             return f"55{ddd}{local_number}", True, False
 
     return None, False, False
+
+
+def normalize_brazilian_phone(raw_phone: str) -> tuple[str | None, bool, bool]:
+    """
+    Normaliza e valida um telefone brasileiro para o padrão E.164 (55 + DDD + Número).
+    Suporta múltiplos telefones separados por /, |, ,, ; e prioriza números celulares (WhatsApp).
+    Retorna uma tupla: (telefone_normalizado, is_valido, is_celular).
+    Exemplos:
+      - "(19) 99876-5432" -> ("5519998765432", True, True)
+      - "(19) 3876-1234 / 99876-5432" -> ("5519998765432", True, True)  [Prioriza celular com DDD herdado]
+      - "+55 19 3876-5432" -> ("551938765432", True, False)
+      - "019998765432" -> ("5519998765432", True, True)
+    """
+    if not raw_phone:
+        return None, False, False
+
+    raw_str = str(raw_phone).strip()
+    
+    # Se houver separadores de múltiplos telefones
+    candidates = re.split(r'[/|;,\\n]+', raw_str)
+    if len(candidates) > 1:
+        first_norm, first_valid, first_mobile = _normalize_single_phone(candidates[0])
+        inherited_ddd = first_norm[2:4] if (first_norm and len(first_norm) >= 4) else None
+        
+        # Se o primeiro já for celular, ótimo
+        if first_valid and first_mobile:
+            return first_norm, True, True
+
+        # Testa os demais candidatos buscando um celular
+        other_results = []
+        if first_valid:
+            other_results.append((first_norm, first_valid, first_mobile))
+
+        for cand in candidates[1:]:
+            cand_clean = cand.strip()
+            if cand_clean:
+                cnorm, cvalid, cmobile = _normalize_single_phone(cand_clean, default_ddd=inherited_ddd)
+                if cvalid:
+                    if cmobile:
+                        return cnorm, True, True  # Prioridade absoluta para celular
+                    other_results.append((cnorm, cvalid, cmobile))
+
+        if other_results:
+            return other_results[0]
+
+        return None, False, False
+
+    # Único telefone
+    return _normalize_single_phone(raw_str)
 
 def cancel_scraping_job(job_id: int) -> tuple[bool, str]:
     """
@@ -303,13 +342,11 @@ def run_lead_scraper_task(job_id: int):
             norm_phone, is_valid_phone, is_mobile = normalize_brazilian_phone(raw_phone)
 
             # Deduplicação: se o telefone for válido, verifica se já existe na base Client
+            display_phone = None
             if norm_phone:
-                existing = Client.query.filter_by(phone=norm_phone).first()
-                if not existing and len(norm_phone) >= 10:
-                    # Verifica também por sufixo dos últimos 8 dígitos
-                    suffix = norm_phone[-8:]
-                    existing = Client.query.filter(Client.phone.endswith(suffix)).first()
-                
+                from app.utils.lead_enricher import LeadEnricher
+                display_phone = LeadEnricher.format_phone_display(norm_phone)
+                existing = LeadEnricher.find_client_by_phone(norm_phone)
                 if existing:
                     # Lead já existente: apenas anexa a tag da busca nas badges se ainda não tiver
                     existing_badges = existing.badges or ''
@@ -351,7 +388,7 @@ def run_lead_scraper_task(job_id: int):
 
             new_client = Client(
                 name=name[:128],
-                phone=norm_phone or None,
+                phone=display_phone or norm_phone or None,
                 email=(item.get("email") or "").strip()[:128] or None,
                 website=website_val,
                 instagram=instagram_val,

@@ -18,10 +18,41 @@ from app.models import Client, Setting
 
 logger = logging.getLogger(__name__)
 
+BRAZIL_DDDS = {
+    '11', '12', '13', '14', '15', '16', '17', '18', '19',  # SP
+    '21', '22', '24',                                      # RJ
+    '27', '28',                                            # ES
+    '31', '32', '33', '34', '35', '37', '38',              # MG
+    '41', '42', '43', '44', '45', '46',                    # PR
+    '47', '48', '49',                                      # SC
+    '51', '53', '54', '55',                                # RS
+    '61',                                                  # DF
+    '62', '64',                                            # GO
+    '63',                                                  # TO
+    '65', '66',                                            # MT
+    '67',                                                  # MS
+    '68',                                                  # AC
+    '69',                                                  # RO
+    '71', '73', '74', '75', '77',                          # BA
+    '79',                                                  # SE
+    '81', '87',                                            # PE
+    '82',                                                  # AL
+    '83',                                                  # PB
+    '84',                                                  # RN
+    '85', '88',                                            # CE
+    '86', '89',                                            # PI
+    '91', '93', '94',                                      # PA
+    '92', '97',                                            # AM
+    '95',                                                  # RR
+    '96',                                                  # AP
+    '98', '99'                                             # MA
+}
+
 # Expressões regulares para detecção de entidades cadastrais em mensagens
 REGEX_EMAIL = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', re.IGNORECASE)
 REGEX_CPF = re.compile(r'\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b')
 REGEX_CNPJ = re.compile(r'\b\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}\b')
+REGEX_PHONE = re.compile(r'(?i)(?:whatsapp|whats|zap|contato|celular|fone|tel|numero|número|chama\s+no\s+(?:whats|zap))?[:\s]*([+]?(?:55\s*)?(?:\(?([1-9]{2})\)?[\s.-]?)?(?:9\d{4}|\d{4})[\s.-]?\d{4})\b')
 
 # Padrões comuns em português para declaração de nome
 PATTERNS_NAME = [
@@ -42,11 +73,104 @@ class LeadEnricher:
     @staticmethod
     def clean_digits(phone_str: str) -> str:
         """Extrai apenas dígitos numéricos de qualquer formato de telefone ou JID do WhatsApp."""
-        if not phone_str:
+        if not phone_str or not isinstance(phone_str, (str, int)):
             return ""
         # Remove sufixos como @c.us, @s.whatsapp.net, :1 (multi-device)
         raw = str(phone_str).split('@')[0].split(':')[0]
         return ''.join(filter(str.isdigit, raw))
+
+    @staticmethod
+    def is_valid_phone(phone_str: str) -> bool:
+        """
+        Valida se a string é um telefone real e utilizável (celular ou fixo):
+        - Rejeita JIDs de grupos e canais (@newsletter, @g.us, 120363...).
+        - Rejeita LIDs do WhatsApp (14 a 16 dígitos sem correspondência com DDI/DDD).
+        - Valida comprimento e DDD brasileiro para números nacionais.
+        """
+        if not phone_str or not isinstance(phone_str, (str, int)):
+            return False
+        raw = str(phone_str).strip()
+        if '@newsletter' in raw or '@broadcast' in raw or '@g.us' in raw:
+            return False
+        if raw.startswith('120363'):
+            return False
+        
+        digits = LeadEnricher.clean_digits(raw)
+        if not digits:
+            return False
+        
+        # Números com mais de 13 dígitos são LIDs ou IDs de grupo
+        if len(digits) > 13:
+            return False
+        
+        # Se começar com 55 e tiver 12 ou 13 dígitos
+        if digits.startswith("55") and len(digits) in (12, 13):
+            ddd = digits[2:4]
+            return ddd in BRAZIL_DDDS
+        
+        # Se for nacional de 10 ou 11 dígitos
+        if len(digits) in (10, 11):
+            ddd = digits[:2]
+            return ddd in BRAZIL_DDDS
+            
+        # Telefones com menos de 10 dígitos são incompletos
+        if len(digits) < 10:
+            return False
+            
+        return True
+
+    @staticmethod
+    def to_e164(phone_str: str) -> str:
+        """
+        Converte o telefone para formato numérico E.164 limpo (ex: 5519998306652).
+        Garante que números brasileiros recebam o prefixo 55 sem duplicar.
+        """
+        if not phone_str:
+            return ""
+        digits = LeadEnricher.clean_digits(phone_str)
+        if not digits or len(digits) < 8 or len(digits) > 13:
+            return digits
+
+        # Se já tiver DDI 55
+        if digits.startswith("55") and len(digits) in (12, 13):
+            if len(digits) == 12:
+                ddd = digits[2:4]
+                num = digits[4:]
+                if num[0] in '6789':
+                    return f"55{ddd}9{num}"
+            return digits
+
+        # Se for número nacional (DDD + 8 ou 9 dígitos)
+        if len(digits) == 10:
+            ddd = digits[:2]
+            num = digits[2:]
+            if num[0] in '6789':
+                return f"55{ddd}9{num}"
+            return f"55{digits}"
+
+        if len(digits) == 11:
+            return f"55{digits}"
+
+        return digits
+
+    @staticmethod
+    def to_whatsapp_url(phone_str: str, text: str = None) -> str | None:
+        """
+        Gera a URL oficial wa.me para abertura de chat sem duplicar o DDI 55.
+        Exemplo: 5519998306652 -> https://wa.me/5519998306652
+        Exemplo: (19) 99830-6652 -> https://wa.me/5519998306652
+        """
+        if not phone_str:
+            return None
+        e164 = LeadEnricher.to_e164(phone_str)
+        if not e164 or len(e164) < 10:
+            return None
+        
+        import urllib.parse
+        base = f"https://wa.me/{e164}"
+        if text:
+            return f"{base}?text={urllib.parse.quote(str(text).encode('utf-8'))}"
+        return base
 
     @staticmethod
     def format_phone_display(phone_str: str) -> str:
@@ -56,9 +180,14 @@ class LeadEnricher:
         Ex: 19998306652   -> (19) 99830-6652
         Ex: 1932345678    -> (19) 3234-5678
         Ex: 551988306652  -> (19) 98830-6652 (normaliza celular de 8 dígitos)
+        Rejeita e retorna vazio se for LID ou canal inválido.
         """
         digits = LeadEnricher.clean_digits(phone_str)
         if not digits:
+            return ""
+
+        # Rejeita LIDs e identificadores de grupos/canais
+        if len(digits) > 13 or digits.startswith("120363"):
             return ""
 
         # Remove DDI 55 do Brasil se presente no início para padronização
@@ -86,8 +215,11 @@ class LeadEnricher:
             num = digits[2:]
             return f"({ddd}) {num[:4]}-{num[4:]}"
 
-        # Fallback para números internacionais ou fora de padrão
-        return digits
+        # Se tiver ao menos 10 dígitos mas não bateu nos anteriores
+        if len(digits) >= 10:
+            return digits
+
+        return ""
 
     @staticmethod
     def find_client_by_phone(phone_str: str) -> Client | None:
@@ -100,7 +232,10 @@ class LeadEnricher:
         Garante que clientes já cadastrados (por importação, planilha ou manual)
         sejam encontrados imediatamente sem duplicidade.
         """
-        digits = LeadEnricher.clean_digits(phone_str)
+        if not phone_str or not isinstance(phone_str, (str, int)):
+            return None
+        safe_phone = str(phone_str).strip()
+        digits = LeadEnricher.clean_digits(safe_phone)
         if not digits or len(digits) < 8:
             return None
 
@@ -108,7 +243,7 @@ class LeadEnricher:
 
         # 1. Busca por igualdade exata (formatado ou dígitos limpos)
         client = Client.query.filter(
-            (Client.phone == formatted) | (Client.phone == digits) | (Client.phone == phone_str)
+            (Client.phone == formatted) | (Client.phone == digits) | (Client.phone == safe_phone)
         ).first()
         if client:
             return client
@@ -248,6 +383,15 @@ class LeadEnricher:
                     entities['segment'] = candidate_seg.capitalize()
                     break
 
+        # 5. Extração de Telefone declarado no texto
+        phone_matches = REGEX_PHONE.findall(clean_text)
+        for pm in phone_matches:
+            # pm pode ser tupla (matched_str, ddd)
+            phone_cand = pm[0] if isinstance(pm, tuple) else pm
+            if phone_cand and LeadEnricher.is_valid_phone(phone_cand):
+                entities['phone'] = LeadEnricher.format_phone_display(phone_cand)
+                break
+
         return entities
 
     @staticmethod
@@ -257,6 +401,7 @@ class LeadEnricher:
         - NUNCA apaga dados já preenchidos;
         - Atualiza o nome se o anterior for provisório ("Lead WA...");
         - Preenche e-mail, CPF, segmento se estiverem vazios;
+        - Preenche telefone se estiver vazio ou se o anterior for um LID inválido;
         - Anota novas informações em notes sem apagar histórico;
         - Salva as alterações no banco com commit transacional.
         Retorna True se houve atualização cadastral efetiva.
@@ -283,21 +428,43 @@ class LeadEnricher:
                     client.name = clean_new_name
                     updated = True
 
-        # 2. Atualização de E-mail
+        # 2. Atualização ou Correção de Telefone
+        new_phone = new_data.get('phone')
+        if new_phone and LeadEnricher.is_valid_phone(new_phone):
+            formatted_new = LeadEnricher.format_phone_display(new_phone)
+            # Se cliente não tem telefone, ou se o telefone atual for um LID/inválido (>13 dígitos)
+            current_is_invalid = not client.phone or not LeadEnricher.is_valid_phone(client.phone)
+            if current_is_invalid:
+                logger.info(f"[LeadEnricher] Atualizando telefone de '{client.phone}' para '{formatted_new}' (ID={client.id})")
+                client.phone = formatted_new
+                updated = True
+            elif client.phone != formatted_new:
+                # Anota nas notas que um telefone alternativo foi informado
+                timestamp_str = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
+                note_tel = f"[{timestamp_str}] Bot Coletou Telefone Adicional: {formatted_new}"
+                if client.notes:
+                    if formatted_new not in client.notes:
+                        client.notes = f"{client.notes}\n{note_tel}"
+                        updated = True
+                else:
+                    client.notes = note_tel
+                    updated = True
+
+        # 3. Atualização de E-mail
         new_email = new_data.get('email')
         if new_email and not client.email:
             logger.info(f"[LeadEnricher] Preenchendo e-mail '{new_email}' para cliente ID={client.id}")
             client.email = new_email.strip().lower()
             updated = True
 
-        # 3. Atualização de CPF / CNPJ
+        # 4. Atualização de CPF / CNPJ
         new_cpf = new_data.get('cpf')
         if new_cpf and not client.cpf:
             logger.info(f"[LeadEnricher] Preenchendo documento '{new_cpf}' para cliente ID={client.id}")
             client.cpf = new_cpf.strip()
             updated = True
 
-        # 4. Atualização de Segmento / Empresa
+        # 5. Atualização de Segmento / Empresa
         new_segment = new_data.get('segment') or new_data.get('company')
         if new_segment and not client.segment:
             logger.info(f"[LeadEnricher] Preenchendo segmento '{new_segment}' para cliente ID={client.id}")

@@ -88,6 +88,25 @@ class RAGEngine:
                 return None
         return cls._collection
 
+    @classmethod
+    def reload_collection(cls):
+        """Descarta o cliente em cache e reinicializa a conexão com o ChromaDB."""
+        try:
+            if hasattr(cls, '_chroma_client') and cls._chroma_client is not None:
+                if hasattr(cls._chroma_client, 'close'):
+                    cls._chroma_client.close()
+        except Exception:
+            pass
+        cls._collection = None
+        cls._chroma_client = None
+        return cls.get_collection()
+
+    @classmethod
+    def get_persist_dir(cls):
+        """Retorna o diretório persistente do ChromaDB."""
+        return os.path.join(os.getcwd(), 'chroma_data')
+
+
     @staticmethod
     def get_embedding(text: str, ollama_url: str = None, model: str = "nomic-embed-text"):
         """Gera o vetor numérico (embedding) de 768 dimensões com Ollama local ou Gemini."""
@@ -353,16 +372,36 @@ class RAGEngine:
                     "raw_text": meta.get("raw_text", doc)
                 })
 
-            # 2. Reranking (Reclassificação de Segunda Camada)
+            # 2. Reranking (Reclassificação de Segunda Camada com FAQ & Skill Boosting)
             if rerank_enabled:
                 for c in candidates:
                     # Cross-Score Heurístico: bônus por correspondência de termos exatos no título ou início de frase
                     title_bonus = 0.08 if any(t in c['title'].lower() for t in cls._tokenize(query)) else 0.0
-                    c['rerank_score'] = round(min(1.0, c['score'] + title_bonus), 4)
+                    
+                    cat_lower = str(c.get('category', '')).lower()
+                    title_lower = str(c.get('title', '')).lower()
+
+                    # Skill Domain Boosting: bonifica diretrizes, atitudes e habilidades de atendimento (+0.18)
+                    is_skill = any(k in cat_lower or k in title_lower for k in ['skill', 'habilidade', 'diretriz', 'conduta', 'objecao', 'fechamento', 'postura', 'vendas'])
+                    skill_bonus = 0.18 if is_skill else 0.0
+                    c['is_skill'] = is_skill
+
+                    # FAQ Domain Boosting: bonifica perguntas e respostas frequentes consolidadas (+0.12)
+                    faq_bonus = 0.12 if ('faq' in cat_lower or 'aprendizado' in cat_lower or 'faq' in title_lower) else 0.0
+                    
+                    c['rerank_score'] = round(min(1.0, c['score'] + title_bonus + faq_bonus + skill_bonus), 4)
                 
                 # Reordena pela pontuação do Reranker
                 candidates.sort(key=lambda x: x.get('rerank_score', x['score']), reverse=True)
             else:
+                for c in candidates:
+                    cat_lower = str(c.get('category', '')).lower()
+                    title_lower = str(c.get('title', '')).lower()
+                    is_skill = any(k in cat_lower or k in title_lower for k in ['skill', 'habilidade', 'diretriz', 'conduta', 'objecao', 'fechamento', 'postura', 'vendas'])
+                    c['is_skill'] = is_skill
+                    skill_bonus = 0.15 if is_skill else 0.0
+                    faq_bonus = 0.10 if ('faq' in cat_lower or 'aprendizado' in cat_lower or 'faq' in title_lower) else 0.0
+                    c['score'] = round(min(1.0, c['score'] + faq_bonus + skill_bonus), 4)
                 candidates.sort(key=lambda x: x['score'], reverse=True)
 
             # 3. Filtragem por Score Mínimo e Corte Top-N Final
@@ -399,9 +438,33 @@ class RAGEngine:
 
         context_lines = []
         for s in snippets:
-            context_lines.append(f"- [{s['title']}]: {s['text']}")
+            prefix = "🎯 [SKILL DE ATENDIMENTO]" if s.get('is_skill') else "📚 [BASE OFICIAL]"
+            context_lines.append(f"- {prefix} [{s['title']}]: {s['text']}")
 
         return "\n".join(context_lines)
+
+    @classmethod
+    def get_structured_context(cls, query: str, top_k: int = None):
+        """Retorna trechos divididos entre Skills de Atendimento Prioritárias e Dados Oficiais do Negócio."""
+        snippets = cls.search_relevant_snippets(query, top_k=top_k)
+        if not snippets:
+            return {"skills_text": "", "official_text": "", "snippets": []}
+
+        skill_lines = []
+        official_lines = []
+
+        for s in snippets:
+            line = f"- [{s['title']}]: {s['text']}"
+            if s.get('is_skill'):
+                skill_lines.append(line)
+            else:
+                official_lines.append(line)
+
+        return {
+            "skills_text": "\n".join(skill_lines),
+            "official_text": "\n".join(official_lines),
+            "snippets": snippets
+        }
 
     # ── Telemetria e Monitoramento em Tempo Real ──────────────────────
     @classmethod

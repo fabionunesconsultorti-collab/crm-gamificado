@@ -150,7 +150,12 @@ def backup_create():
     dest = "both" if upload_gdrive else "local"
     result = BackupManager.create_backup(destination=dest, upload_gdrive=upload_gdrive)
     if result.get('success'):
-        msg = f"✔ Backup criado com sucesso! Arquivo: {result.get('filename')} ({result.get('total_records')} registros)."
+        msg = f"✔ Backup completo gerado com sucesso! Arquivo: {result.get('filename')} ({result.get('total_records')} registros no banco"
+        if result.get('rag_docs_count', 0) > 0 or result.get('rag_vector_included'):
+            msg += f", {result.get('rag_docs_count', 0)} docs RAG + base vetorial ChromaDB"
+        if result.get('uploads_included'):
+            msg += f", {result.get('uploads_count', 0)} arquivos de mídia/uploads"
+        msg += ")."
         if result.get('gdrive'):
             gd = result.get('gdrive')
             msg += f" Google Drive: {gd.get('message')}"
@@ -176,7 +181,7 @@ def backup_download(filename):
 @login_required
 @admin_required
 def backup_restore():
-    """Restaura o banco a partir de arquivo enviado ou de backup local."""
+    """Restaura o sistema integralmente a partir de arquivo enviado ou de backup local."""
     uploaded_file = request.files.get('backup_file')
     local_filename = request.form.get('local_filename', '').strip()
 
@@ -201,7 +206,14 @@ def backup_restore():
     if result.get('success'):
         stats = result.get('stats', {})
         total_restored = sum(stats.values())
-        flash(f"🎉 Backup restaurado com sucesso! {total_restored} registros sincronizados.")
+        msg = f"🎉 Backup completo restaurado com sucesso! {total_restored} registros sincronizados no banco de dados."
+        if result.get('rag_restored'):
+            msg += f" 🧠 Base vetorial RAG reestabelecida e reconectada ({result.get('rag_docs_count', 0)} documentos)."
+        if result.get('uploads_restored'):
+            msg += f" 🎨 Mídias/Logotipos restaurados ({result.get('uploads_count', 0)} arquivos)."
+        if result.get('env_restored'):
+            msg += " ⚙️ Configurações de ambiente (.env) preservadas com segurança."
+        flash(msg)
     else:
         flash(f"❌ {result.get('error')}")
 
@@ -909,6 +921,107 @@ def knowledge_upload_file():
     return redirect(url_for('admin.knowledge'))
 
 
+@bp.route('/knowledge/website', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_add_website():
+    """Extrai conteúdo textual limpo de uma URL de website e indexa no RAG."""
+    from app.utils.web_crawler import WebPageExtractor
+    
+    url = request.form.get('url', '').strip()
+    custom_title = request.form.get('title', '').strip()
+    category = request.form.get('category', 'website').strip().lower()
+
+    if not url:
+        flash('⚠️ Informe a URL do website a ser adicionado.', 'warning')
+        return redirect(url_for('admin.knowledge') + '?tab=tab-website')
+
+    extraction = WebPageExtractor.extract_from_url(url)
+    if not extraction.get('ok'):
+        flash(f"❌ Falha ao extrair website: {extraction.get('error')}", 'danger')
+        return redirect(url_for('admin.knowledge') + '?tab=tab-website')
+
+    title = custom_title or extraction['title']
+    content = extraction['content']
+
+    # Verifica se já existe documento com esta URL para atualizar
+    existing = KnowledgeDoc.query.filter(
+        (KnowledgeDoc.content.like(f"%Fonte do Website: {extraction['url']}%")) |
+        (KnowledgeDoc.title == title)
+    ).first()
+
+    if existing:
+        existing.title = title
+        existing.content = content
+        existing.category = category
+        existing.doc_type = 'url'
+        existing.is_active = True
+        doc = existing
+    else:
+        doc = KnowledgeDoc(
+            title=title,
+            category=category,
+            doc_type='url',
+            content=content,
+            is_active=True
+        )
+        db.session.add(doc)
+
+    db.session.commit()
+
+    # Indexa no ChromaDB
+    chunks_indexed = RAGEngine.index_document(
+        doc_id=doc.id,
+        title=doc.title,
+        content=doc.content,
+        category=doc.category
+    )
+    doc.chunks_count = chunks_indexed
+    db.session.commit()
+
+    flash(f'🌐 Website "{title}" extraído e indexado com sucesso ({chunks_indexed} fragmentos criados)!', 'success')
+    return redirect(url_for('admin.knowledge'))
+
+
+@bp.route('/knowledge/skill', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_add_skill():
+    """Cadastra uma diretriz ou habilidade de atendimento prioritária no RAG."""
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    category = request.form.get('category', 'skill').strip().lower()
+
+    if not title or not content:
+        flash('⚠️ Preencha o título e a diretriz da habilidade de atendimento.', 'warning')
+        return redirect(url_for('admin.knowledge') + '?tab=tab-skill')
+
+    full_title = title if (title.startswith('Skill:') or title.startswith('🎯')) else f"🎯 Skill: {title}"
+    full_content = f"**Diretriz Prioritária de Atendimento / Técnica de Venda:**\n{content}"
+
+    doc = KnowledgeDoc(
+        title=full_title,
+        category=category,
+        doc_type='skill',
+        content=full_content,
+        is_active=True
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    chunks_indexed = RAGEngine.index_document(
+        doc_id=doc.id,
+        title=doc.title,
+        content=doc.content,
+        category=doc.category
+    )
+    doc.chunks_count = chunks_indexed
+    db.session.commit()
+
+    flash(f'🎯 Skill de Atendimento "{title}" cadastrado e indexado com prioridade máxima ({chunks_indexed} trechos)!', 'success')
+    return redirect(url_for('admin.knowledge'))
+
+
 @bp.route('/knowledge/toggle/<int:id>', methods=['POST'])
 @login_required
 @admin_required
@@ -1068,6 +1181,40 @@ def knowledge_telemetry():
     """Retorna métricas ao vivo de telemetria do RAG em formato JSON."""
     metrics = RAGEngine.get_telemetry_metrics()
     return jsonify(metrics)
+
+
+@bp.route('/knowledge/mine-faqs', methods=['POST'])
+@login_required
+@admin_required
+def knowledge_mine_faqs():
+    """Aciona o ciclo autônomo de aprendizado e mineração de FAQs com base nas conversas reais."""
+    try:
+        from app.utils.faq_miner import FAQMiner
+        data = request.get_json(silent=True) or {}
+        limit_msgs = int(data.get('limit_messages', 150))
+        days = int(data.get('days', 30))
+
+        result = FAQMiner.run_mining_cycle(limit_messages=limit_msgs, days=days)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Falha ao minerar FAQs: {str(e)}'}), 500
+
+
+@bp.route('/knowledge/mine-faqs/preview', methods=['GET'])
+@login_required
+@admin_required
+def knowledge_mine_faqs_preview():
+    """Retorna prévia dos diálogos minerados sem persistir alterações."""
+    try:
+        from app.utils.faq_miner import FAQMiner
+        dialogues = FAQMiner.collect_recent_dialogues(limit_messages=100, days=30)
+        return jsonify({
+            'ok': True,
+            'total_dialogues': len(dialogues),
+            'dialogues': dialogues[:15]
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 # ══════════════════════════════════════════════════════════════════

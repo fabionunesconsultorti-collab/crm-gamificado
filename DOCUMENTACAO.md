@@ -1177,10 +1177,315 @@ A interface da Base de Conhecimento foi expandida com duas novas abas dedicadas:
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global, Procedimento de Recuperação WAHA e Painel Avançado de Calibração e Treinamento RAG.*
+## 27. Plano de Modularização e Feature Flags (Arquitetura Independente de Módulos)
 
+### 27.1 Diagnóstico Técnico do Estado Atual
 
+A aplicação utiliza Flask Blueprints (`auth/`, `main/`, `crm/`, `admin/`, `api/`), o que é o caminho correto para modularização. Porém, todos os blueprints são registrados **incondicionalmente** na factory `create_app()` e não há nenhum mecanismo de feature flags para ligar/desligar funcionalidades de forma independente.
 
+**Problemas de acoplamento identificados:**
+
+| # | Problema | Arquivo(s) | Impacto |
+|---|----------|------------|---------|
+| 1 | **Modelo Monolítico** — 11 modelos de domínios distintos em arquivo único | `app/models.py` (451 linhas) | Impossível isolar domínios (WhatsApp, RAG, Prospecção) |
+| 2 | **Imports Estáticos Cruzados** — sem guard ou fallback | `app/crm/routes.py` (importa WAHA, AI, Scraper incondicionalmente) | Se Ollama/WAHA offline, carregamento pode falhar |
+| 3 | **Admin "God Object"** — arquivo de rotas excessivamente grande | `app/admin/routes.py` (1.177 linhas) | Toda alteração em qualquer área toca o mesmo arquivo |
+| 4 | **Tasks Acopladas** — re-export no `__init__.py` sem proteção | `app/tasks/__init__.py` | Redis offline derruba toda a aplicação |
+| 5 | **WAHA Hardcoded no Boot** — webhook init sem feature flag | `app/__init__.py` (linhas 52-65) | Sempre tenta conectar, mesmo se WhatsApp não for usado |
+| 6 | **Zero Feature Flags** — nenhuma ocorrência no código | Todo o projeto | Impossível desativar funcionalidades sem alterar código |
+| 7 | **Utils Catch-All** — 12 arquivos de domínios distintos | `app/utils/` | Sem encapsulamento; dependências cruzadas invisíveis |
+
+### 27.2 Mapa de Dependências (Acoplamento Real)
+
+```
+Blueprints                    Utils (Catch-all)              Tasks
+┌──────────┐                 ┌──────────────────┐           ┌──────────────────┐
+│ auth/    │                 │ waha.py          │←────┐     │ whatsapp.py      │
+│ main/    │                 │ ai_handler.py    │←──┐ │     │ lead_scraper.py  │
+│ crm/     │──hardcoded────→ │ maps_scraper.py  │   │ │     │ buffer.py        │
+│ admin/   │──hardcoded────→ │ rag_engine.py    │   │ │     │ queue.py         │
+│ api/     │──hardcoded────→ │ backup_manager.py│   │ │     └───────┬──────────┘
+└──────┬───┘                 │ lead_enricher.py │   │ │             │
+       │                     │ live_tracker.py  │   │ │             │
+       │                     │ conversation_    │   │ │             │
+       │                     │   memory.py      │   │ │             │
+       │                     └──────────────────┘   │ │             │
+       │                                            │ │             │
+       └──────────── Todos importam ────────────────┘ │             │
+                     models.py (monolítico) ──────────┘             │
+                     11 modelos em 1 arquivo ───────────────────────┘
+```
+
+**Todas as setas são hardcoded** — nenhuma é condicional ou desligável.
+
+### 27.3 Teste de Impacto: O Que Quebra Se Desligar um Serviço
+
+| Se desligar... | O que quebra | Nível de Impacto |
+|----------------|--------------|:-----------------:|
+| **Redis** | `tasks/__init__.py` falha no import → toda a app morre | 🔴 Crítico |
+| **Ollama / IA** | WhatsApp bot, geração de mensagens, admin settings | 🟠 Alto |
+| **WAHA / WhatsApp** | Init da app trava 2s; CRM routes com ImportError | 🟠 Alto |
+| **ChromaDB / RAG** | Admin settings, processamento WhatsApp perde contexto RAG | 🟡 Médio |
+| **Maps Scraper** | CRM routes importam incondicionalmente | 🟡 Médio |
+| **PostgreSQL → SQLite** | Funciona (config trata), mas migrations podem divergir | 🟡 Médio |
+
+### 27.4 Plano de Remediação em 5 Fases
+
+#### Fase 1 — Feature Flags e Registry de Módulos (Esforço: ~2 dias, Risco: 🟢 Baixo)
+
+**Objetivo:** Poder ligar/desligar qualquer módulo via configuração, sem alterar código-fonte.
+
+**Ações:**
+
+1. Criar arquivo `app/utils/module_registry.py` com:
+   - Definição de módulos: `whatsapp`, `ai_bot`, `rag`, `prospecting`, `gamification`, `backup`
+   - Função `is_module_enabled(module_name)` que lê da tabela `Setting`
+   - Decorator `@requires_module('nome')` para proteger rotas
+   - Função `get_all_modules()` para UI de administração
+
+2. Chaves de feature flags na tabela `Setting`:
+   ```
+   module_whatsapp_enabled     = true (default)
+   module_ai_bot_enabled       = true
+   module_rag_enabled          = true
+   module_prospecting_enabled  = true
+   module_gamification_enabled = true
+   module_backup_enabled       = true
+   ```
+
+3. Exemplo de uso do decorator:
+   ```python
+   @bp.route('/prospeccao')
+   @login_required
+   @requires_module('prospecting')
+   def prospeccao(): ...
+   ```
+
+4. Modificar `app/__init__.py` para:
+   - Inicializar WAHA/backup scheduler condicionalmente
+   - Injetar `is_module_enabled` nos templates via `context_processor`
+   - Invalidar cache do registry por request
+
+5. Tornar sidebar do `base.html` condicional com Jinja:
+   ```html
+   {% if is_module_enabled('whatsapp') %}
+   <li><a href="...">Disparo em Lote</a></li>
+   {% endif %}
+   ```
+
+6. Criar painel `/admin/modules` com toggles visuais por módulo.
+
+#### Fase 2 — Separação de Models por Domínio (Esforço: ~2 dias, Risco: 🟢 Baixo)
+
+**Objetivo:** Cada domínio funcional possui seus próprios modelos.
+
+**Estrutura alvo:**
+```
+app/models/
+├── __init__.py        → re-exporta tudo (retrocompatível)
+├── user.py            → User, load_user
+├── client.py          → Client, Store
+├── whatsapp.py        → WahaInstance, MessageLog, MessageTemplate
+├── prospecting.py     → ScrapingJob
+├── knowledge.py       → KnowledgeDoc
+├── settings.py        → Setting
+└── system.py          → SystemLog, FileMappingTemplate
+```
+
+O `__init__.py` mantém retrocompatibilidade re-exportando todos os modelos:
+```python
+from app.models.user import User
+from app.models.client import Client, Store
+from app.models.whatsapp import WahaInstance, MessageLog, MessageTemplate
+# ... etc
+```
+
+#### Fase 3 — Lazy Loading e Imports Condicionais (Esforço: ~3 dias, Risco: 🟡 Médio)
+
+**Objetivo:** Nenhum módulo falha se uma dependência externa estiver ausente.
+
+**Ações:**
+
+1. Proteger `tasks/__init__.py` com try/except:
+   ```python
+   try:
+       from .queue import get_queue, get_redis_connection
+   except Exception:
+       get_queue = get_redis_connection = None
+   ```
+
+2. Transformar imports estáticos em lazy imports nos routes:
+   ```python
+   # ANTES (falha se WAHA offline)
+   from app.utils.waha import WahaAPI
+
+   # DEPOIS (graceful degradation)
+   def _get_waha():
+       if not is_module_enabled('whatsapp'):
+           return None
+       from app.utils.waha import WahaAPI
+       return WahaAPI
+   ```
+
+3. Tornar init do WAHA condicional no boot da app:
+   ```python
+   if not app.config.get('TESTING') and is_module_enabled('whatsapp'):
+       # ... init webhook
+   ```
+
+#### Fase 4 — Quebrar o Admin "God Object" (Esforço: ~3 dias, Risco: 🟡 Médio)
+
+**Objetivo:** Cada domínio funcional tem seus próprios routes no admin.
+
+**Estrutura alvo:**
+```
+app/admin/
+├── __init__.py            → Blueprint + imports condicionais
+├── routes.py              → Rotas base (settings gerais, dashboard)
+├── routes_whatsapp.py     → WAHA instances, logs, templates
+├── routes_ai.py           → Config IA, prompts, RAG
+├── routes_backup.py       → Backup/Restore
+├── routes_users.py        → CRUD de usuários
+└── routes_theme.py        → Personalização visual
+```
+
+Cada sub-módulo registra rotas condicionalmente:
+```python
+# admin/__init__.py
+bp = Blueprint('admin', __name__)
+from app.admin import routes  # sempre
+
+if is_module_enabled('whatsapp'):
+    from app.admin import routes_whatsapp
+if is_module_enabled('ai_bot'):
+    from app.admin import routes_ai
+```
+
+#### Fase 5 — Reorganizar em Packages por Domínio (Esforço: ~2 dias, Risco: 🔴 Alto)
+
+**Objetivo:** Cada módulo funcional é auto-contido com seus modelos, rotas, tasks e utilitários.
+
+**Estrutura alvo:**
+```
+app/
+├── modules/
+│   ├── whatsapp/
+│   │   ├── __init__.py
+│   │   ├── models.py       → WahaInstance, MessageLog, MessageTemplate
+│   │   ├── api.py          → WahaAPI
+│   │   ├── tasks.py        → process_whatsapp_message, buffer
+│   │   ├── routes.py       → Webhook endpoints
+│   │   └── memory.py       → ConversationMemory
+│   ├── ai/
+│   │   ├── __init__.py
+│   │   ├── handler.py      → AIHandler
+│   │   ├── rag_engine.py   → RAGEngine
+│   │   └── models.py       → KnowledgeDoc
+│   ├── prospecting/
+│   │   ├── __init__.py
+│   │   ├── scraper.py      → MapsScraperClient
+│   │   ├── tasks.py        → dispatch_scraping_job
+│   │   └── models.py       → ScrapingJob
+│   ├── gamification/
+│   │   ├── __init__.py
+│   │   ├── engine.py       → award_xp, leaderboard
+│   │   └── constants.py    → XP values
+│   └── backup/
+│       ├── __init__.py
+│       ├── manager.py      → BackupManager
+│       └── scheduler.py    → Cron de backup
+├── core/
+│   ├── models.py           → User, Client, Store, Setting, SystemLog
+│   ├── auth/               → Blueprint de auth
+│   └── exports.py          → CSV/PDF
+```
+
+### 27.5 Ordem de Prioridade Recomendada
+
+| Prioridade | Fase | Risco Regressão | Valor Imediato |
+|:---:|---|:---:|---|
+| 🥇 | **Fase 1** — Feature Flags | 🟢 Baixo | Desligar módulos sem deploy |
+| 🥈 | **Fase 3** — Lazy Loading | 🟡 Médio | App não morre com Redis/Ollama offline |
+| 🥉 | **Fase 2** — Models separados | 🟢 Baixo | Manutenção e clareza |
+| 4 | **Fase 4** — Admin split | 🟡 Médio | Redução de complexidade |
+| 5 | **Fase 5** — Packages por domínio | 🔴 Alto | Arquitetura limpa de longo prazo |
+
+> **Nota:** As Fases 1 e 3 podem ser feitas sem refatoração estrutural e dão o maior ganho de resiliência. As Fases 4 e 5 são refatorações mais profundas que devem ser feitas com suite de testes robusta.
+
+### 27.6 Métricas de Acoplamento (Antes vs. Meta)
+
+| Métrica | Valor Atual | Meta Ideal |
+|---|:---:|:---:|
+| Modelos por arquivo | 11 em 1 | 2-3 por arquivo |
+| Linhas no admin/routes.py | 1.177 | < 200 por arquivo |
+| Feature flags | 0 | 6+ |
+| Imports condicionais | 0 | 15+ |
+| Módulos desligáveis independentemente | 0 | 6 |
+| Blueprints condicionais | 0 de 5 | 3 de 5 |
+
+---
+
+---
+
+## 28. Correção e Normalização de Telefones & Resolução de LIDs do WhatsApp
+
+### 28.1 Contexto e Diagnóstico do Problema
+Anteriormente, a captura automática de contatos via webhook e scraping apresentava inconsistências críticas:
+1. **LIDs do WhatsApp (`@lid`)**: O WhatsApp Web / Multi-Device moderno frequentemente entrega identificadores de dispositivo (ex: `71674514952338@lid`) em vez do JID padrão (`5519998...`). A rotina anterior extraía apenas os dígitos crus, cadastrando o LID de 14–16 dígitos no campo `phone`, impossibilitando o disparo ou abertura de conversas.
+2. **Canais e Newsletters (`@newsletter`)**: Mensagens de canais (`120363...@newsletter`) eram tratadas como mensagens de clientes, gerando auto-cadastros falsos (ex: `Lead WA 3742` com telefone `120363404701403742`).
+3. **Duplicação de DDI `55` em Links**: Nos templates e rotas de mensagem, links do tipo `https://wa.me/55{{ client.phone }}` duplicavam o DDI para telefones que já continham `55` (ficando `5555...`), ou geravam links sem DDI quando o telefone não o continha.
+4. **Múltiplos Telefones no Google Maps**: Estabelecimentos comerciais com telefones concatenados por barra (`/`, `|` ou `,`) tinham seus dígitos somados em números de 18 a 22 dígitos e eram descartados pela validação.
+
+### 28.2 Solução Implementada
+
+1. **Resolução de Contatos via WAHA (`WahaAPI.resolve_contact_phone`)**:
+   - Quando um identificador for `@lid` ou não for um telefone nacional válido, a API do WAHA (`GET /api/{session}/contacts/{id}`) é consultada em tempo real para obter o número real (`@c.us`), o nome registrado e o `pushName`.
+   - Se o número não for resolúvel ou for um grupo/canal, o sistema impede a criação de leads corrompidos.  
+2. **Filtro Estrito no Webhook (`app/api/routes.py`)**:
+   - Rejeição imediata de eventos originados de `@newsletter`, prefixos `120363` e grupos `@g.us` no auto-cadastro.
+3. **Propriedades Seguras no Modelo `Client` (`app/models.py`)**:
+   - `client.whatsapp_url`: Retorna a URL oficial `https://wa.me/55...` com garantia de DDI 55 único (sem duplicações).
+   - `client.whatsapp_chat_id`: Retorna o formato exato esperado pela API do WAHA (`55...c.us`).
+   - `client.formatted_phone`: Formatação legível brasileira `(DD) 9XXXX-XXXX`.
+   - `client.clean_phone`: Apenas os dígitos válidos.
+4. **Tratamento de Múltiplos Números na Prospecção Ativa (`app/tasks/lead_scraper.py`)**:
+   - Divide números múltiplos por separadores (`/`, `|`, `,`, `;`), herda o DDD do primeiro telefone caso os seguintes sejam locais e prioriza celulares com nono dígito.
+5. **Correção e Saneamento da Base de Dados**:
+   - Leads pré-existentes gravados com identificadores LID foram devidamente convertidos para seus números reais de WhatsApp e nomes da agenda, e registros espúrios de canais de newsletter foram removidos.
+
+---
+
+## 31. Skills & Diretrizes de Atendimento Prioritárias no RAG (Priority Chunks & Conduct Control)
+
+### 31.1 Conceito e Arquitetura de Priorização
+Diferente dos documentos puramente informativos (como manuais, contratos ou tabelas de preços), os **Skills de Atendimento** representam orientações estratégicas sobre **como o bot deve se comportar e conduzir a comunicação** no WhatsApp (ex: técnicas de fechamento, contorno de objeções, tom de voz empático, qualificação BANT).
+
+Para garantir que essas diretrizes não sejam sufocadas ou desconsideradas durante a recuperação do RAG, a arquitetura foi aprimorada com três mecanismos de priorização:
+
+1. **Skill Domain Boosting (+0.18 no Reranking):**
+   - No motor `RAGEngine.search_relevant_snippets()`, trechos cadastrados sob a categoria/tipo `skill` (ou contendo palavras como `habilidade`, `diretriz`, `conduta`, `objecao`, `fechamento`, `postura`) recebem um bônus prioritário de **+0.18** no score final do reranker, garantindo sua presença entre os trechos recuperados.
+2. **Particionamento Estruturado de Contexto (`RAGEngine.get_structured_context`):**
+   - O motor divide automaticamente os fragmentos resgatados em dois grupos distintos:
+     - `skills_text`: Trechos de postura, tom de voz e técnica de vendas;
+     - `official_text`: Dados oficiais de produtos, regras operacionais e preços.
+3. **Injeção Prioritária no Prompt de Sistema (`AIHandler.generate_chat_reply`):**
+   - Os skills de atendimento recuperados são injetados em um bloco exclusivo de alta visibilidade no prompt do LLM:
+     `🎯 SKILLS & DIRETRIZES DE ATENDIMENTO PRIORITÁRIAS (CONDUTA E TÉCNICA DE VENDAS)`
+   - O prompt impõe ao modelo a **Diretiva de Postura**, obrigando-o a adotar a conduta e técnica especificada durante a resposta.
+
+### 31.2 Cadastro e Templates Prontos no Painel (`/admin/knowledge`)
+- **Aba Dedicada:** Aba **"5. Skills de Atendimento (Prioritários)"** no painel administrativo.
+- **Rota `POST /admin/knowledge/skill`:** Grava o documento com `doc_type='skill'`, fatiando e indexando no ChromaDB.
+- **Templates de Skills em 1 Clique:**
+  - ⚡ **Contorno de Objeção (Preço/Concorrência):** Acolhimento empático, demonstração de ROI e comparativo de diferenciais exclusivos;
+  - ⚡ **Técnica de Fechamento Soft:** Condução positiva para a próxima ação de avanço no funil (agendamento ou cadastro);
+  - ⚡ **Atendimento Empático & Tom de Voz:** Parágrafos curtos, escuta ativa e tratamento personalizado no WhatsApp;
+  - ⚡ **Qualificação de Necessidades (BANT):** Perguntas de sondagem prévia para identificar gargalos do lead.
+- **Selo Visual `🎯 SKILL`:** Destaque em âmbar translúcido na tabela de auditoria de conhecimento.
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global, Procedimento de Recuperação WAHA, Painel Avançado de Calibração e Treinamento RAG, Plano de Modularização e Feature Flags, Correção/Normalização de Telefones WhatsApp, Aprendizado Contínuo com Conversas & RAG Estrito, Ingestão Semântica de Websites e Skills & Diretrizes de Atendimento Prioritárias no RAG.*
 
 
 

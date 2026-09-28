@@ -111,6 +111,56 @@ class Client(db.Model):
         if not url.startswith(('http://', 'https://')):
             return f"https://{url}"
         return url
+    @property
+    def clean_phone(self):
+        """Retorna apenas os dígitos do telefone."""
+        if not self.phone:
+            return ""
+        return ''.join(filter(str.isdigit, str(self.phone)))
+
+    @property
+    def formatted_phone(self):
+        """Retorna o telefone formatado visualmente no padrão brasileiro (DD) 9XXXX-XXXX."""
+        if not self.phone:
+            return ""
+        try:
+            from app.utils.lead_enricher import LeadEnricher
+            return LeadEnricher.format_phone_display(self.phone)
+        except Exception:
+            return str(self.phone)
+
+    @property
+    def whatsapp_url(self):
+        """Retorna a URL do wa.me garantindo DDI 55 único e formatação correta sem duplicações."""
+        if not self.phone:
+            return None
+        try:
+            from app.utils.lead_enricher import LeadEnricher
+            return LeadEnricher.to_whatsapp_url(self.phone)
+        except Exception:
+            digits = ''.join(filter(str.isdigit, str(self.phone)))
+            if not digits:
+                return None
+            if len(digits) in (10, 11):
+                return f"https://wa.me/55{digits}"
+            return f"https://wa.me/{digits}"
+
+    @property
+    def whatsapp_chat_id(self):
+        """Retorna o chat_id no padrão WAHA (ex: 5519998306652@c.us)."""
+        if not self.phone:
+            return None
+        try:
+            from app.utils.lead_enricher import LeadEnricher
+            e164 = LeadEnricher.to_e164(self.phone)
+            return f"{e164}@c.us" if e164 else None
+        except Exception:
+            digits = ''.join(filter(str.isdigit, str(self.phone)))
+            if not digits:
+                return None
+            if len(digits) in (10, 11):
+                return f"55{digits}@c.us"
+            return f"{digits}@c.us"
 
     def __repr__(self):
         return f'<Client {self.name}>'
@@ -354,6 +404,8 @@ class MessageLog(db.Model):
     content = db.Column(db.Text)
     channel = db.Column(db.String(32), default='whatsapp_link') # 'whatsapp_link', 'waha_api'
     status = db.Column(db.String(32), default='sent') # 'sent', 'delivered', 'read', 'error'
+    direction = db.Column(db.String(16), default='outbound') # 'inbound', 'outbound'
+    chat_id = db.Column(db.String(64), index=True, nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     api_response = db.Column(db.Text) # To store raw webhook/API json feedback
     waha_instance_id = db.Column(db.Integer, db.ForeignKey('waha_instance.id'), nullable=True)
@@ -363,7 +415,7 @@ class MessageLog(db.Model):
     waha_instance = db.relationship('WahaInstance', backref='message_logs')
 
     def __repr__(self):
-        return f'<MessageLog to {self.client_id} at {self.timestamp}>'
+        return f'<MessageLog {self.direction} to/from {self.client_id or self.chat_id} at {self.timestamp}>'
 
 class ScrapingJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -297,13 +297,34 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                     push_name_candidate = cleaned_pname
                     break
 
-        client = LeadEnricher.find_client_by_phone(clean_digits or chat_id)
-        if not client:
+        # Resolve contato com o WAHA se chat_id for um @lid ou número longo de dispositivo
+        resolved_contact = None
+        try:
+            resolved_contact = WahaAPI.resolve_contact_phone(chat_id, instance_id=instance_id)
+        except Exception:
+            pass
+
+        if isinstance(resolved_contact, dict) and resolved_contact.get('is_valid') is True:
+            real_phone = str(resolved_contact.get('phone') or '')
+            real_clean = str(resolved_contact.get('clean_phone') or '')
+            if not push_name_candidate:
+                resolved_name = resolved_contact.get('name') or resolved_contact.get('push_name')
+                if resolved_name and isinstance(resolved_name, str):
+                    push_name_candidate = LeadEnricher.extract_clean_push_name(resolved_name)
+        else:
+            real_phone = LeadEnricher.format_phone_display(clean_digits)
+            real_clean = clean_digits
+
+        # Busca cliente por telefone real ou pelo chat_id
+        client = LeadEnricher.find_client_by_phone(real_clean or clean_digits or chat_id)
+        
+        # Auto-cadastro de novo lead somente se o telefone for válido e não for grupo/canal/LID desconhecido
+        if not client and LeadEnricher.is_valid_phone(real_clean or real_phone):
             auto_create = Setting.get('whatsapp_bot_auto_create_lead')
             if auto_create is None or str(auto_create).lower() in ['true', '1', 'yes']:
                 try:
-                    display_phone = LeadEnricher.format_phone_display(clean_digits)
-                    initial_name = push_name_candidate or f"Lead WA {clean_digits[-4:] if len(clean_digits) >= 4 else clean_digits}"
+                    display_phone = real_phone or LeadEnricher.format_phone_display(real_clean)
+                    initial_name = push_name_candidate or f"Lead WA {real_clean[-4:] if len(real_clean) >= 4 else real_clean}"
                     client = Client(
                         name=initial_name,
                         phone=display_phone,
@@ -319,6 +340,15 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
 
         client_info = None
         if client:
+            # Se o telefone do cliente no CRM for inválido (ex: LID de 14 dígitos) e agora obtivemos o real
+            if resolved_contact.get('is_valid') and (not client.phone or not LeadEnricher.is_valid_phone(client.phone)):
+                client.phone = resolved_contact['phone']
+                try:
+                    db.session.commit()
+                    logger.info(f"[Task WhatsApp Batch] Telefone do Lead ID={client.id} corrigido de LID para '{client.phone}'")
+                except Exception:
+                    db.session.rollback()
+
             # Se o lead ainda estava com nome genérico e capturamos um PushName válido, atualiza o nome
             if (not client.name or client.name.startswith("Lead WA")) and push_name_candidate:
                 client.name = push_name_candidate
@@ -360,6 +390,26 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                 'segment': getattr(client, 'segment', None),
                 'qualification_prompt': qualif_prompt
             }
+
+        # 6.1 Registro no Banco da Mensagem Inbound Recebida do Lead
+        try:
+            inbound_log = MessageLog(
+                client_id=client.id if client else None,
+                user_id=None,
+                content=aggregated_text,
+                channel='waha_api',
+                status='received',
+                direction='inbound',
+                chat_id=chat_id,
+                timestamp=datetime.now(timezone.utc),
+                waha_instance_id=_resolve_waha_instance_pk(instance_id)
+            )
+            db.session.add(inbound_log)
+            db.session.commit()
+            logger.info(f"[Task WhatsApp Batch] Inbound MessageLog registrado: ID={inbound_log.id}")
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f"[Task WhatsApp Batch] Erro ao registrar Inbound MessageLog: {e}")
 
         # 7. Regra de Transbordo para Atendente Humano
         triggers_raw = Setting.get('whatsapp_bot_handover_trigger') or 'humano, atendente, falar com pessoa, falar com alguem, suporte humano'
@@ -495,9 +545,11 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
             log = MessageLog(
                 client_id=client.id if client else None,
                 user_id=None,
-                content=f"[Lote {len(messages)} msgs]\n{reply_text}",
+                content=reply_text,
                 channel='waha_api',
                 status='sent' if success else 'error',
+                direction='outbound',
+                chat_id=chat_id,
                 timestamp=datetime.now(timezone.utc),
                 api_response=raw_response_str,
                 waha_instance_id=_resolve_waha_instance_pk(instance_id)

@@ -406,13 +406,17 @@
                     <!-- Contato -->
                     <td>
                         <div class="d-flex flex-col gap-1">
-                            {% if client.phone %}
+                            {% if client.whatsapp_url %}
                             <div class="text-sm font-semibold">
-                                <a href="https://wa.me/55{{ client.phone | replace('(', '') | replace(')', '') | replace('-', '') | replace(' ', '') }}" 
+                                <a href="{{ client.whatsapp_url }}" 
                                    target="_blank" rel="noopener noreferrer" 
                                    class="text-main d-inline-flex align-center gap-1" style="text-decoration:none;" title="Conversar no WhatsApp">
-                                    <i class="fa-brands fa-whatsapp text-success"></i> {{ client.phone }}
+                                    <i class="fa-brands fa-whatsapp text-success"></i> {{ client.formatted_phone or client.phone }}
                                 </a>
+                            </div>
+                            {% elif client.phone %}
+                            <div class="text-sm font-semibold text-muted">
+                                <i class="fa-solid fa-phone opacity-50"></i> {{ client.phone }}
                             </div>
                             {% endif %}
                             {% if client.email %}
