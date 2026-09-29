@@ -101,6 +101,15 @@ with app.app_context():
         'whatsapp_bot_auto_create_lead': 'true',
         'whatsapp_bot_inject_client_data': 'true'
     }
+    
+    # Feature Flags dos Módulos dos 5 Setores
+    from app.core.module_registry import SECTORS, ModuleRegistry
+    for sector_key, sector_data in SECTORS.items():
+        for mod_key in sector_data['modules'].keys():
+            flag_key = ModuleRegistry.get_setting_key(sector_key, mod_key)
+            if flag_key not in default_settings:
+                default_settings[flag_key] = 'true'
+
     for key, val in default_settings.items():
         if not Setting.query.filter_by(key=key).first():
             db.session.add(Setting(key=key, value=val))

@@ -96,6 +96,75 @@
 
 {% block content %}
 <form action="" method="post" class="w-100" id="clientForm">
+
+    {% if tf_profile %}
+    <!-- 0. Perfil Preditivo de Inteligência TensorFlow (Base de Aprendizado para IAs) -->
+    <div class="form-section-card max-w-lg m-0 mb-4" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 115, 0, 0.4); border-radius: 16px;">
+        <div class="form-section-header border-bottom pb-3 mb-3">
+            <h4 class="form-section-title text-warning d-flex align-center gap-2 m-0" style="font-size: 1.05rem;">
+                <i class="fa-solid fa-brain text-warning" style="font-size: 1.25rem;"></i> Indicativos Preditivos TensorFlow (Base de Aprendizado para IAs)
+            </h4>
+            <span class="badge" style="background: rgba(255, 115, 0, 0.2); color: #ff7300; border: 1px solid rgba(255, 115, 0, 0.4); font-size: 0.7rem;">
+                Atualizado: {{ tf_profile.updated_at }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+            <!-- Card 1: Humor & Sentimento Predito -->
+            <div class="p-3 rounded-lg" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="text-xs text-muted font-semibold mb-1 d-flex align-center justify-between">
+                    <span>Humor &amp; Sentimento Predito</span>
+                    <span>{{ tf_profile.humor.emoji }}</span>
+                </div>
+                <div class="font-bold text-main text-base mb-1">{{ tf_profile.sentiment.sentiment }}</div>
+                <div class="text-xs text-warning mb-2 font-medium">Humor: {{ tf_profile.humor.humor }}</div>
+                <p class="text-xs text-muted m-0" style="line-height: 1.4;">
+                    <strong>Tom Recomendado para IA:</strong> {{ tf_profile.humor.tone }}
+                </p>
+            </div>
+
+            <!-- Card 2: Histórico & Métricas Neurais -->
+            <div class="p-3 rounded-lg" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="text-xs text-muted font-semibold mb-1">Qualificação &amp; Risco de Churn</div>
+                <div class="d-flex align-baseline gap-2 mb-1">
+                    <span class="font-bold text-2xl text-main">{{ tf_profile.lead_score.score }}</span>
+                    <span class="text-xs text-muted">/100 ({{ tf_profile.lead_score.classification }})</span>
+                </div>
+                <div class="text-xs mb-2">
+                    Risco de Churn: <strong class="text-{{ tf_profile.churn_risk.badge_color }}">{{ tf_profile.churn_risk.churn_risk_pct }}% ({{ tf_profile.churn_risk.risk_level }})</strong>
+                </div>
+                <p class="text-xs text-muted m-0" style="line-height: 1.4;">
+                    <strong>Diretriz Tática:</strong> {{ tf_profile.lead_score.recommendation }}
+                </p>
+            </div>
+
+            <!-- Card 3: Termos & Palavras-Chave Relevantes -->
+            <div class="p-3 rounded-lg" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                <div class="text-xs text-muted font-semibold mb-2">Termos &amp; Palavras-Chave Extraídas</div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    {% for term in tf_profile.relevant_terms %}
+                    <span class="badge" style="background: rgba(99, 102, 241, 0.18); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.7rem; padding: 2px 8px;">
+                        #{{ term }}
+                    </span>
+                    {% endfor %}
+                </div>
+                <div class="text-xs text-muted mt-2">
+                    Vocabulário e contexto de interesse acumulados do histórico de interações.
+                </div>
+            </div>
+        </div>
+
+        <!-- Diretriz Injetada no Prompt da IA de Resposta -->
+        <div class="p-3 rounded-lg" style="background: rgba(15, 23, 42, 0.8); border: 1px dashed rgba(255, 115, 0, 0.3);">
+            <div class="d-flex align-center justify-between mb-1">
+                <span class="text-xs font-semibold text-warning"><i class="fa-solid fa-code"></i> Prompt Contextual Injetado na IA de Resposta (Ollama / Gemini)</span>
+                <span class="text-xs text-muted">Transmissão Cognitiva Ativa</span>
+            </div>
+            <pre class="m-0 text-xs" style="color: #a7f3d0; white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{{ tf_profile.ai_directive }}</pre>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 1. Dados Essenciais -->
     <div class="form-section-card max-w-lg m-0 mb-4">
         <div class="form-section-header">

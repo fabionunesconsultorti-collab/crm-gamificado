@@ -388,7 +388,8 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                 'status': client.status,
                 'assigned_user': client.assigned_user.username if getattr(client, 'assigned_user', None) else None,
                 'segment': getattr(client, 'segment', None),
-                'qualification_prompt': qualif_prompt
+                'qualification_prompt': qualif_prompt,
+                'client_obj': client
             }
 
         # 6.1 Registro no Banco da Mensagem Inbound Recebida do Lead

@@ -4,20 +4,85 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import db, login
 
+import json
+
+class PermissionGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    description = db.Column(db.String(256))
+    permissions_json = db.Column(db.Text, default='{}')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_permissions(self) -> dict:
+        try:
+            return json.loads(self.permissions_json) if self.permissions_json else {}
+        except Exception:
+            return {}
+
+    def set_permissions(self, perm_dict: dict):
+        self.permissions_json = json.dumps(perm_dict)
+
+    def __repr__(self):
+        return f'<PermissionGroup {self.name}>'
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True)
     password_hash = db.Column(db.String(256))
     role = db.Column(db.String(20), default='vendedor') # 'admin', 'gerente', 'vendedor'
+    group_id = db.Column(db.Integer, db.ForeignKey('permission_group.id'), nullable=True)
+    custom_permissions_json = db.Column(db.Text, default='{}')
     performance_points = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    group = db.relationship('PermissionGroup', backref=db.backref('users', lazy=True))
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def get_custom_permissions(self) -> dict:
+        try:
+            return json.loads(self.custom_permissions_json) if self.custom_permissions_json else {}
+        except Exception:
+            return {}
+
+    def set_custom_permissions(self, perm_dict: dict):
+        self.custom_permissions_json = json.dumps(perm_dict)
+
+    def has_permission(self, resource: str, action: str) -> bool:
+        """
+        Verifica se o usuário possui a permissão (resource.action) respeitando:
+        1. Sobrescrita Individual (custom_permissions do usuário).
+        2. Herdada do Grupo de Permissões (group.permissions).
+        3. Fallbacks de papel e segurança (view, edit, delete).
+        """
+        perm_key = f"{resource}.{action}"
+        
+        # 1. Sobrescrita individual do Usuário
+        custom_perms = self.get_custom_permissions()
+        if perm_key in custom_perms:
+            return bool(custom_perms[perm_key])
+
+        # 2. Grupo atribuído
+        if self.group:
+            group_perms = self.group.get_permissions()
+            if perm_key in group_perms:
+                return bool(group_perms[perm_key])
+
+        # 3. Fallback legado por role
+        if self.role == 'admin':
+            return True
+        if self.role == 'gerente' and action != 'delete':
+            return True
+
+        if resource in ['clients', 'kanban'] and action in ['view', 'edit']:
+            return True
+
+        return False
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -498,5 +563,168 @@ class KnowledgeDoc(db.Model):
 
     def __repr__(self):
         return f'<KnowledgeDoc {self.id}: {self.title} [{self.category}]>'
+
+
+class IntegrationConfig(db.Model):
+    __tablename__ = 'integration_config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(64), unique=True, index=True, nullable=False)  # ex: 'bling', 'tiny'
+    name = db.Column(db.String(128), nullable=False)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
+    auth_type = db.Column(db.String(32), default='oauth2')  # 'oauth2', 'api_key'
+    client_id = db.Column(db.String(256), nullable=True)
+    client_secret = db.Column(db.String(256), nullable=True)
+    api_key = db.Column(db.String(256), nullable=True)
+    access_token = db.Column(db.Text, nullable=True)
+    refresh_token = db.Column(db.Text, nullable=True)
+    token_expires_at = db.Column(db.DateTime, nullable=True)
+    settings_json = db.Column(db.Text, default='{}')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_settings(self):
+        import json
+        if not self.settings_json:
+            return {}
+        try:
+            return json.loads(self.settings_json)
+        except Exception:
+            return {}
+
+    def set_settings(self, data_dict):
+        import json
+        self.settings_json = json.dumps(data_dict)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'provider': self.provider,
+            'name': self.name,
+            'is_active': bool(self.is_active),
+            'auth_type': self.auth_type,
+            'client_id': self.client_id or '',
+            'has_client_secret': bool(self.client_secret),
+            'has_api_key': bool(self.api_key),
+            'has_access_token': bool(self.access_token),
+            'token_expires_at': self.token_expires_at.strftime('%Y-%m-%d %H:%M:%S') if self.token_expires_at else None,
+            'settings': self.get_settings(),
+            'updated_at': self.updated_at.strftime('%d/%m/%Y %H:%M') if self.updated_at else ''
+        }
+
+    def __repr__(self):
+        return f'<IntegrationConfig {self.provider} active={self.is_active}>'
+
+
+class ExternalEntityMap(db.Model):
+    __tablename__ = 'external_entity_map'
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(64), index=True, nullable=False)  # ex: 'bling'
+    crm_entity_type = db.Column(db.String(32), index=True, nullable=False)  # ex: 'client'
+    crm_entity_id = db.Column(db.Integer, index=True, nullable=False)  # ID local
+    external_id = db.Column(db.String(128), index=True, nullable=False)  # ID no Bling
+    sync_status = db.Column(db.String(32), default='synced')  # 'synced', 'pending', 'error'
+    last_synced_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sync_hash = db.Column(db.String(64), nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('provider', 'crm_entity_type', 'crm_entity_id', name='uq_provider_entity_local'),
+        db.UniqueConstraint('provider', 'crm_entity_type', 'external_id', name='uq_provider_entity_ext'),
+    )
+
+    def __repr__(self):
+        return f'<ExternalEntityMap {self.provider}:{self.crm_entity_type} {self.crm_entity_id}<->{self.external_id}>'
+
+
+class BlingSalesCache(db.Model):
+    __tablename__ = 'bling_sales_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bling_order_id = db.Column(db.String(128), unique=True, index=True, nullable=False)
+    order_number = db.Column(db.String(64))
+    client_cpf_cnpj = db.Column(db.String(32), index=True)
+    client_name = db.Column(db.String(256))
+    total_value = db.Column(db.Float, default=0.0)
+    order_date = db.Column(db.Date)
+    status = db.Column(db.String(64), index=True)
+    seller_name = db.Column(db.String(128))
+    raw_json = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bling_order_id': self.bling_order_id,
+            'order_number': self.order_number,
+            'client_cpf_cnpj': self.client_cpf_cnpj,
+            'client_name': self.client_name,
+            'total_value': self.total_value or 0.0,
+            'order_date': self.order_date.strftime('%d/%m/%Y') if self.order_date else '',
+            'status': self.status or '',
+            'seller_name': self.seller_name or '',
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else ''
+        }
+
+    def __repr__(self):
+        return f'<BlingSalesCache {self.order_number} ({self.total_value})>'
+
+
+class IntegrationLog(db.Model):
+    __tablename__ = 'integration_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(64), index=True, nullable=False)
+    action = db.Column(db.String(128), nullable=False)
+    status = db.Column(db.String(32), default='info')  # 'success', 'warning', 'error', 'info'
+    details = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<IntegrationLog {self.provider}:{self.action} [{self.status}] at {self.timestamp}>'
+
+
+class BlingProductCache(db.Model):
+    __tablename__ = 'bling_product_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    bling_product_id = db.Column(db.String(128), unique=True, index=True, nullable=False)
+    code = db.Column(db.String(64), index=True)
+    name = db.Column(db.String(256), index=True)
+    brand = db.Column(db.String(128), index=True)
+    supplier_name = db.Column(db.String(128), index=True)
+    category = db.Column(db.String(128), index=True)
+    size = db.Column(db.String(32), index=True)
+    price = db.Column(db.Float, default=0.0)
+    cost_price = db.Column(db.Float, default=0.0)
+    current_stock = db.Column(db.Integer, default=0)
+    last_sale_date = db.Column(db.Date, nullable=True)
+    days_without_sale = db.Column(db.Integer, default=0)
+    raw_json = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'bling_product_id': self.bling_product_id,
+            'code': self.code or '',
+            'name': self.name or '',
+            'brand': self.brand or 'Não Informada',
+            'supplier_name': self.supplier_name or 'Não Informado',
+            'category': self.category or 'Geral',
+            'size': self.size or 'Único',
+            'price': self.price or 0.0,
+            'cost_price': self.cost_price or 0.0,
+            'current_stock': self.current_stock or 0,
+            'last_sale_date': self.last_sale_date.strftime('%d/%m/%Y') if self.last_sale_date else 'Sem Vendas',
+            'days_without_sale': self.days_without_sale or 0,
+            'capital_locked': round((self.current_stock or 0) * (self.cost_price or self.price or 0.0), 2)
+        }
+
+    def __repr__(self):
+        return f'<BlingProductCache {self.code}:{self.name} stock={self.current_stock}>'
+
+
 
 

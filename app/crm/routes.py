@@ -13,6 +13,8 @@ from app.utils.waha import WahaAPI
 from app.utils.ai_handler import AIHandler
 from app.utils.maps_scraper import MapsScraperClient
 from app.tasks.lead_scraper import dispatch_scraping_job
+from app.core.module_registry import requires_module
+from app.core.plugins.event_bus import EventBus
 # ── XP Awards ────────────────────────────────────────────────────────────────
 XP_NOVO_CLIENTE  = 10
 XP_LEAD_PROPOSTA = 20
@@ -339,6 +341,10 @@ def new_client():
         award_xp(current_user, XP_NOVO_CLIENTE, f"Novo cliente cadastrado: {client.name}")
 
         db.session.commit()
+        try:
+            EventBus.publish('client.created', client)
+        except Exception as e:
+            pass
         flash('✅ Cliente cadastrado com sucesso!')
         return redirect(url_for('crm.list_clients'))
 
@@ -414,7 +420,9 @@ def edit_client(id):
 
     users = User.query.all()
     stores = Store.query.all()
-    return render_template('crm/form.html', title='Editar Cliente', client=client, users=users, stores=stores)
+    from app.utils.tf_engine import TensorFlowEngine
+    tf_profile = TensorFlowEngine.get_client_intelligence_profile(client) if client else None
+    return render_template('crm/form.html', title='Editar Cliente', client=client, users=users, stores=stores, tf_profile=tf_profile)
 
 # ── Message Client (Manual WA / API preview) ──────────────────────────────────
 @bp.route('/client/<int:id>/message', methods=['GET', 'POST'])
@@ -535,6 +543,7 @@ def import_batch():
 # ── Bulk Message Engine ────────────────────────────────────────────────────────
 @bp.route('/bulk-message', methods=['GET'])
 @login_required
+@requires_module('waha')
 def bulk_message():
     templates = MessageTemplate.query.all()
     # Listamos todos os clientes ativos com número de telefone para o usuário filtrar
@@ -734,6 +743,7 @@ def api_waha_reset_counters(id):
 # ── Prospecção Ativa (Google Maps Scraper) ──────────────────────────────────
 @bp.route('/prospeccao')
 @login_required
+@requires_module('prospecting')
 def prospeccao():
     jobs = ScrapingJob.query.order_by(ScrapingJob.created_at.desc()).limit(100).all()
     scraper_client = MapsScraperClient()
@@ -751,6 +761,7 @@ def prospeccao():
 
 @bp.route('/prospeccao/start', methods=['POST'])
 @login_required
+@requires_module('prospecting')
 def prospeccao_start():
     data = request.get_json(silent=True) or request.form.to_dict()
     query = (data.get('query') or data.get('keyword') or '').strip()

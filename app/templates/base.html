@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - CRM Pro</title>
     <meta name="description" content="CRM Pro — Sistema de Gestão de Clientes e Funil de Vendas">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="alternate icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
     <style id="custom-theme-vars-style">
@@ -26,6 +31,12 @@
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>
+        if (localStorage.getItem('crm_sidebar_collapsed') === '1') {
+            document.documentElement.classList.add('sidebar-collapsed');
+            document.addEventListener('DOMContentLoaded', () => document.body.classList.add('sidebar-collapsed'));
+        }
+    </script>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -34,102 +45,196 @@
     <!-- ── SIDEBAR ──────────────────────────────────────────────────── -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            {%- set _logo_url    = get_setting('company_logo_url', '') -%}
-            {%- set _co_name     = get_setting('company_name', 'CRM PRO') -%}
-            {%- set _co_tagline  = get_setting('company_tagline', 'GESTÃO DE VENDAS') -%}
-            {% if _logo_url %}
-            <div class="sidebar-logo-wrap">
-                <img src="{{ _logo_url }}" alt="{{ _co_name }}" class="sidebar-logo-img">
-                <div class="sidebar-logo-text">
-                    <div class="sidebar-brand text-main">{{ _co_name }}</div>
-                    <div class="sidebar-tagline">{{ _co_tagline }}</div>
+            <div class="d-flex align-center justify-between w-100 sidebar-header-inner">
+                {%- set _logo_url    = get_setting('company_logo_url', '') -%}
+                {%- set _co_name     = get_setting('company_name', 'CRM PRO') -%}
+                {%- set _co_tagline  = get_setting('company_tagline', 'GESTÃO DE VENDAS') -%}
+                {% if _logo_url %}
+                <div class="sidebar-logo-wrap" onclick="toggleSidebarCollapse()" title="Alternar recolher/expandir menu">
+                    <img src="{{ _logo_url }}" alt="{{ _co_name }}" class="sidebar-logo-img">
+                    <div class="sidebar-logo-text">
+                        <div class="sidebar-brand text-main">{{ _co_name }}</div>
+                        <div class="sidebar-tagline">{{ _co_tagline }}</div>
+                    </div>
                 </div>
+                {% else %}
+                {%- set _parts = _co_name.split() -%}
+                <div class="sidebar-logo-wrap" onclick="toggleSidebarCollapse()" title="Alternar recolher/expandir menu">
+                    <h2 class="sidebar-brand m-0">
+                        <span class="text-primary">{{ _parts[0] if _parts else 'CRM' }}</span>
+                        <span class="text-main sidebar-logo-text"> {{ _parts[1:] | join(' ') if _parts | length > 1 else 'PRO' }}</span>
+                    </h2>
+                </div>
+                {% endif %}
+                <button class="sidebar-collapse-btn-header" onclick="toggleSidebarCollapse()" title="Recolher / Expandir Menu">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
             </div>
-            {% else %}
-            {%- set _parts = _co_name.split() -%}
-            <h2 class="sidebar-brand">
-                <span class="text-primary">{{ _parts[0] if _parts else 'CRM' }}</span>
-                <span class="text-main"> {{ _parts[1:] | join(' ') if _parts | length > 1 else 'PRO' }}</span>
-            </h2>
-            <div class="sidebar-tagline">{{ _co_tagline }}</div>
-            {% endif %}
         </div>
 
         <nav class="sidebar-nav">
+            <!-- 1. GESTÃO DE CLIENTES -->
             <div class="nav-section-title m-0 mb-1">
-                PRINCIPAL
+                <span>GESTÃO DE CLIENTES</span>
             </div>
             <ul>
                 <li>
-                    <a href="{{ url_for('main.index') }}" class="nav-link {{ 'active' if request.endpoint == 'main.index' }}">
-                        <i class="fa-solid fa-chart-line nav-icon"></i> Dashboard
+                    <a href="{{ url_for('main.index') }}" class="nav-link {{ 'active' if request.endpoint == 'main.index' }}" data-tooltip="Dashboard">
+                        <i class="fa-solid fa-chart-line nav-icon text-primary"></i>
+                        <span class="nav-text">Dashboard</span>
                     </a>
                 </li>
+                {% if is_module_enabled('clients') %}
                 <li>
-                    <a href="{{ url_for('crm.list_clients') }}" class="nav-link {{ 'active' if request.endpoint in ['crm.list_clients','crm.new_client','crm.edit_client', 'crm.import_csv'] }}">
-                        <i class="fa-solid fa-users nav-icon"></i> Clientes
+                    <a href="{{ url_for('crm.list_clients') }}" class="nav-link {{ 'active' if request.endpoint in ['crm.list_clients','crm.new_client','crm.edit_client', 'crm.import_csv'] }}" data-tooltip="Clientes & Leads">
+                        <i class="fa-solid fa-users nav-icon text-info"></i>
+                        <span class="nav-text">Clientes & Leads</span>
                     </a>
                 </li>
+                {% endif %}
+                {% if is_module_enabled('funnel') %}
                 <li>
-                    <a href="{{ url_for('crm.kanban') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.kanban' }}">
-                        <i class="fa-solid fa-filter nav-icon"></i> Funil Kanban
+                    <a href="{{ url_for('crm.kanban') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.kanban' }}" data-tooltip="Funil Kanban">
+                        <i class="fa-solid fa-filter nav-icon text-primary"></i>
+                        <span class="nav-text">Funil Kanban</span>
                     </a>
                 </li>
+                {% endif %}
+                {% if is_module_enabled('prospecting') %}
                 <li>
-                    <a href="{{ url_for('crm.bulk_message') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.bulk_message' }}">
-                        <i class="fa-solid fa-paper-plane nav-icon text-success"></i> Disparo em Lote
+                    <a href="{{ url_for('crm.prospeccao') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.prospeccao' }}" data-tooltip="Prospecção Ativa">
+                        <i class="fa-solid fa-map-location-dot nav-icon text-warning"></i>
+                        <span class="nav-text">Prospecção Ativa</span>
                     </a>
                 </li>
+                {% endif %}
+                {% if is_module_enabled('gamification') %}
                 <li>
-                    <a href="{{ url_for('crm.prospeccao') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.prospeccao' }}">
-                        <i class="fa-solid fa-map-location-dot nav-icon text-warning"></i> Prospecção Ativa
+                    <a href="{{ url_for('main.ranking') }}" class="nav-link {{ 'active' if request.endpoint == 'main.ranking' }}" data-tooltip="Ranking XP">
+                        <i class="fa-solid fa-trophy nav-icon text-warning"></i>
+                        <span class="nav-text">Ranking & Gamificação</span>
                     </a>
                 </li>
-
-                <li>
-                    <a href="{{ url_for('main.ranking') }}" class="nav-link {{ 'active' if request.endpoint == 'main.ranking' }}">
-                        <i class="fa-solid fa-trophy nav-icon"></i> Ranking XP
-                    </a>
-                </li>
+                {% endif %}
             </ul>
 
+            <!-- 2. IA E AUTOMAÇÃO -->
+            {% if current_user.role in ['admin', 'gerente'] %}
+            {% if is_module_enabled('rag_engine') or is_module_enabled('auto_responder') or is_module_enabled('tf_engine') %}
+            <div class="nav-section-title">
+                <span>IA E AUTOMAÇÃO</span>
+            </div>
+            <ul>
+                {% if is_module_enabled('rag_engine') %}
+                <li>
+                    <a href="{{ url_for('admin.knowledge') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.knowledge' }}" data-tooltip="Base RAG">
+                        <i class="fa-solid fa-brain nav-icon text-info"></i>
+                        <span class="nav-text">Base de Conhecimento RAG</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% if is_module_enabled('auto_responder') %}
+                <li>
+                    <a href="{{ url_for('admin.bot_live') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.bot_live' }}" data-tooltip="Fluxo IA">
+                        <i class="fa-solid fa-network-wired nav-icon text-success"></i>
+                        <span class="nav-text">Fluxo IA do Bot</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% if is_module_enabled('tf_engine') %}
+                <li>
+                    <a href="{{ url_for('admin.tensorflow_dashboard') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.tensorflow_dashboard' }}" data-tooltip="TensorFlow">
+                        <i class="fa-solid fa-microchip nav-icon text-warning"></i>
+                        <span class="nav-text">Painel TensorFlow</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+            {% endif %}
+            {% endif %}
+
+            <!-- 3. INTEGRAÇÕES -->
+            {% if is_module_enabled('waha') or is_integration_active('bling') or current_user.role in ['admin', 'gerente'] %}
+            <div class="nav-section-title">
+                <span>INTEGRAÇÕES</span>
+            </div>
+            <ul>
+                {% if current_user.role in ['admin', 'gerente'] %}
+                <li>
+                    <a href="{{ url_for('integrations.admin_integrations') }}" class="nav-link {{ 'active' if 'integrations.admin_integrations' in request.endpoint }}" data-tooltip="Integrações">
+                        <i class="fa-solid fa-plug nav-icon text-primary"></i>
+                        <span class="nav-text">Central de Integrações</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% if is_module_enabled('waha') %}
+                <li>
+                    <a href="{{ url_for('crm.bulk_message') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.bulk_message' }}" data-tooltip="Disparo WAHA">
+                        <i class="fa-solid fa-paper-plane nav-icon text-success"></i>
+                        <span class="nav-text">Disparo em Lote WAHA</span>
+                    </a>
+                </li>
+                {% endif %}
+                {% if is_integration_active('bling') %}
+                <li>
+                    <a href="{{ url_for('integrations.bling_dashboard') }}" class="nav-link {{ 'active' if request.endpoint == 'integrations.bling_dashboard' }}" data-tooltip="Bling ERP">
+                        <i class="fa-solid fa-boxes-packing nav-icon text-warning"></i>
+                        <span class="nav-text">Bling Analytics</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('integrations.bling_reports') }}" class="nav-link {{ 'active' if request.endpoint == 'integrations.bling_reports' }}" data-tooltip="Relatórios Bling">
+                        <i class="fa-solid fa-chart-pie nav-icon text-info"></i>
+                        <span class="nav-text">Relatórios ERP Bling</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+            {% endif %}
+
+            <!-- 4. CONFIGURAÇÃO (Inclui Plugins e Extensões) -->
             {% if current_user.role in ['admin', 'gerente'] %}
             <div class="nav-section-title">
-                ADMINISTRAÇÃO
+                <span>CONFIGURAÇÃO</span>
             </div>
             <ul>
                 <li>
-                    <a href="{{ url_for('admin.list_users') }}" class="nav-link {{ 'active' if 'admin.list_users' == request.endpoint or 'admin.new_user' == request.endpoint or 'admin.edit_user' == request.endpoint }}">
-                        <i class="fa-solid fa-user-gear nav-icon"></i> Usuários
+                    <a href="{{ url_for('admin.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}" data-tooltip="Configurações">
+                        <i class="fa-solid fa-gear nav-icon text-secondary"></i>
+                        <span class="nav-text">Configurações Globais</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.templates_list') }}" class="nav-link {{ 'active' if 'admin.templates_list' in request.endpoint }}">
-                        <i class="fa-solid fa-file-code nav-icon"></i> Templates 
+                    <a href="{{ url_for('admin.modules_panel') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.modules_panel' }}" data-tooltip="Módulos por Setor">
+                        <i class="fa-solid fa-layer-group nav-icon text-info"></i>
+                        <span class="nav-text">Módulos por Setor</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.logs' }}">
-                        <i class="fa-solid fa-scroll nav-icon"></i> Logs do Sistema
+                    <a href="{{ url_for('admin.plugins_panel') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.plugins_panel' }}" data-tooltip="Plugins">
+                        <i class="fa-solid fa-puzzle-piece nav-icon text-primary"></i>
+                        <span class="nav-text">Plugins & Extensões</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.knowledge') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.knowledge' }}">
-                        <i class="fa-solid fa-brain nav-icon text-info"></i> Base de Conhecimento
+                    <a href="{{ url_for('admin.list_users') }}" class="nav-link {{ 'active' if 'admin.list_users' == request.endpoint or 'admin.new_user' == request.endpoint or 'admin.edit_user' == request.endpoint or 'admin.list_groups' == request.endpoint }}" data-tooltip="Usuários & Permissões">
+                        <i class="fa-solid fa-user-gear nav-icon"></i>
+                        <span class="nav-text">Usuários & Permissões</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.bot_live') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.bot_live' }}">
-                        <i class="fa-solid fa-network-wired nav-icon text-success"></i> Fluxo IA do Bot
+                    <a href="{{ url_for('admin.templates_list') }}" class="nav-link {{ 'active' if 'admin.templates_list' in request.endpoint }}" data-tooltip="Templates">
+                        <i class="fa-solid fa-file-code nav-icon"></i>
+                        <span class="nav-text">Templates de Mensagem</span>
                     </a>
                 </li>
                 <li>
-                    <a href="{{ url_for('admin.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}">
-                        <i class="fa-solid fa-gear nav-icon"></i> Configurações
+                    <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.logs' }}" data-tooltip="Logs">
+                        <i class="fa-solid fa-scroll nav-icon"></i>
+                        <span class="nav-text">Logs & Auditoria</span>
                     </a>
                 </li>
             </ul>
-
             {% endif %}
         </nav>
 
@@ -139,7 +244,7 @@
                 <div class="avatar avatar-md">
                     {{ current_user.username[0] | upper }}
                 </div>
-                <div>
+                <div class="sidebar-footer-info">
                     <div class="font-semibold text-sm text-main">{{ current_user.username }}</div>
                     <div class="text-xs text-muted">
                         {{ current_user.role | capitalize }} &middot;
@@ -147,8 +252,9 @@
                     </div>
                 </div>
             </div>
-            <a href="{{ url_for('auth.logout') }}" class="nav-link logout-link">
-                <i class="fa-solid fa-right-from-bracket nav-icon"></i> Sair
+            <a href="{{ url_for('auth.logout') }}" class="nav-link logout-link" data-tooltip="Sair">
+                <i class="fa-solid fa-right-from-bracket nav-icon"></i>
+                <span class="nav-text">Sair</span>
             </a>
         </div>
     </aside>
@@ -158,8 +264,11 @@
         <!-- Top bar -->
         <div class="header-glass mb-4">
             <div class="d-flex align-center gap-2">
-                <button id="sidebarToggle" class="sidebar-toggle">
+                <button id="sidebarToggle" class="sidebar-toggle" title="Menu Mobile">
                     <i class="fa-solid fa-bars"></i>
+                </button>
+                <button class="sidebar-collapse-btn-top me-1" onclick="toggleSidebarCollapse()" title="Recolher / Expandir Menu">
+                    <i class="fa-solid fa-indent"></i>
                 </button>
                 <h3 class="m-0 font-semibold text-main">{{ title }}</h3>
             </div>
@@ -206,10 +315,45 @@
 
         if (toggleBtn) toggleBtn.onclick = () => sidebar.classList.contains('active') ? closeSidebar() : openSidebar();
 
+        function toggleSidebarCollapse() {
+            document.body.classList.toggle('sidebar-collapsed');
+            document.documentElement.classList.toggle('sidebar-collapsed');
+            const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+            localStorage.setItem('crm_sidebar_collapsed', isCollapsed ? '1' : '0');
+        }
+
+        // Restore sidebar state
+        if (localStorage.getItem('crm_sidebar_collapsed') === '1') {
+            document.body.classList.add('sidebar-collapsed');
+        }
+
         // Auto-dismiss flash after 4 s
         document.querySelectorAll('.flash-msg').forEach(el => {
             setTimeout(() => el.style.opacity = '0', 3500);
             setTimeout(() => el.remove(), 4000);
+        });
+
+        // Universal Modal Toggle Handler (data-bs-toggle="modal" & data-bs-dismiss="modal")
+        document.addEventListener('click', function(e) {
+            const toggleBtn = e.target.closest('[data-bs-toggle="modal"]');
+            if (toggleBtn) {
+                e.preventDefault();
+                const targetSelector = toggleBtn.getAttribute('data-bs-target') || toggleBtn.getAttribute('href');
+                if (targetSelector) {
+                    const modalEl = document.querySelector(targetSelector);
+                    if (modalEl) modalEl.classList.add('show');
+                }
+            }
+            
+            const dismissBtn = e.target.closest('[data-bs-dismiss="modal"]');
+            if (dismissBtn) {
+                const modalEl = dismissBtn.closest('.modal');
+                if (modalEl) modalEl.classList.remove('show');
+            }
+
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('show');
+            }
         });
     </script>
     {% block extra_js %}{% endblock %}

@@ -748,6 +748,83 @@
             </div>
         </div>
 
+        <!-- ── TEMAS ALTERNATIVOS (design não-glassmorphism) ── -->
+        <div style="margin-top:1.5rem; margin-bottom:0.75rem; padding-top:1rem; border-top:1px solid var(--glass-border);">
+            <div class="d-flex align-center gap-2 mb-2">
+                <i class="fa-solid fa-layer-group" style="color:#f59e0b;"></i>
+                <span class="text-sm font-semibold">Estilos Alternativos de Design</span>
+            </div>
+            <p class="text-xs text-muted m-0">Temas que vão além do glassmorphism — cada um traz uma personalidade visual única com bordas, sombras e tipografia distintas.</p>
+        </div>
+
+        <div class="theme-grid" id="themeGridAlt">
+            <!-- industrial -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'industrial' %}selected{% endif %}"
+                 onclick="applyTheme('industrial', this)" data-theme-id="industrial">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch" style="border-radius:3px">
+                    <div class="theme-swatch-item" style="background:#141414; border-radius:2px"></div>
+                    <div class="theme-swatch-item" style="background:#2a2a2a; border-radius:2px"></div>
+                    <div class="theme-swatch-item" style="background:#d97706; border-radius:2px"></div>
+                    <div class="theme-swatch-item" style="background:#ef4444; border-radius:2px"></div>
+                </div>
+                <div class="theme-name"><i class="fa-solid fa-industry" style="font-size:0.7rem; margin-right:0.3rem; color:#d97706;"></i> Industrial</div>
+                <div class="theme-desc">Aço • Matte • Fábrica</div>
+            </div>
+            <!-- ubuntu -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'ubuntu' %}selected{% endif %}"
+                 onclick="applyTheme('ubuntu', this)" data-theme-id="ubuntu">
+                <span class="theme-check"><i class="fa-solid fa-check"></i></span>
+                <div class="theme-swatch">
+                    <div class="theme-swatch-item" style="background:#1e0014"></div>
+                    <div class="theme-swatch-item" style="background:#3c0a28"></div>
+                    <div class="theme-swatch-item" style="background:#e95420"></div>
+                    <div class="theme-swatch-item" style="background:#77216f"></div>
+                </div>
+                <div class="theme-name"><i class="fa-brands fa-ubuntu" style="font-size:0.7rem; margin-right:0.3rem; color:#e95420;"></i> Ubuntu</div>
+                <div class="theme-desc">Aubergine • Linux Desktop</div>
+            </div>
+            <!-- java -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'java' %}selected{% endif %}"
+                 onclick="applyTheme('java', this)" data-theme-id="java">
+                <span class="theme-check"><i class="fa-solid fa-check" style="color:#1e293b"></i></span>
+                <div class="theme-swatch" style="border-radius:2px">
+                    <div class="theme-swatch-item" style="background:#d1d5db; border-radius:1px"></div>
+                    <div class="theme-swatch-item" style="background:#f1f5f9; border-radius:1px"></div>
+                    <div class="theme-swatch-item" style="background:#2563eb; border-radius:1px"></div>
+                    <div class="theme-swatch-item" style="background:#16a34a; border-radius:1px"></div>
+                </div>
+                <div class="theme-name"><i class="fa-brands fa-java" style="font-size:0.8rem; margin-right:0.3rem; color:#2563eb;"></i> Java Swing</div>
+                <div class="theme-desc">Metal L&amp;F • Corporativo</div>
+            </div>
+            <!-- brutalist -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'brutalist' %}selected{% endif %}"
+                 onclick="applyTheme('brutalist', this)" data-theme-id="brutalist">
+                <span class="theme-check" style="background:#0a0a0a"><i class="fa-solid fa-check" style="color:#ffffff"></i></span>
+                <div class="theme-swatch" style="border-radius:0">
+                    <div class="theme-swatch-item" style="background:#f5f5f5; border-radius:0; border:2px solid #0a0a0a;"></div>
+                    <div class="theme-swatch-item" style="background:#e5e5e5; border-radius:0; border:2px solid #0a0a0a;"></div>
+                    <div class="theme-swatch-item" style="background:#0a0a0a; border-radius:0;"></div>
+                    <div class="theme-swatch-item" style="background:#dc2626; border-radius:0; border:2px solid #0a0a0a;"></div>
+                </div>
+                <div class="theme-name"><i class="fa-solid fa-cube" style="font-size:0.7rem; margin-right:0.3rem; color:#0a0a0a;"></i> Brutalist</div>
+                <div class="theme-desc">Concreto • Raw • Zero Blur</div>
+            </div>
+            <!-- retro-terminal -->
+            <div class="theme-card {% if get_setting('theme_name', 'dark-indigo') == 'retro-terminal' %}selected{% endif %}"
+                 onclick="applyTheme('retro-terminal', this)" data-theme-id="retro-terminal">
+                <span class="theme-check" style="background:#22c55e"><i class="fa-solid fa-check" style="color:#000"></i></span>
+                <div class="theme-swatch" style="border-radius:1px">
+                    <div class="theme-swatch-item" style="background:#050505; border-radius:0"></div>
+                    <div class="theme-swatch-item" style="background:#0a140a; border-radius:0"></div>
+                    <div class="theme-swatch-item" style="background:#22c55e; border-radius:0"></div>
+                    <div class="theme-swatch-item" style="background:#facc15; border-radius:0"></div>
+                </div>
+                <div class="theme-name"><i class="fa-solid fa-terminal" style="font-size:0.7rem; margin-right:0.3rem; color:#22c55e;"></i> Retro Terminal</div>
+                <div class="theme-desc">CRT • Fósforo Verde • Hacker</div>
+            </div>
+        </div>
+
         <div class="d-flex align-center gap-2 mt-3">
             <span id="theme-feedback" class="text-xs text-muted"></span>
         </div>
@@ -771,6 +848,12 @@
                 <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-ocean')">Ocean</button>
                 <button type="button" class="btn-xs-theme" onclick="loadBasePreset('dark-amber')">Amber</button>
                 <button type="button" class="btn-xs-theme" onclick="loadBasePreset('light')">Light</button>
+                <span class="text-xs text-muted" style="margin-left:0.25rem;">|</span>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('industrial')" style="border-color:#d97706;">Industrial</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('ubuntu')" style="border-color:#e95420;">Ubuntu</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('java')" style="border-color:#2563eb;">Java</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('brutalist')" style="border-color:#0a0a0a;">Brutalist</button>
+                <button type="button" class="btn-xs-theme" onclick="loadBasePreset('retro-terminal')" style="border-color:#22c55e;">Terminal</button>
             </div>
         </div>
 
@@ -1098,6 +1181,61 @@
             text_main: '#0f172a',
             text_muted: '#475569',
             glass_border: '#cbd5e1'
+        },
+        'industrial': {
+            sidebar_bg: '#141414',
+            primary_color: '#d97706',
+            primary_hover: '#b45309',
+            bg_dark: '#1a1a1a',
+            card_bg: '#2a2a2a',
+            accent_color: '#ef4444',
+            text_main: '#e5e5e5',
+            text_muted: '#a3a3a3',
+            glass_border: '#404040'
+        },
+        'ubuntu': {
+            sidebar_bg: '#1e0014',
+            primary_color: '#e95420',
+            primary_hover: '#c7431a',
+            bg_dark: '#2c001e',
+            card_bg: '#3c0a28',
+            accent_color: '#77216f',
+            text_main: '#f5f1ed',
+            text_muted: '#d4c4bb',
+            glass_border: '#5c1a18'
+        },
+        'java': {
+            sidebar_bg: '#d1d5db',
+            primary_color: '#2563eb',
+            primary_hover: '#1d4ed8',
+            bg_dark: '#e2e8f0',
+            card_bg: '#f1f5f9',
+            accent_color: '#16a34a',
+            text_main: '#1e293b',
+            text_muted: '#475569',
+            glass_border: '#94a3b8'
+        },
+        'brutalist': {
+            sidebar_bg: '#f5f5f5',
+            primary_color: '#000000',
+            primary_hover: '#333333',
+            bg_dark: '#d4d4d4',
+            card_bg: '#e5e5e5',
+            accent_color: '#dc2626',
+            text_main: '#0a0a0a',
+            text_muted: '#525252',
+            glass_border: '#0a0a0a'
+        },
+        'retro-terminal': {
+            sidebar_bg: '#050505',
+            primary_color: '#22c55e',
+            primary_hover: '#16a34a',
+            bg_dark: '#0a0a0a',
+            card_bg: '#0a140a',
+            accent_color: '#facc15',
+            text_main: '#4ade80',
+            text_muted: '#22c55e',
+            glass_border: '#1a3a1a'
         }
     };
 
@@ -1708,18 +1846,88 @@
 <div id="tab-ai" class="tab-content {% if active_tab == 'ai' %}active{% endif %}">
     <div class="header-glass max-w-lg">
         <form action="{{ url_for('admin.settings', tab='ai') }}" method="post" class="w-100">
-            <h4 class="card-title mb-4">
-                <i class="fa-solid fa-brain text-warning"></i> Inteligência Artificial & Automação
+            <h4 class="card-title mb-4 d-flex align-center justify-between">
+                <span><i class="fa-solid fa-puzzle-piece text-warning"></i> Gerenciador de Plugins de IA</span>
+                <a href="{{ url_for('admin.tensorflow_dashboard') }}" class="btn-primary text-xs px-2 py-1 d-inline-flex align-center gap-1" style="background: rgba(255, 115, 0, 0.2); color: #ff7300; border: 1px solid rgba(255, 115, 0, 0.4); text-decoration: none; border-radius: 6px;">
+                    <i class="fa-solid fa-microchip"></i> Painel TensorFlow
+                </a>
             </h4>
 
+            <!-- Master Switch Global -->
+            <div class="p-3 mb-4 rounded-md" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3);">
+                <label class="d-flex align-center justify-between cursor-pointer font-semibold text-main m-0">
+                    <span class="d-flex align-center gap-2">
+                        <i class="fa-solid fa-power-off text-primary"></i> Ativar Inteligência Artificial Globalmente
+                    </span>
+                    <select name="ai_enabled" class="input-glass w-auto py-1 px-3 text-xs font-bold">
+                        <option value="true" {% if settings.get('ai_enabled', 'true')|lower in ['true','1','sim'] %}selected{% endif %}>🟢 LIGADO</option>
+                        <option value="false" {% if settings.get('ai_enabled')|lower in ['false','0','nao'] %}selected{% endif %}>🔴 DESLIGADO</option>
+                    </select>
+                </label>
+            </div>
+
+            <h5 class="text-sm font-semibold text-muted mb-3"><i class="fa-solid fa-sliders"></i> Plugins de Provedores de IA (Liga/Desliga Independente)</h5>
+
+            <!-- Grid de Plugins Independente -->
+            <div class="grid grid-2 gap-3 mb-4">
+                <!-- Plugin Ollama -->
+                <div class="p-3 rounded-md border" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="font-bold text-sm text-main">🦙 Ollama Local</span>
+                        <select name="ai_plugin_ollama_enabled" class="input-glass w-auto py-1 px-2 text-xs">
+                            <option value="true" {% if settings.get('ai_plugin_ollama_enabled', 'true')|lower in ['true','1'] %}selected{% endif %}>🟢 Ativo</option>
+                            <option value="false" {% if settings.get('ai_plugin_ollama_enabled')|lower in ['false','0'] %}selected{% endif %}>⚪ Inativo</option>
+                        </select>
+                    </div>
+                    <span class="text-xs text-muted block">Docker Local - Gratuito & Ilimitado</span>
+                </div>
+
+                <!-- Plugin TensorFlow -->
+                <div class="p-3 rounded-md border" style="background: rgba(255,115,0,0.05); border-color: rgba(255,115,0,0.3);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="font-bold text-sm text-warning">🧠 TensorFlow Keras</span>
+                        <select name="ai_plugin_tensorflow_enabled" class="input-glass w-auto py-1 px-2 text-xs">
+                            <option value="true" {% if settings.get('ai_plugin_tensorflow_enabled', 'true')|lower in ['true','1'] %}selected{% endif %}>🟢 Ativo</option>
+                            <option value="false" {% if settings.get('ai_plugin_tensorflow_enabled')|lower in ['false','0'] %}selected{% endif %}>⚪ Inativo</option>
+                        </select>
+                    </div>
+                    <span class="text-xs text-muted block">Redes Neurais de Lead Score, Churn e Sentimento</span>
+                </div>
+
+                <!-- Plugin Gemini -->
+                <div class="p-3 rounded-md border" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="font-bold text-sm text-main">♊ Google Gemini</span>
+                        <select name="ai_plugin_gemini_enabled" class="input-glass w-auto py-1 px-2 text-xs">
+                            <option value="true" {% if settings.get('ai_plugin_gemini_enabled', 'true')|lower in ['true','1'] %}selected{% endif %}>🟢 Ativo</option>
+                            <option value="false" {% if settings.get('ai_plugin_gemini_enabled')|lower in ['false','0'] %}selected{% endif %}>⚪ Inativo</option>
+                        </select>
+                    </div>
+                    <span class="text-xs text-muted block">Cloud API Ultra Rápida</span>
+                </div>
+
+                <!-- Plugin DeepSeek -->
+                <div class="p-3 rounded-md border" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="font-bold text-sm text-main">🐳 DeepSeek</span>
+                        <select name="ai_plugin_deepseek_enabled" class="input-glass w-auto py-1 px-2 text-xs">
+                            <option value="true" {% if settings.get('ai_plugin_deepseek_enabled')|lower in ['true','1'] %}selected{% endif %}>🟢 Ativo</option>
+                            <option value="false" {% if settings.get('ai_plugin_deepseek_enabled', 'false')|lower in ['false','0'] %}selected{% endif %}>⚪ Inativo</option>
+                        </select>
+                    </div>
+                    <span class="text-xs text-muted block">Cloud API Raciocínio</span>
+                </div>
+            </div>
+
             <div class="form-group mb-3">
-                <label for="ai_provider">Provedor de Inteligência Artificial</label>
+                <label for="ai_provider">Provedor Primário Padrão</label>
                 <select name="ai_provider" id="ai_provider" class="input-glass" onchange="toggleAiProviderFields()">
                     <option value="ollama" {% if settings.get('ai_provider', 'ollama') == 'ollama' %}selected{% endif %}>🦙 Ollama (Docker Local - 100% Gratuito & Ilimitado)</option>
+                    <option value="tensorflow" {% if settings.get('ai_provider') == 'tensorflow' %}selected{% endif %}>🧠 TensorFlow (Redes Neurais Locais Keras)</option>
                     <option value="deepseek" {% if settings.get('ai_provider') == 'deepseek' %}selected{% endif %}>DeepSeek (Cloud API)</option>
                     <option value="google" {% if settings.get('ai_provider') == 'google' %}selected{% endif %}>Google Gemini (Cloud API)</option>
                 </select>
-                <small class="text-xs text-muted mt-1 d-block">Ollama roda direto no seu Docker sem custos de API por mensagem.</small>
+                <small class="text-xs text-muted mt-1 d-block">Caso o provedor primário falhe ou seja desativado, o sistema executa o fallback automático para outro plugin ativo.</small>
             </div>
 
             <!-- Bloco Específico do Ollama -->
@@ -1769,11 +1977,12 @@
             </div>
 
             <button type="submit" class="btn-primary mt-3">
-                <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações de IA
+                <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações de Plugins de IA
             </button>
         </form>
     </div>
 </div>
+
 
 <!-- Tab: Bot de Resposta Automática -->
 <div id="tab-bot" class="tab-content {% if active_tab == 'bot' %}active{% endif %}">

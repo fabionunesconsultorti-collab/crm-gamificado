@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Header com Telemetria e Controle de Plugin -->
+    <div class="card-glass mb-4 p-4" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 115, 0, 0.3); border-radius: 16px;">
+        <div class="d-flex flex-wrap align-center justify-between gap-3">
+            <div class="d-flex align-center gap-3">
+                <div class="icon-avatar" style="background: rgba(255, 115, 0, 0.15); color: #ff7300; width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; border: 1px solid rgba(255, 115, 0, 0.3);">
+                    <i class="fa-solid fa-microchip"></i>
+                </div>
+                <div>
+                    <h2 class="m-0 font-bold text-main d-flex align-center gap-2" style="font-size: 1.6rem;">
+                        Painel de Operação TensorFlow
+                        <span class="badge" style="background: rgba(255, 115, 0, 0.2); color: #ff7300; border: 1px solid rgba(255, 115, 0, 0.4); font-size: 0.75rem; padding: 4px 10px; border-radius: 20px;">
+                            Plugin Keras v{{ tf_status.version }}
+                        </span>
+                    </h2>
+                    <p class="text-muted text-sm m-0 mt-1">
+                        Gerenciamento de Redes Neurais Locais, Treinamento de Modelos e Simulação de Predição em Tempo Real
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex align-center gap-2">
+                <div class="px-3 py-2 text-right" style="background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="text-xs text-muted">Motor de Hardware</div>
+                    <div class="font-bold text-sm text-warning d-flex align-center gap-1">
+                        <i class="fa-solid fa-bolt"></i> {{ tf_status.device }}
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="triggerTraining()" style="background: linear-gradient(135deg, #ff7300 0%, #e65100 100%); border: none; box-shadow: 0 4px 15px rgba(255, 115, 0, 0.3); border-radius: 10px; font-weight: 600; padding: 10px 18px;">
+                    <i class="fa-solid fa-rotate text-white"></i> Treinar Modelos
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Métricas dos Modelos -->
+    <div class="grid grid-3 gap-4 mb-4">
+        <!-- Model 1 -->
+        <div class="card-glass p-4">
+            <div class="d-flex align-center justify-between mb-3">
+                <div class="font-semibold text-main d-flex align-center gap-2">
+                    <i class="fa-solid fa-bullseye text-warning"></i> Lead Scoring Neural
+                </div>
+                <span class="badge bg-success-soft text-success">Ativo</span>
+            </div>
+            <div class="d-flex align-baseline gap-2 mb-2">
+                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.lead_score_acc }}%</div>
+                <div class="text-xs text-muted">Acurácia (Validação)</div>
+            </div>
+            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                <div class="progress-fill" style="width: {{ tf_status.metrics.lead_score_acc }}%; height: 100%; background: linear-gradient(90deg, #ff7300, #10b981);"></div>
+            </div>
+            <div class="text-xs text-muted d-flex justify-between">
+                <span>Loss: <strong>{{ tf_status.metrics.lead_score_loss }}</strong></span>
+                <span>Densidade: Keras 3-Layers</span>
+            </div>
+        </div>
+
+        <!-- Model 2 -->
+        <div class="card-glass p-4">
+            <div class="d-flex align-center justify-between mb-3">
+                <div class="font-semibold text-main d-flex align-center gap-2">
+                    <i class="fa-solid fa-user-slash text-danger"></i> Churn Risk Predictor
+                </div>
+                <span class="badge bg-success-soft text-success">Ativo</span>
+            </div>
+            <div class="d-flex align-baseline gap-2 mb-2">
+                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.churn_acc }}%</div>
+                <div class="text-xs text-muted">Acurácia (Validação)</div>
+            </div>
+            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                <div class="progress-fill" style="width: {{ tf_status.metrics.churn_acc }}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981);"></div>
+            </div>
+            <div class="text-xs text-muted d-flex justify-between">
+                <span>Loss: <strong>{{ tf_status.metrics.churn_loss }}</strong></span>
+                <span>Função: Binary Cross-Entropy</span>
+            </div>
+        </div>
+
+        <!-- Model 3 -->
+        <div class="card-glass p-4">
+            <div class="d-flex align-center justify-between mb-3">
+                <div class="font-semibold text-main d-flex align-center gap-2">
+                    <i class="fa-solid fa-comments text-info"></i> Classificador de Sentimento
+                </div>
+                <span class="badge bg-success-soft text-success">Ativo</span>
+            </div>
+            <div class="d-flex align-baseline gap-2 mb-2">
+                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.sentiment_acc }}%</div>
+                <div class="text-xs text-muted">Acurácia (Validação)</div>
+            </div>
+            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                <div class="progress-fill" style="width: {{ tf_status.metrics.sentiment_acc }}%; height: 100%; background: linear-gradient(90deg, #a855f7, #3b82f6);"></div>
+            </div>
+            <div class="text-xs text-muted d-flex justify-between">
+                <span>Loss: <strong>{{ tf_status.metrics.sentiment_loss }}</strong></span>
+                <span>Arquitetura: Embedding + Dense</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Abas de Ferramentas de Simulação e Treinamento -->
+    <div class="grid grid-3-1 gap-4">
+        <!-- Coluna Esquerda: Benchmarks de Inferência Neurais -->
+        <div class="card-glass p-4">
+            <h3 class="font-bold text-main text-lg mb-3 d-flex align-center gap-2">
+                <i class="fa-solid fa-flask text-warning"></i> Bancada de Teste de Inferência Neural
+            </h3>
+            
+            <div class="tabs-nav mb-4 border-b border-glass pb-2 d-flex gap-2">
+                <button type="button" class="btn-tab active" id="tab-btn-lead" onclick="switchSimTab('lead')">
+                    <i class="fa-solid fa-user-check"></i> Lead Scoring
+                </button>
+                <button type="button" class="btn-tab" id="tab-btn-churn" onclick="switchSimTab('churn')">
+                    <i class="fa-solid fa-shield-cat"></i> Risco de Churn
+                </button>
+                <button type="button" class="btn-tab" id="tab-btn-text" onclick="switchSimTab('text')">
+                    <i class="fa-solid fa-message"></i> Sentimento & Intenção
+                </button>
+            </div>
+
+            <!-- Tab 1: Lead Score -->
+            <div id="sim-tab-lead" class="sim-tab-content">
+                <form id="form-sim-lead" onsubmit="runSimLead(event)">
+                    <div class="grid grid-2 gap-3 mb-3">
+                        <div>
+                            <label class="form-label text-xs">Frequência de Compras</label>
+                            <input type="number" id="lead_freq" class="input-glass" value="4" min="0" max="100">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">LTV Total (R$)</label>
+                            <input type="number" id="lead_ltv" class="input-glass" value="2500" min="0">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Nota no Google (0 a 5)</label>
+                            <input type="number" step="0.1" id="lead_rating" class="input-glass" value="4.8" min="0" max="5">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Dias sem Contato</label>
+                            <input type="number" id="lead_days" class="input-glass" value="12" min="0">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary w-100 py-2">
+                        <i class="fa-solid fa-play"></i> Calcular Score Neural
+                    </button>
+                </form>
+
+                <div id="res-lead" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-muted">Resultado da Inferência:</span>
+                        <span id="res-lead-badge" class="badge"></span>
+                    </div>
+                    <div class="d-flex align-baseline gap-2 mb-2">
+                        <span class="font-bold text-3xl text-main" id="res-lead-score">0</span>
+                        <span class="text-xs text-muted">/ 100 de Score de Qualificação</span>
+                    </div>
+                    <p class="text-xs text-muted m-0 mt-2" id="res-lead-rec"></p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Churn Risk -->
+            <div id="sim-tab-churn" class="sim-tab-content d-none">
+                <form id="form-sim-churn" onsubmit="runSimChurn(event)">
+                    <div class="grid grid-2 gap-3 mb-3">
+                        <div>
+                            <label class="form-label text-xs">Dias de Inatividade</label>
+                            <input type="number" id="churn_days" class="input-glass" value="65" min="0">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Histórico de Compras</label>
+                            <input type="number" id="churn_freq" class="input-glass" value="1" min="0">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary w-100 py-2" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        <i class="fa-solid fa-play"></i> Avaliar Risco de Churn
+                    </button>
+                </form>
+
+                <div id="res-churn" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-muted">Probabilidade de Cancelamento:</span>
+                        <span id="res-churn-badge" class="badge"></span>
+                    </div>
+                    <div class="d-flex align-baseline gap-2 mb-2">
+                        <span class="font-bold text-3xl text-main" id="res-churn-pct">0%</span>
+                    </div>
+                    <p class="text-xs text-muted m-0 mt-2" id="res-churn-action"></p>
+                </div>
+            </div>
+
+            <!-- Tab 3: Text Classifier -->
+            <div id="sim-tab-text" class="sim-tab-content d-none">
+                <form id="form-sim-text" onsubmit="runSimText(event)">
+                    <div class="mb-3">
+                        <label class="form-label text-xs">Mensagem do Cliente no WhatsApp</label>
+                        <textarea id="text_msg" class="input-glass w-100" rows="3" placeholder="Ex: Olá! Gostaria de saber qual é o valor do plano corporativo?">Gostaria de saber qual é o preço do plano de CRM para 5 usuários?</textarea>
+                    </div>
+                    <button type="submit" class="btn-primary w-100 py-2" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);">
+                        <i class="fa-solid fa-robot"></i> Classificar Sentimento & Intenção
+                    </button>
+                </form>
+
+                <div id="res-text" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                    <div class="grid grid-2 gap-3 mb-2">
+                        <div>
+                            <span class="text-xs text-muted block">Sentimento Detectado</span>
+                            <span class="font-bold text-main text-base" id="res-text-sent"></span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-muted block">Intenção Identificada</span>
+                            <span class="font-bold text-main text-base" id="res-text-intent"></span>
+                        </div>
+                    </div>
+                    <div class="text-xs text-muted mt-2">Confiança do Modelo: <strong id="res-text-conf"></strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: Console de Treinamento em Tempo Real -->
+        <div class="card-glass p-4">
+            <h4 class="font-bold text-main text-base mb-3 d-flex align-center justify-between">
+                <span><i class="fa-solid fa-terminal text-success"></i> Console de Treino Keras</span>
+                <span id="train-status-badge" class="badge bg-secondary-soft text-muted">Standby</span>
+            </h4>
+
+            <div id="terminal-log" style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 0.78rem; color: #a7f3d0; line-height: 1.5;">
+                <div class="text-muted">[TensorFlowEngine] Sistema pronto. Aguardando disparo de treinamento de épocas...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #94a3b8);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-tab:hover {
+    color: var(--text-main, #f8fafc);
+    background: rgba(255, 255, 255, 0.05);
+}
+.btn-tab.active {
+    color: #ff7300;
+    background: rgba(255, 115, 0, 0.12);
+    font-weight: 600;
+}
+</style>
+
+<script>
+function switchSimTab(tab) {
+    document.querySelectorAll('.sim-tab-content').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.btn-tab').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(`sim-tab-${tab}`).classList.remove('d-none');
+    document.getElementById(`tab-btn-${tab}`).classList.add('active');
+}
+
+function runSimLead(e) {
+    e.preventDefault();
+    const data = {
+        purchase_frequency: document.getElementById('lead_freq').value,
+        ltv: document.getElementById('lead_ltv').value,
+        google_rating: document.getElementById('lead_rating').value,
+        days_since_last: document.getElementById('lead_days').value
+    };
+
+    fetch("{{ url_for('admin.tf_predict_lead') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            const el = document.getElementById('res-lead');
+            el.classList.remove('d-none');
+            document.getElementById('res-lead-score').innerText = res.data.score;
+            document.getElementById('res-lead-rec').innerText = res.data.recommendation;
+            
+            const badge = document.getElementById('res-lead-badge');
+            badge.innerText = res.data.classification;
+            badge.className = `badge bg-${res.data.badge_color}-soft text-${res.data.badge_color}`;
+        }
+    });
+}
+
+function runSimChurn(e) {
+    e.preventDefault();
+    const data = {
+        days_since_last: document.getElementById('churn_days').value,
+        purchase_frequency: document.getElementById('churn_freq').value
+    };
+
+    fetch("{{ url_for('admin.tf_predict_churn') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            const el = document.getElementById('res-churn');
+            el.classList.remove('d-none');
+            document.getElementById('res-churn-pct').innerText = res.data.churn_risk_pct + "%";
+            document.getElementById('res-churn-action').innerText = res.data.recommended_action;
+            
+            const badge = document.getElementById('res-churn-badge');
+            badge.innerText = res.data.risk_level;
+            badge.className = `badge bg-${res.data.badge_color}-soft text-${res.data.badge_color}`;
+        }
+    });
+}
+
+function runSimText(e) {
+    e.preventDefault();
+    const data = { text: document.getElementById('text_msg').value };
+
+    fetch("{{ url_for('admin.tf_classify_text') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            const el = document.getElementById('res-text');
+            el.classList.remove('d-none');
+            document.getElementById('res-text-sent').innerText = res.data.sentiment;
+            document.getElementById('res-text-intent').innerText = res.data.intent;
+            document.getElementById('res-text-conf').innerText = res.data.confidence_pct + "%";
+        }
+    });
+}
+
+function triggerTraining() {
+    const logDiv = document.getElementById('terminal-log');
+    const statusBadge = document.getElementById('train-status-badge');
+    
+    statusBadge.innerText = "Treinando...";
+    statusBadge.className = "badge bg-warning-soft text-warning";
+
+    logDiv.innerHTML = `<div class="text-warning">[TensorFlowEngine] Iniciando pipeline de treino Keras Sequential...</div>`;
+
+    fetch("{{ url_for('admin.tf_train_api') }}", { method: "POST" })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok && res.metrics && res.metrics.history) {
+            res.metrics.history.forEach(ep => {
+                const line = document.createElement('div');
+                line.innerHTML = `<span class="text-info">Época ${ep.epoch}/20:</span> Loss=${ep.loss} | Accuracy=${ep.accuracy}% | Val_Loss=${ep.val_loss} | Val_Acc=${ep.val_accuracy}%`;
+                logDiv.appendChild(line);
+                logDiv.scrollTop = logDiv.scrollHeight;
+            });
+            const successLine = document.createElement('div');
+            successLine.className = "text-success font-bold mt-2";
+            successLine.innerText = `✔ ${res.message}`;
+            logDiv.appendChild(successLine);
+
+            statusBadge.innerText = "Concluído";
+            statusBadge.className = "badge bg-success-soft text-success";
+            setTimeout(() => window.location.reload(), 2000);
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{
+  "id": "lead_notifier",
+  "name": "Notificador de Novos Leads",
+  "version": "1.0.0",
+  "sector": "gestao_clientes",
+  "description": "Emite alertas em tempo real e insere notificações visuais quando novos leads dão entrada no CRM.",
+  "author": "Equipe CRM Pro",
+  "icon": "fa-bell"
+}

@@ -9,6 +9,7 @@ from app.utils.exports import ReportGenerator
 from app.utils.ai_handler import AIHandler
 from app.utils.backup_manager import BackupManager
 from app.utils.rag_engine import RAGEngine
+from app.core.module_registry import requires_module
 import os
 import io
 from datetime import datetime
@@ -67,6 +68,7 @@ def settings():
     if request.method == 'POST':
         keys = [
             'msg_boas_vindas', 'msg_proposta', 'msg_fechamento', 'frase_bom_dia', 
+            'ai_enabled', 'ai_plugin_ollama_enabled', 'ai_plugin_gemini_enabled', 'ai_plugin_deepseek_enabled', 'ai_plugin_tensorflow_enabled',
             'ai_api_key', 'ai_provider', 'ai_system_prompt', 'ai_ollama_url', 'ai_ollama_model',
             # Parâmetros do Bot de Resposta Automática
             'whatsapp_bot_enabled', 'whatsapp_bot_persona_name', 'whatsapp_bot_company_name',
@@ -251,6 +253,7 @@ def backup_test_gdrive():
 @bp.route('/bot/live')
 @login_required
 @admin_required
+@requires_module('auto_responder')
 def bot_live():
     """Tela em tempo real do fluxo autônomo de atendimento WAHA + Ollama + Redis."""
     from app.utils.live_tracker import LiveTracker
@@ -570,7 +573,14 @@ def new_user():
             flash('⚠️ Nome de usuário já existe.')
             return redirect(request.url)
 
-        user = User(username=username, email=email, role=role, performance_points=xp)
+        group_id = request.form.get('group_id')
+        user = User(
+            username=username,
+            email=email,
+            role=role,
+            performance_points=xp,
+            group_id=int(group_id) if group_id and group_id.isdigit() else None
+        )
         user.set_password(password)
         db.session.add(user)
 
@@ -581,7 +591,9 @@ def new_user():
         flash(f'✅ Usuário {username} criado com sucesso!')
         return redirect(url_for('admin.list_users'))
 
-    return render_template('admin/user_form.html', title='Novo Usuário')
+    from app.models import PermissionGroup
+    groups = PermissionGroup.query.order_by(PermissionGroup.name).all()
+    return render_template('admin/user_form.html', title='Novo Usuário', groups=groups)
 
 
 # ── Edit user ─────────────────────────────────────────────────────────────────
@@ -592,8 +604,8 @@ def edit_user(id):
     user = User.query.get_or_404(id)
     if request.method == 'POST':
         user.email    = request.form.get('email')
-        user.role     = request.form.get('role', 'vendedor')
-        user.performance_points = int(request.form.get('performance_points', 0))
+        group_id = request.form.get('group_id')
+        user.group_id = int(group_id) if group_id and group_id.isdigit() else None
 
         password = request.form.get('password')
         if password:
@@ -606,7 +618,9 @@ def edit_user(id):
         flash(f'✅ Usuário {user.username} atualizado!')
         return redirect(url_for('admin.list_users'))
 
-    return render_template('admin/user_form.html', title='Editar Usuário', user=user)
+    from app.models import PermissionGroup
+    groups = PermissionGroup.query.order_by(PermissionGroup.name).all()
+    return render_template('admin/user_form.html', title='Editar Usuário', user=user, groups=groups)
 
 
 # ── Delete user ───────────────────────────────────────────────────────────────
@@ -625,6 +639,124 @@ def delete_user(id):
     db.session.commit()
     flash(f'🗑️ Usuário {name} excluído.')
     return redirect(url_for('admin.list_users'))
+
+
+# ── Gerenciamento de Grupos de Permissões (RBAC) ──────────────────────────────
+@bp.route('/groups', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def list_groups():
+    from app.models import PermissionGroup
+    from app.core.permissions import PERMISSION_RESOURCES, ACTION_LABELS
+    
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        description = (request.form.get('description') or '').strip()
+        
+        if not name:
+            flash('⚠️ O nome do grupo é obrigatório.', 'error')
+            return redirect(url_for('admin.list_groups'))
+            
+        if PermissionGroup.query.filter_by(name=name).first():
+            flash('⚠️ Já existe um grupo com este nome.', 'error')
+            return redirect(url_for('admin.list_groups'))
+
+        # Coleta matriz de permissões
+        perm_dict = {}
+        for res_key, res_data in PERMISSION_RESOURCES.items():
+            for act in res_data['actions']:
+                key = f"{res_key}.{act}"
+                perm_dict[key] = request.form.get(key) == 'on'
+
+        group = PermissionGroup(name=name, description=description)
+        group.set_permissions(perm_dict)
+        db.session.add(group)
+        db.session.commit()
+
+        flash(f'✅ Grupo de permissões "{name}" criado com sucesso!')
+        return redirect(url_for('admin.list_groups'))
+
+    groups = PermissionGroup.query.order_by(PermissionGroup.name).all()
+    return render_template('admin/groups.html', groups=groups, resources=PERMISSION_RESOURCES, action_labels=ACTION_LABELS)
+
+
+@bp.route('/groups/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_group(id):
+    from app.models import PermissionGroup
+    from app.core.permissions import PERMISSION_RESOURCES, ACTION_LABELS
+    group = PermissionGroup.query.get_or_404(id)
+
+    if request.method == 'POST':
+        group.name = (request.form.get('name') or group.name).strip()
+        group.description = (request.form.get('description') or '').strip()
+
+        perm_dict = {}
+        for res_key, res_data in PERMISSION_RESOURCES.items():
+            for act in res_data['actions']:
+                key = f"{res_key}.{act}"
+                perm_dict[key] = request.form.get(key) == 'on'
+
+        group.set_permissions(perm_dict)
+        db.session.commit()
+        flash(f'✅ Grupo "{group.name}" atualizado com sucesso!')
+        return redirect(url_for('admin.list_groups'))
+
+    return render_template('admin/group_form.html', group=group, resources=PERMISSION_RESOURCES, action_labels=ACTION_LABELS)
+
+
+@bp.route('/groups/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_group(id):
+    from app.models import PermissionGroup
+    group = PermissionGroup.query.get_or_404(id)
+    name = group.name
+    
+    # Desvincula usuários
+    for user in group.users:
+        user.group_id = None
+
+    db.session.delete(group)
+    db.session.commit()
+    flash(f'🗑️ Grupo "{name}" excluído.')
+    return redirect(url_for('admin.list_groups'))
+
+
+# ── Edição de Permissões Individuais por Usuário ─────────────────────────────
+@bp.route('/users/<int:id>/permissions', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def user_permissions(id):
+    from app.models import PermissionGroup
+    from app.core.permissions import PERMISSION_RESOURCES, ACTION_LABELS
+    user = User.query.get_or_404(id)
+
+    if request.method == 'POST':
+        # Atualiza grupo
+        group_id = request.form.get('group_id')
+        user.group_id = int(group_id) if group_id and group_id.isdigit() else None
+
+        # Processa overrides customizados por usuário
+        custom_perms = {}
+        for res_key, res_data in PERMISSION_RESOURCES.items():
+            for act in res_data['actions']:
+                key = f"{res_key}.{act}"
+                override_val = request.form.get(f"custom_{key}")
+                if override_val == 'allow':
+                    custom_perms[key] = True
+                elif override_val == 'deny':
+                    custom_perms[key] = False
+                # 'inherit' não coloca chave no custom dict
+
+        user.set_custom_permissions(custom_perms)
+        db.session.commit()
+        flash(f'✅ Permissões de {user.username} atualizadas com sucesso!')
+        return redirect(url_for('admin.list_users'))
+
+    groups = PermissionGroup.query.order_by(PermissionGroup.name).all()
+    return render_template('admin/user_permissions.html', user=user, groups=groups, resources=PERMISSION_RESOURCES, action_labels=ACTION_LABELS)
 
 # ── WAHA WhatsApp API (AJAX) ──────────────────────────────────────────────────
 @bp.route('/api/waha/status', methods=['GET'])
@@ -752,6 +884,7 @@ def ai_models():
 @bp.route('/knowledge', methods=['GET'])
 @login_required
 @admin_required
+@requires_module('rag_engine')
 def knowledge():
     """Painel interativo para gerenciamento e calibração avançada da base de conhecimento (RAG)."""
     docs = KnowledgeDoc.query.order_by(KnowledgeDoc.created_at.desc()).all()
@@ -1316,8 +1449,116 @@ def save_appearance():
         val = data['custom_theme_config']
         if isinstance(val, dict):
             val = json.dumps(val)
-        Setting.set_val('custom_theme_config', str(val).strip(), 'Configuração de cores do tema personalizado (JSON)')
+        Setting.set_val('custom_theme_config', val, 'Configuração JSON do tema personalizado')
         saved.append('custom_theme_config')
-
     return jsonify({'success': True, 'saved': saved})
+
+
+# ── TensorFlow Operational Dashboard & APIs ──────────────────────────────────
+@bp.route('/tensorflow')
+@login_required
+@admin_required
+@requires_module('tf_engine')
+def tensorflow_dashboard():
+    """Painel de Operação do TensorFlow para Redes Neurais e Plugins de IA."""
+    from app.utils.tf_engine import TensorFlowEngine
+    from app.utils.plugin_manager import AIPluginManager
+    tf_status = TensorFlowEngine.get_status()
+    plugin_states = AIPluginManager.get_plugin_states()
+    return render_template('admin/tensorflow.html', title='Painel TensorFlow', tf_status=tf_status, plugin_states=plugin_states)
+
+@bp.route('/tensorflow/predict_lead', methods=['POST'])
+@login_required
+@admin_required
+def tf_predict_lead():
+    from app.utils.tf_engine import TensorFlowEngine
+    data = request.get_json(silent=True) or request.form
+    res = TensorFlowEngine.predict_lead_score(data)
+    return jsonify({'ok': True, 'data': res})
+
+@bp.route('/tensorflow/predict_churn', methods=['POST'])
+@login_required
+@admin_required
+def tf_predict_churn():
+    from app.utils.tf_engine import TensorFlowEngine
+    data = request.get_json(silent=True) or request.form
+    res = TensorFlowEngine.predict_churn_risk(data)
+    return jsonify({'ok': True, 'data': res})
+
+@bp.route('/tensorflow/classify_text', methods=['POST'])
+@login_required
+@admin_required
+def tf_classify_text():
+    from app.utils.tf_engine import TensorFlowEngine
+    data = request.get_json(silent=True) or request.form
+    text = data.get('text', '')
+    res = TensorFlowEngine.classify_sentiment_and_intent(text)
+    return jsonify({'ok': True, 'data': res})
+
+@bp.route('/tensorflow/train', methods=['POST'])
+@login_required
+@admin_required
+def tf_train_api():
+    from app.utils.tf_engine import TensorFlowEngine
+    from app.models import Client
+    sample_count = max(100, Client.query.count() * 10)
+    res = TensorFlowEngine.train_models(sample_count=sample_count)
+    return jsonify(res)
+
+
+# ── Painel de Gerenciamento de Plugins ──────────────────────────────────────────
+@bp.route('/plugins', methods=['GET'])
+@login_required
+@admin_required
+def plugins_panel():
+    from app.core.plugins.manager import PluginManager
+    from app.core.module_registry import SECTORS
+    plugins = PluginManager.get_all_plugins()
+    return render_template('admin/plugins.html', plugins=plugins, sectors=SECTORS)
+
+
+@bp.route('/api/plugins/toggle', methods=['POST'])
+@login_required
+@admin_required
+def api_toggle_plugin():
+    from app.core.plugins.manager import PluginManager
+    data = request.get_json(silent=True) or request.form
+    plugin_id = data.get('plugin_id')
+    enable = str(data.get('enable', 'true')).lower() in ['true', '1', 'yes']
+    
+    if not plugin_id:
+        return jsonify({'success': False, 'message': 'ID do plugin é obrigatório.'}), 400
+
+    res = PluginManager.toggle_plugin(plugin_id, enable)
+    return jsonify(res)
+
+
+# ── Painel de Gerenciamento de Módulos e Setores ──────────────────────────────
+@bp.route('/modules', methods=['GET'])
+@login_required
+@admin_required
+def modules_panel():
+    from app.core.module_registry import ModuleRegistry
+    sectors = ModuleRegistry.get_all_sectors()
+    return render_template('admin/modules.html', sectors=sectors)
+
+
+@bp.route('/api/modules/toggle', methods=['POST'])
+@login_required
+@admin_required
+def api_toggle_module():
+    from app.core.module_registry import ModuleRegistry
+    from app.models import Setting
+    from app import db
+    data = request.get_json(silent=True) or request.form
+    setting_key = data.get('key')
+    enable = str(data.get('enable', 'true')).lower() in ['true', '1', 'yes']
+
+    if not setting_key:
+        return jsonify({'success': False, 'message': 'Chave da feature flag não informada.'}), 400
+
+    Setting.set_val(setting_key, 'true' if enable else 'false')
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Status do módulo atualizado com sucesso!', 'enabled': enable})
+
 

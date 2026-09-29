@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.main import bp
 from app.models import Client, SystemLog, User
 from app import db
+from app.core.module_registry import requires_module
 from collections import defaultdict
 
 @bp.route('/')
@@ -25,6 +26,7 @@ def index():
 
 @bp.route('/ranking')
 @login_required
+@requires_module('gamification')
 def ranking():
     users = User.query.order_by(User.performance_points.desc()).all()
 

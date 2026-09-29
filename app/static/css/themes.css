@@ -3,8 +3,17 @@
  *  CRM Pro — Sistema de Temas Visuais
  *  Arquivo: themes.css
  *  Aplicação: <html data-theme="nome-do-tema">
- *  Temas disponíveis: dark-indigo | dark-emerald | dark-rose |
- *                     dark-ocean  | dark-amber   | light | custom
+ *
+ *  Temas Glassmorphism:
+ *    dark-indigo | dark-emerald | dark-rose | dark-ocean |
+ *    dark-amber  | light        | custom
+ *
+ *  Temas Alternativos (design não-glassmorphism):
+ *    industrial     — Aço escovado / Matte / Fábrica
+ *    ubuntu         — Aubergine / Linux Desktop / GNOME
+ *    java           — Metal Look-and-Feel / Swing / Corporativo
+ *    brutalist      — Concreto Cru / Zero Blur / Sombras Duras
+ *    retro-terminal — CRT / Fósforo Verde / Hacker
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -164,6 +173,136 @@
 }
 
 /* ================================================================
+   TEMA: Industrial (Aço escovado / Matte / Parafusos e chapas)
+   Inspiração: dashboards de fábricas, equipamentos pesados, UI de
+   controle industrial com superfícies metálicas, sem transparência.
+   ================================================================ */
+[data-theme="industrial"] {
+    --primary-color:   #d97706;
+    --primary-hover:   #b45309;
+    --bg-dark:         #1a1a1a;
+    --card-bg:         #2a2a2a;
+    --text-main:       #e5e5e5;
+    --text-muted:      #a3a3a3;
+    --glass-border:    #404040;
+    --accent-color:    #ef4444;
+    --sidebar-bg:      #141414;
+    --bg-gradient-1:   rgba(217,119,6,0.03);
+    --bg-gradient-2:   rgba(239,68,68,0.02);
+    --input-bg:        #1f1f1f;
+    --input-border:    #404040;
+    --table-hover:     rgba(217,119,6,0.06);
+    --nav-active-bg:   rgba(217,119,6,0.18);
+    --nav-hover-bg:    rgba(217,119,6,0.08);
+    --theme-radius:    4px;
+    --theme-shadow:    0 2px 0 rgba(0,0,0,0.4);
+}
+
+/* ================================================================
+   TEMA: Ubuntu (Inspirado no desktop Ubuntu/Gnome, tons quentes)
+   Laranja Aubergine com a warmth do Linux desktop, cantos suaves,
+   tipografia humanista e superfícies flat com sutil profundidade.
+   ================================================================ */
+[data-theme="ubuntu"] {
+    --primary-color:   #e95420;
+    --primary-hover:   #c7431a;
+    --bg-dark:         #2c001e;
+    --card-bg:         #3c0a28;
+    --text-main:       #f5f1ed;
+    --text-muted:      #d4c4bb;
+    --glass-border:    rgba(233,84,32,0.18);
+    --accent-color:    #77216f;
+    --sidebar-bg:      #1e0014;
+    --bg-gradient-1:   rgba(233,84,32,0.06);
+    --bg-gradient-2:   rgba(119,33,111,0.04);
+    --input-bg:        rgba(233,84,32,0.06);
+    --input-border:    rgba(233,84,32,0.2);
+    --table-hover:     rgba(233,84,32,0.05);
+    --nav-active-bg:   rgba(233,84,32,0.24);
+    --nav-hover-bg:    rgba(233,84,32,0.1);
+    --theme-radius:    8px;
+    --theme-shadow:    0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* ================================================================
+   TEMA: Java / Swing (Corporativo, estilo desktop Java clássico)
+   Metal Look-and-Feel com cinza corporativo, azul sistema, botões
+   com bordas visíveis e superfícies opacas "old-school" premium.
+   ================================================================ */
+[data-theme="java"] {
+    --primary-color:   #2563eb;
+    --primary-hover:   #1d4ed8;
+    --bg-dark:         #e2e8f0;
+    --card-bg:         #f1f5f9;
+    --text-main:       #1e293b;
+    --text-muted:      #475569;
+    --glass-border:    #94a3b8;
+    --accent-color:    #16a34a;
+    --sidebar-bg:      #d1d5db;
+    --bg-gradient-1:   rgba(37,99,235,0.03);
+    --bg-gradient-2:   rgba(22,163,74,0.02);
+    --input-bg:        #ffffff;
+    --input-border:    #94a3b8;
+    --table-hover:     rgba(37,99,235,0.06);
+    --nav-active-bg:   rgba(37,99,235,0.14);
+    --nav-hover-bg:    rgba(37,99,235,0.06);
+    --theme-radius:    3px;
+    --theme-shadow:    inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* ================================================================
+   TEMA: Brutalist (Concreto cru / Minimalismo extremo / Sans-serif)
+   Design brutalistra com superfícies nuas, bordas grossas, tipografia
+   pesada e ausência de gradientes ou transparências. Raw e direto.
+   ================================================================ */
+[data-theme="brutalist"] {
+    --primary-color:   #000000;
+    --primary-hover:   #333333;
+    --bg-dark:         #d4d4d4;
+    --card-bg:         #e5e5e5;
+    --text-main:       #0a0a0a;
+    --text-muted:      #525252;
+    --glass-border:    #0a0a0a;
+    --accent-color:    #dc2626;
+    --sidebar-bg:      #f5f5f5;
+    --bg-gradient-1:   transparent;
+    --bg-gradient-2:   transparent;
+    --input-bg:        #ffffff;
+    --input-border:    #0a0a0a;
+    --table-hover:     rgba(0,0,0,0.04);
+    --nav-active-bg:   #0a0a0a;
+    --nav-hover-bg:    rgba(0,0,0,0.06);
+    --theme-radius:    0px;
+    --theme-shadow:    3px 3px 0 #0a0a0a;
+}
+
+/* ================================================================
+   TEMA: Retro Terminal (Fósforo verde / Monitor CRT / Hacker)
+   Efeito de terminal de computador antigo com caracteres verdes
+   fosforescentes sobre fundo negro, scanlines sutis e glow.
+   ================================================================ */
+[data-theme="retro-terminal"] {
+    --primary-color:   #22c55e;
+    --primary-hover:   #16a34a;
+    --bg-dark:         #0a0a0a;
+    --card-bg:         rgba(10, 20, 10, 0.92);
+    --text-main:       #4ade80;
+    --text-muted:      #22c55e;
+    --glass-border:    rgba(34,197,94,0.2);
+    --accent-color:    #facc15;
+    --sidebar-bg:      #050505;
+    --bg-gradient-1:   rgba(34,197,94,0.03);
+    --bg-gradient-2:   rgba(250,204,21,0.01);
+    --input-bg:        rgba(34,197,94,0.06);
+    --input-border:    rgba(34,197,94,0.25);
+    --table-hover:     rgba(34,197,94,0.06);
+    --nav-active-bg:   rgba(34,197,94,0.2);
+    --nav-hover-bg:    rgba(34,197,94,0.08);
+    --theme-radius:    2px;
+    --theme-shadow:    0 0 8px rgba(34,197,94,0.15);
+}
+
+/* ================================================================
    Aplicação das variáveis de tema nos elementos globais
    ================================================================ */
 
@@ -209,3 +348,326 @@ body {
 [data-theme="light"] .card-title        { color: #475569; }
 [data-theme="light"] .flash-msg         { color: #1e1b4b; }
 [data-theme="light"] .header-glass      { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+/* ================================================================
+   INDUSTRIAL — Overrides de personalidade visual
+   Superfícies matte opacas, bordas retas, sombras duras, sem blur.
+   ================================================================ */
+[data-theme="industrial"] .card,
+[data-theme="industrial"] .card-glass,
+[data-theme="industrial"] .kpi-card,
+[data-theme="industrial"] .stat-card,
+[data-theme="industrial"] .header-glass,
+[data-theme="industrial"] .auth-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 4px;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+    border-width: 2px;
+    border-style: solid;
+}
+[data-theme="industrial"] .sidebar {
+    backdrop-filter: none;
+    border-right: 3px solid #404040 !important;
+}
+[data-theme="industrial"] .nav-link { border-radius: 3px; }
+[data-theme="industrial"] .input-glass { border-radius: 3px; border-width: 2px; }
+[data-theme="industrial"] .badge { border-radius: 3px; }
+[data-theme="industrial"] .btn-primary,
+[data-theme="industrial"] .btn-danger,
+[data-theme="industrial"] .btn-success,
+[data-theme="industrial"] .btn-warning,
+[data-theme="industrial"] .btn-info,
+[data-theme="industrial"] .btn-secondary {
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+}
+[data-theme="industrial"] .btn-primary:hover,
+[data-theme="industrial"] .btn-danger:hover,
+[data-theme="industrial"] .btn-success:hover {
+    box-shadow: 0 2px 0 rgba(0,0,0,0.6);
+    transform: translateY(0);
+}
+[data-theme="industrial"] .table-glass th {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    background: #1f1f1f;
+}
+[data-theme="industrial"] .sidebar-brand { letter-spacing: 0.04em; }
+[data-theme="industrial"] .nav-section-title {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border-bottom: 2px solid #404040;
+    padding-bottom: 0.4rem;
+}
+[data-theme="industrial"] .kpi-icon { border-radius: 4px; }
+
+/* ================================================================
+   UBUNTU — Overrides de personalidade visual
+   Cantos suaves, cores quentes aubergine, botões arredondados,
+   sombras sutis com calor, tipografia humanista.
+   ================================================================ */
+[data-theme="ubuntu"] .card,
+[data-theme="ubuntu"] .card-glass,
+[data-theme="ubuntu"] .kpi-card,
+[data-theme="ubuntu"] .stat-card,
+[data-theme="ubuntu"] .header-glass,
+[data-theme="ubuntu"] .auth-card {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+[data-theme="ubuntu"] .sidebar {
+    backdrop-filter: none;
+    box-shadow: 2px 0 12px rgba(30,0,20,0.4) !important;
+}
+[data-theme="ubuntu"] .nav-link { border-radius: 6px; }
+[data-theme="ubuntu"] .nav-link.active { font-weight: 700; }
+[data-theme="ubuntu"] .input-glass { border-radius: 6px; }
+[data-theme="ubuntu"] .badge { border-radius: 12px; }
+[data-theme="ubuntu"] .btn-primary,
+[data-theme="ubuntu"] .btn-danger,
+[data-theme="ubuntu"] .btn-success,
+[data-theme="ubuntu"] .btn-warning,
+[data-theme="ubuntu"] .btn-info,
+[data-theme="ubuntu"] .btn-secondary {
+    border-radius: 6px;
+    font-weight: 600;
+}
+[data-theme="ubuntu"] .sidebar-brand     { color: #f5f1ed; }
+[data-theme="ubuntu"] .sidebar-tagline   { color: #d4c4bb; }
+[data-theme="ubuntu"] .nav-section-title { color: #d4c4bb; }
+[data-theme="ubuntu"] .kpi-icon { border-radius: 8px; }
+
+/* ================================================================
+   JAVA / SWING — Overrides de personalidade visual
+   Look-and-feel Metal clássico do Java Swing. Bordas finas visíveis,
+   superfícies opacas cinza, botões com efeito de relevo 3D beveled.
+   ================================================================ */
+[data-theme="java"] .card,
+[data-theme="java"] .card-glass,
+[data-theme="java"] .kpi-card,
+[data-theme="java"] .stat-card,
+[data-theme="java"] .header-glass,
+[data-theme="java"] .auth-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 3px;
+    border-width: 1px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 3px rgba(0,0,0,0.1);
+}
+[data-theme="java"] .sidebar {
+    backdrop-filter: none;
+    border-right: 1px solid #94a3b8 !important;
+    box-shadow: 1px 0 0 rgba(255,255,255,0.3) !important;
+}
+[data-theme="java"] .sidebar-brand     { color: #1e293b; }
+[data-theme="java"] .sidebar-tagline   { color: #64748b; }
+[data-theme="java"] .nav-link          { color: #334155; border-radius: 2px; }
+[data-theme="java"] .nav-link:hover    { background: rgba(37,99,235,0.08); color: #1e293b; }
+[data-theme="java"] .nav-link.active   { background: rgba(37,99,235,0.14); color: #2563eb; }
+[data-theme="java"] .nav-section-title { color: #64748b; font-weight: 600; }
+[data-theme="java"] .input-glass {
+    border-radius: 3px;
+    color: #1e293b;
+    border: 1px solid #94a3b8;
+    background: #ffffff;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+}
+[data-theme="java"] .input-glass::placeholder { color: rgba(71,85,105,0.5); }
+[data-theme="java"] .badge {
+    border-radius: 3px;
+    border: 1px solid currentColor;
+}
+[data-theme="java"] .btn-primary,
+[data-theme="java"] .btn-danger,
+[data-theme="java"] .btn-success,
+[data-theme="java"] .btn-warning,
+[data-theme="java"] .btn-info,
+[data-theme="java"] .btn-secondary {
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.15);
+    border: 1px solid rgba(0,0,0,0.15);
+}
+[data-theme="java"] .btn-primary:hover  { box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 4px rgba(37,99,235,0.3); }
+[data-theme="java"] .btn-secondary      { background: #e2e8f0; color: #334155; border: 1px solid #94a3b8; }
+[data-theme="java"] .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
+[data-theme="java"] .sidebar-toggle     { color: #1e293b; border-color: #94a3b8; }
+[data-theme="java"] .card-title         { color: #475569; }
+[data-theme="java"] .flash-msg          { color: #1e3a5f; background: rgba(37,99,235,0.1); border: 1px solid rgba(37,99,235,0.25); }
+[data-theme="java"] .header-glass       { box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 4px rgba(0,0,0,0.1); }
+[data-theme="java"] .table-glass th     { background: #e2e8f0; color: #334155; }
+[data-theme="java"] .kpi-icon           { border-radius: 3px; }
+[data-theme="java"] .icon-btn:hover     { color: #1e293b; background: rgba(0,0,0,0.06); }
+
+/* ================================================================
+   BRUTALIST — Overrides de personalidade visual
+   Sem bordas arredondadas, sem gradientes, sem blur. Bordas grossas
+   pretas, sombras duras offset, tipografia pesada e crua.
+   ================================================================ */
+[data-theme="brutalist"] .card,
+[data-theme="brutalist"] .card-glass,
+[data-theme="brutalist"] .kpi-card,
+[data-theme="brutalist"] .stat-card,
+[data-theme="brutalist"] .header-glass,
+[data-theme="brutalist"] .auth-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+    border: 3px solid #0a0a0a;
+    box-shadow: 4px 4px 0 #0a0a0a;
+}
+[data-theme="brutalist"] .sidebar {
+    backdrop-filter: none;
+    border-right: 3px solid #0a0a0a !important;
+    border-radius: 0;
+}
+[data-theme="brutalist"] .sidebar-brand     { color: #0a0a0a; font-weight: 900; letter-spacing: -0.02em; }
+[data-theme="brutalist"] .sidebar-tagline   { color: #525252; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; }
+[data-theme="brutalist"] .nav-link          { color: #404040; border-radius: 0; font-weight: 600; }
+[data-theme="brutalist"] .nav-link:hover    { background: rgba(0,0,0,0.06); color: #0a0a0a; }
+[data-theme="brutalist"] .nav-link.active   { background: #0a0a0a; color: #ffffff; font-weight: 700; }
+[data-theme="brutalist"] .nav-section-title { color: #525252; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; }
+[data-theme="brutalist"] .input-glass {
+    border-radius: 0;
+    border: 2px solid #0a0a0a;
+    color: #0a0a0a;
+    background: #ffffff;
+}
+[data-theme="brutalist"] .input-glass::placeholder { color: #a3a3a3; }
+[data-theme="brutalist"] .input-glass:focus { box-shadow: 3px 3px 0 #0a0a0a; border-color: #0a0a0a; }
+[data-theme="brutalist"] .badge {
+    border-radius: 0;
+    border: 2px solid currentColor;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="brutalist"] .btn-primary,
+[data-theme="brutalist"] .btn-danger,
+[data-theme="brutalist"] .btn-success,
+[data-theme="brutalist"] .btn-warning,
+[data-theme="brutalist"] .btn-info,
+[data-theme="brutalist"] .btn-secondary {
+    border-radius: 0;
+    border: 3px solid #0a0a0a;
+    box-shadow: 3px 3px 0 #0a0a0a;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+}
+[data-theme="brutalist"] .btn-primary { background: #0a0a0a; color: #ffffff; }
+[data-theme="brutalist"] .btn-primary:hover  { background: #262626; box-shadow: 2px 2px 0 #0a0a0a; transform: translate(1px,1px); }
+[data-theme="brutalist"] .btn-danger:hover   { box-shadow: 2px 2px 0 #0a0a0a; transform: translate(1px,1px); }
+[data-theme="brutalist"] .btn-secondary      { background: #e5e5e5; color: #0a0a0a; border: 3px solid #0a0a0a; }
+[data-theme="brutalist"] .btn-secondary:hover { background: #d4d4d4; transform: translate(1px,1px); box-shadow: 2px 2px 0 #0a0a0a; }
+[data-theme="brutalist"] .sidebar-toggle    { color: #0a0a0a; border: 2px solid #0a0a0a; border-radius: 0; }
+[data-theme="brutalist"] .card-title        { color: #525252; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+[data-theme="brutalist"] .flash-msg         { color: #0a0a0a; border-radius: 0; border: 2px solid #0a0a0a; background: #fef9c3; }
+[data-theme="brutalist"] .header-glass      { box-shadow: 4px 4px 0 #0a0a0a; }
+[data-theme="brutalist"] .table-glass th    { background: #0a0a0a; color: #ffffff; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+[data-theme="brutalist"] .table-glass td    { border-color: #0a0a0a; }
+[data-theme="brutalist"] .kpi-icon          { border-radius: 0; border: 2px solid #0a0a0a; }
+[data-theme="brutalist"] .kpi-card:hover    { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #0a0a0a; }
+[data-theme="brutalist"] .icon-btn:hover    { color: #0a0a0a; background: rgba(0,0,0,0.06); }
+[data-theme="brutalist"] .avatar            { border-radius: 0; border: 2px solid #0a0a0a; }
+[data-theme="brutalist"] .stat-card:hover   { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 #0a0a0a; }
+
+/* ================================================================
+   RETRO TERMINAL — Overrides de personalidade visual
+   Efeito monitor CRT fosforescente verde. Scanlines, glow verde,
+   tipografia monospace e bordas discretas.
+   ================================================================ */
+[data-theme="retro-terminal"] body,
+[data-theme="retro-terminal"] {
+    font-family: 'Courier New', 'Lucida Console', monospace;
+}
+[data-theme="retro-terminal"] * {
+    font-family: 'Courier New', 'Lucida Console', monospace !important;
+}
+[data-theme="retro-terminal"] .card,
+[data-theme="retro-terminal"] .card-glass,
+[data-theme="retro-terminal"] .kpi-card,
+[data-theme="retro-terminal"] .stat-card,
+[data-theme="retro-terminal"] .header-glass,
+[data-theme="retro-terminal"] .auth-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 2px;
+    border: 1px solid rgba(34,197,94,0.25);
+    box-shadow: 0 0 10px rgba(34,197,94,0.08), inset 0 0 30px rgba(34,197,94,0.02);
+}
+[data-theme="retro-terminal"] .sidebar {
+    backdrop-filter: none;
+    border-right: 1px solid rgba(34,197,94,0.3) !important;
+    box-shadow: 1px 0 15px rgba(34,197,94,0.06) !important;
+}
+[data-theme="retro-terminal"] .sidebar-brand { color: #4ade80; text-shadow: 0 0 6px rgba(34,197,94,0.4); }
+[data-theme="retro-terminal"] .sidebar-tagline { color: #22c55e; }
+[data-theme="retro-terminal"] .nav-link { color: #22c55e; border-radius: 2px; }
+[data-theme="retro-terminal"] .nav-link:hover { background: rgba(34,197,94,0.1); color: #4ade80; }
+[data-theme="retro-terminal"] .nav-link.active {
+    background: rgba(34,197,94,0.2);
+    color: #4ade80;
+    text-shadow: 0 0 4px rgba(34,197,94,0.3);
+}
+[data-theme="retro-terminal"] .nav-section-title { color: #16a34a; text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="retro-terminal"] .input-glass {
+    border-radius: 2px;
+    color: #4ade80;
+    caret-color: #4ade80;
+}
+[data-theme="retro-terminal"] .input-glass::placeholder { color: rgba(34,197,94,0.35); }
+[data-theme="retro-terminal"] .input-glass:focus { box-shadow: 0 0 8px rgba(34,197,94,0.2); }
+[data-theme="retro-terminal"] .badge {
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="retro-terminal"] .btn-primary,
+[data-theme="retro-terminal"] .btn-danger,
+[data-theme="retro-terminal"] .btn-success,
+[data-theme="retro-terminal"] .btn-warning,
+[data-theme="retro-terminal"] .btn-info,
+[data-theme="retro-terminal"] .btn-secondary {
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+[data-theme="retro-terminal"] .btn-primary { background: #16a34a; }
+[data-theme="retro-terminal"] .btn-primary:hover { background: #15803d; box-shadow: 0 0 12px rgba(34,197,94,0.35); }
+[data-theme="retro-terminal"] .sidebar-toggle { color: #4ade80; border-color: rgba(34,197,94,0.3); border-radius: 2px; }
+[data-theme="retro-terminal"] .card-title { color: #22c55e; }
+[data-theme="retro-terminal"] .flash-msg { color: #4ade80; border-color: rgba(34,197,94,0.3); }
+[data-theme="retro-terminal"] .header-glass { box-shadow: 0 0 10px rgba(34,197,94,0.06); }
+[data-theme="retro-terminal"] .table-glass th {
+    background: rgba(34,197,94,0.08);
+    color: #4ade80;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="retro-terminal"] .kpi-val   { text-shadow: 0 0 4px rgba(34,197,94,0.3); }
+[data-theme="retro-terminal"] .kpi-icon  { border-radius: 2px; }
+[data-theme="retro-terminal"] .stat-value { text-shadow: 0 0 4px rgba(34,197,94,0.3); }
+[data-theme="retro-terminal"] .icon-btn:hover { color: #4ade80; background: rgba(34,197,94,0.08); }
+/* CRT Scanline overlay */
+[data-theme="retro-terminal"] body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.04) 2px,
+        rgba(0, 0, 0, 0.04) 4px
+    );
+}

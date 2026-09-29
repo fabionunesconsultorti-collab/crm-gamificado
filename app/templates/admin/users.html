@@ -6,6 +6,9 @@
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="userSearchInput" placeholder="Buscar usuário ou perfil..." onkeyup="filterUsers()" autocomplete="off">
     </div>
+    <a href="{{ url_for('admin.list_groups') }}" class="btn-outline btn-sm me-1">
+        <i class="fa-solid fa-users-gear"></i> Grupos de Permissões
+    </a>
     <a href="{{ url_for('admin.new_user') }}" class="btn-primary btn-sm">
         <i class="fa-solid fa-user-plus"></i> Novo Usuário
     </a>
@@ -64,10 +67,10 @@
                 <tr>
                     <th>Usuário</th>
                     <th>E-mail</th>
-                    <th>Perfil de Acesso</th>
+                    <th>Perfil / Grupo</th>
                     <th>Pontos XP</th>
                     <th>Criado em</th>
-                    <th class="text-right" style="width: 120px;">Ações</th>
+                    <th class="text-right" style="width: 150px;">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -96,6 +99,11 @@
                             <i class="fa-solid {% if user.role == 'admin' %}fa-crown{% elif user.role == 'gerente' %}fa-star{% else %}fa-user{% endif %} me-1"></i>
                             {{ user.role | capitalize }}
                         </span>
+                        {% if user.group %}
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-1 text-xs">
+                            <i class="fa-solid fa-users-gear me-1"></i>{{ user.group.name }}
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         <span class="text-warning font-semibold"><i class="fa-solid fa-bolt me-1"></i>{{ user.performance_points }} XP</span>
@@ -106,6 +114,9 @@
                     </td>
                     <td class="text-right">
                         <div class="d-flex gap-2 justify-end">
+                            <a href="{{ url_for('admin.user_permissions', id=user.id) }}" class="icon-btn-solid info" title="Permissões Específicas">
+                                <i class="fa-solid fa-user-shield"></i>
+                            </a>
                             <a href="{{ url_for('admin.edit_user', id=user.id) }}" class="icon-btn-solid primary" title="Editar Usuário">
                                 <i class="fa-solid fa-pen"></i>
                             </a>

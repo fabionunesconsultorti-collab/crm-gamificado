@@ -66,8 +66,18 @@ class AIHandler:
             rag_k = 3
 
         rag_on = str(config.get('whatsapp_bot_rag_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
+        global_on = str(config.get('ai_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
+        ollama_on = str(config.get('ai_plugin_ollama_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
+        gemini_on = str(config.get('ai_plugin_gemini_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
+        deepseek_on = str(config.get('ai_plugin_deepseek_enabled', 'false')).strip().lower() in ['true', '1', 'yes', 'sim']
+        tf_on = str(config.get('ai_plugin_tensorflow_enabled', 'true')).strip().lower() in ['true', '1', 'yes', 'sim']
 
         return {
+            'global_ai_enabled': global_on,
+            'plugin_ollama_enabled': ollama_on,
+            'plugin_gemini_enabled': gemini_on,
+            'plugin_deepseek_enabled': deepseek_on,
+            'plugin_tensorflow_enabled': tf_on,
             'api_key': config.get('ai_api_key', ''),
             'provider': config.get('ai_provider', 'ollama'),
             'prompt': config.get('ai_system_prompt', 
@@ -92,13 +102,45 @@ class AIHandler:
         }
 
     @staticmethod
+    def get_effective_provider(cfg):
+        """Determina o provedor ativo validando se o plugin está habilitado, com fallback automático."""
+        if not cfg.get('global_ai_enabled', True):
+            return None, "IA desativada globalmente."
+
+        primary = cfg.get('provider', 'ollama')
+
+        # Mapeia cada provedor para a sua trava de plugin
+        provider_plugin_map = {
+            'ollama': cfg.get('plugin_ollama_enabled', True),
+            'google': cfg.get('plugin_gemini_enabled', True),
+            'gemini': cfg.get('plugin_gemini_enabled', True),
+            'deepseek': cfg.get('plugin_deepseek_enabled', True),
+            'tensorflow': cfg.get('plugin_tensorflow_enabled', True)
+        }
+
+        # Se o primário estiver ativado e funcional, usa ele
+        if provider_plugin_map.get(primary, True):
+            return primary, None
+
+        # Fallback automático: procura o primeiro plugin ativado
+        for p, is_on in provider_plugin_map.items():
+            if is_on:
+                return p, f"Aviso: O provedor primário '{primary}' teve seu plugin desativado. Chaveado automaticamente para '{p}'."
+
+        return None, "Todos os plugins de IA estão desativados nas configurações."
+
+    @staticmethod
     def rewrite_message(text):
         """Reescreve uma mensagem de template ou campanha para torná-la única e humanizada."""
         cfg = AIHandler.get_config()
 
-        # Validações por provedor
-        if cfg['provider'] != 'ollama' and not cfg['api_key']:
-            return text, "API Key de IA não configurada nas opções administrativas."
+        provider, err = AIHandler.get_effective_provider(cfg)
+        if not provider:
+            return text, err or "Nenhum plugin de IA ativo."
+
+        # Validações de API Key para provedores de nuvem
+        if provider in ['google', 'gemini', 'deepseek'] and not cfg['api_key']:
+            return text, f"API Key de IA não configurada para o provedor {provider}."
 
         try:
             user_instruction = (
@@ -106,8 +148,14 @@ class AIHandler:
             )
             full_prompt = f"{cfg['prompt']}\n\n{user_instruction}\n\nTexto reescrito:"
 
+            # Provedor TensorFlow (Rede Neural Nativa)
+            if provider == 'tensorflow':
+                from app.utils.tf_engine import TensorFlowEngine
+                tf_res = TensorFlowEngine.classify_sentiment_and_intent(text)
+                return text, f"Processado via Plugin TensorFlow (Sentimento: {tf_res['sentiment']}, Intenção: {tf_res['intent']})"
+
             # Provedor 1: OLLAMA (Local Docker)
-            if cfg['provider'] == 'ollama':
+            elif provider == 'ollama':
                 url = f"{cfg['ollama_url']}/api/chat"
                 payload = {
                     "model": cfg['ollama_model'],
@@ -132,7 +180,7 @@ class AIHandler:
                     return text, f"Erro no Ollama ({resp.status_code}): {resp.text}"
 
             # Provedor 2: DEEPSEEK (Cloud API)
-            elif cfg['provider'] == 'deepseek':
+            elif provider == 'deepseek':
                 headers = {
                     "Authorization": f"Bearer {cfg['api_key']}",
                     "Content-Type": "application/json"
@@ -292,7 +340,29 @@ class AIHandler:
         if client_info and isinstance(client_info, dict) and client_info.get('qualification_prompt'):
             prompt_sections.append(str(client_info['qualification_prompt']).strip())
 
+        # 4. Injeção de Inteligência Preditiva TensorFlow (Humor, Score, Termos Relevantes)
+        if client_info and isinstance(client_info, dict) and client_info.get('client_obj'):
+            try:
+                from app.utils.tf_engine import TensorFlowEngine
+                from app.utils.plugin_manager import AIPluginManager
+                if AIPluginManager.is_plugin_active('tensorflow'):
+                    tf_profile = TensorFlowEngine.get_client_intelligence_profile(client_info['client_obj'])
+                    if tf_profile and tf_profile.get('ai_directive'):
+                        prompt_sections.append(
+                            "\n================================================================================\n"
+                            "🧠 INTELIGÊNCIA PREDITIVA TENSORFLOW (HUMOR, PERFIL NEURAL & TERMOS DO CLIENTE)\n"
+                            "================================================================================\n"
+                            f"{tf_profile['ai_directive']}\n"
+                            "================================================================================\n"
+                            "DIRETIVA: Adapte rigorosamente o TOM e a POSTURA da resposta conforme o humor e "
+                            "a qualificação neural do cliente acima. Use os termos relevantes para contextualizar "
+                            "a conversa sem parecer artificial."
+                        )
+            except Exception as e:
+                print(f"[AIHandler] Aviso TensorFlow inject: {e}")
+
         final_system_prompt = "\n\n".join(prompt_sections)
+
 
         # Construção da lista estruturada de mensagens (Chat Multi-turno)
         messages = [{"role": "system", "content": final_system_prompt}]

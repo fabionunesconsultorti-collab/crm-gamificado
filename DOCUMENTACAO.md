@@ -1485,7 +1485,195 @@ Para garantir que essas diretrizes não sejam sufocadas ou desconsideradas duran
 
 ---
 
-> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global, Procedimento de Recuperação WAHA, Painel Avançado de Calibração e Treinamento RAG, Plano de Modularização e Feature Flags, Correção/Normalização de Telefones WhatsApp, Aprendizado Contínuo com Conversas & RAG Estrito, Ingestão Semântica de Websites e Skills & Diretrizes de Atendimento Prioritárias no RAG.*
+## 32. Central de Integrações e Módulo ERP Bling (Arquitetura Desacoplada & Plugin Framework)
+
+### 32.1 Arquitetura Desacoplada (Integration Plugin Framework)
+Para permitir que o CRM se conecte a diferentes ERPs e plataformas sem acoplamento rígido, foi implementado o motor **`IntegrationManager`** baseado no padrão **Adapter + Feature Flag**:
+
+1. **Abstração Base (`BaseIntegrationAdapter`):** Interface padronizada em `app/integrations/base.py` para gerenciamento de status, logs, testes de conexão e sincronização de clientes/vendas.
+2. **Gerenciador Central (`IntegrationManager`):** Registro dinâmico de adaptadores em `app/integrations/manager.py`. Permite ligar (ON) ou desligar (OFF) cada integração via painel administrativo.
+3. **Persistência de Dados & Mapeamento Universal:**
+   - `integration_config`: Tabela para armazenar estado ON/OFF, autenticação (OAuth2/API Key), tokens e configurações em JSON.
+   - `external_entity_map`: Mapeamento universal de IDs (`crm_entity_id` <-> `external_id`) por provedor.
+   - `bling_sales_cache`: Cache local de pedidos de venda do Bling ERP para aceleração de dashboards sem rate-limit.
+   - `integration_log`: Histórico e auditoria de execuções.
+
+### 32.2 Funcionalidades do Módulo Bling ERP
+- **Sincronização Bi-direcional de Clientes (Puxar / Subir):**
+  - **Inbound (Bling ➔ CRM):** Puxa contatos da API v3 do Bling com deduplicação por CPF/CNPJ, Telefone formatado e E-mail.
+  - **Outbound (CRM ➔ Bling):** Exporta clientes do CRM para o Bling individualmente ou em lote.
+- **Bling Analytics & Dashboards (`/integrations/bling/dashboard`):**
+  - Gráficos interativos (Chart.js) com a **Curva ABC de Clientes Top 10** e **Distribuição de Pedidos por Status**.
+  - KPIs em tempo real (Faturamento Total, Ticket Médio, Total de Pedidos e Clientes Sincronizados).
+  - Tabela de vendas com filtro instantâneo e exportação para **CSV**.
+- **Central de Administração (`/integrations/admin`):**
+  - Switch Toggle ON/OFF por provedor.
+  - Modal de configuração para OAuth 2.0 Client ID/Secret, Access Token e API Key.
+  - Botão de teste de conexão em 1 clique e histórico de logs.
+
+### 32.3 Guia Passo a Passo do Desenvolvedor: Como Adicionar Novas Integrações (ex: Tiny ERP, Shopify, WooCommerce, Hubspot)
+
+Para adicionar qualquer nova integração no CRM mantendo o isolamento desacoplado, o desenvolvedor deve seguir este fluxo em 4 passos simples:
+
+#### Passo 1: Criar a pasta do provedor
+Crie o diretório `app/integrations/<provedor>/` (ex: `app/integrations/tiny/` ou `app/integrations/shopify/`).
+
+#### Passo 2: Implementar a classe Adapter estendendo `BaseIntegrationAdapter`
+Crie o arquivo `app/integrations/<provedor>/adapter.py` com a classe estendendo `BaseIntegrationAdapter` e decorada com `@IntegrationManager.register`:
+
+```python
+from app.integrations.base import BaseIntegrationAdapter
+from app.integrations.manager import IntegrationManager
+
+@IntegrationManager.register
+class TinyAdapter(BaseIntegrationAdapter):
+    provider_name = "tiny"
+    display_name = "Tiny ERP"
+    description = "Integração desacoplada com Tiny ERP para sincronização de clientes e vendas."
+
+    def test_connection(self) -> dict:
+        # Lógica de teste de conexão com a API do Tiny
+        config = self.get_config()
+        # ... realiza requisição HTTP de teste ...
+        return {"success": True, "message": "Conexão com Tiny ERP realizada com sucesso!"}
+
+    def sync_clients_inbound(self, limit: int = 100) -> dict:
+        # Importa contatos do Tiny e salva no CRM (Client + ExternalEntityMap)
+        return {"success": True, "message": "Importação concluída com sucesso."}
+
+    def sync_clients_outbound(self, client_id=None) -> dict:
+        # Exporta contatos do CRM para o Tiny
+        return {"success": True, "message": "Exportação para o Tiny concluída."}
+
+    def fetch_sales_reports(self, start_date=None, end_date=None) -> dict:
+        # Consulta pedidos de venda do Tiny e salva em cache
+        return {"success": True, "message": "Relatórios de venda atualizados."}
+```
+
+#### Passo 3: Registrar o import em `app/integrations/__init__.py`
+Adicione o import do novo adaptador ao final de `app/integrations/__init__.py`:
+```python
+import app.integrations.tiny.adapter
+```
+
+#### Passo 4: Reconhecimento Automático e Interface Pronta
+Ao inicializar o CRM:
+1. O `IntegrationManager` detecta a nova integração automaticamente.
+2. O card do **Tiny ERP** é renderizado no painel `/integrations/admin` com botão **Switch Toggle (ON/OFF)**, modal de credenciais, teste de conexão e logs de auditoria.
+3. Se o administrador desligar a chave, a função fica 100% inativa sem impactar nenhuma outra área do sistema.
+
+---
+
+## 28. Plano Diretor de Refatoração Faseada por Setores & Arquitetura de Plugins Desligáveis
+
+### 28.1 Diretrizes e Reorganização por Setores
+
+Para garantir manutenibilidade a longo prazo, isolamento de falhas e expansão desacoplada, a aplicação foi reavaliada e dividida formalmente em **5 Setores Funcionais**:
+
+```
+                       ┌──────────────────────────────────────────┐
+                       │          app/core / Flask App            │
+                       └────────────────────┬─────────────────────┘
+                                            │
+        ┌───────────────────┬───────────────┼───────────────┬───────────────────┐
+        │                   │               │               │                   │
+  ┌─────▼─────────────┐ ┌───▼───────────┐ ┌─▼─────────────┐ ┌▼───────────────┐ ┌─▼─────────────┐
+  │ Gestão de Clientes│ │ IA & Automação│ │ Configuração  │ │  Integrações   │ │    Plugins    │
+  │ (gestao_clientes) │ │ (ia_automacao)│ │(configuracao) │ │ (integracoes)  │ │(motor_plugins)│
+  └───────────────────┘ └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
+```
+
+#### Estrutura Detalhada por Setor:
+
+1. **Gestão de Clientes (`gestao_clientes`)**
+   - **Módulos**: Funil Kanban (`funnel`), Cadastro & Lead Scoring (`clients`), Prospecção Google Maps (`prospecting`), Tarefas & Lembretes (`tasks`), Gamificação & Ranking (`gamification`).
+   - **Independência**: Cada sub-módulo pode ser ligado/desligado individualmente sem afetar as rotas de clientes principais.
+
+2. **IA e Automação (`ia_automacao`)**
+   - **Módulos**: Conectores LLM (`llm_providers`), Engine RAG Vectorial (`rag_engine`), TensorFlow Local Neural (`tf_engine`), Auto-Responder Bot (`auto_responder`), Minerador FAQ (`faq_miner`).
+   - **Isolamento de Falhas**: Se a IA estiver offline ou desativada, a plataforma continua operando normalmente como CRM tradicional.
+
+3. **Configuração (`configuracao`)**
+   - **Módulos**: Parâmetros Globais (`system_settings`), Regras Anti-Ban WhatsApp (`antiban`), Backups Automáticos (`backups`), Personalizador HSL (`ui_theme`), Logs & Auditoria (`audit_logs`).
+
+4. **Integrações (`integracoes`)**
+   - **Módulos**: Gateway WhatsApp (`waha`), ERP Bling (`bling`), Receptor/Disparador de Webhooks (`webhooks`).
+   - **Desacoplamento**: Todas as integrações herdam de `BaseIntegrationAdapter` e respondem ao `IntegrationManager`.
+
+5. **Plugins (`motor_plugins`)**
+   - **Módulos**: Registry de Plugins (`plugin_registry`), Barramento de Eventos (`event_bus`), Gerenciador de Hooks (`hook_manager`).
+   - **Diretriz Mandatória**: **Todas as novas funcionalidades adicionadas à ferramenta serão implementadas exclusivamente como Plugins** dentro da pasta `app/plugins/`.
+
+---
+
+### 28.2 Especificação da Arquitetura de Plugins
+
+Todas as novas funções serão empacotadas no seguinte padrão plug-and-play:
+
+#### Estrutura de Pastas de um Plugin (`app/plugins/<id_plugin>/`):
+- `plugin.json` — Manifesto com metadados (id, name, version, sector, description, dependencies).
+- `plugin.py` — Classe principal herdando de `BasePlugin`.
+- `routes.py` — Blueprint isolado do plugin.
+- `models.py` — Modelos de dados exclusivos da extensão.
+- `templates/` — Visualizações Jinja específicas.
+
+#### Contrato de Código (`BasePlugin`):
+```python
+from app.core.plugins import BasePlugin
+
+class MeuNovoPlugin(BasePlugin):
+    id = "meu_novo_plugin"
+    name = "Nova Funcionalidade"
+    sector = "gestao_clientes"
+    version = "1.0.0"
+
+    def on_enable(self, app):
+        """Registra rotas, listeners de evento e injeta elementos na UI."""
+        pass
+
+    def on_disable(self, app):
+        """Remove hooks e suspende execuções do plugin."""
+        pass
+
+    def register_hooks(self, event_bus):
+        """Escuta eventos do sistema (ex: ao criar lead, ao receber mensagem)."""
+        event_bus.subscribe("client.created", self.on_client_created)
+
+    def on_client_created(self, client):
+        # Lógica personalizada da nova função
+        pass
+```
+
+---
+
+### 28.3 Plano de Execução Faseada da Refatoração
+
+```mermaid
+gantt
+    title Cronograma de Refatoração Faseada e Sistema de Plugins
+    dateFormat  YYYY-MM-DD
+    section Fase 1
+    Estrutura por Setores & ModuleRegistry   :active, f1, 2026-10-01, 3d
+    section Fase 2
+    Motor Core de Plugins & EventBus        :f2, after f1, 2d
+    section Fase 3
+    Desacoplamento Fino & Feature Flags     :f3, after f2, 2d
+    section Fase 4
+    Migração de Novas Funções & Homologação :f4, after f3, 1d
+```
+
+| Fase | Objetivo | Entregáveis Principais | Risco |
+|:---:|:---|:---|:---:|
+| **Fase 1** | **Reorganização em Setores** | Reestruturar código em `app/sectors/`, separar models e criar `ModuleRegistry`. | 🟢 Baixo |
+| **Fase 2** | **Motor de Plugins** | Implementar `BasePlugin`, `EventBus`, `PluginRegistry` e painel visual `/admin/plugins`. | 🟢 Baixo |
+| **Fase 3** | **Guards & Feature Flags** | Proteger rotas com `@requires_module`, tornar UI dinâmica e isolar workers Celery/Redis. | 🟡 Médio |
+| **Fase 4** | **Validação & Plugins-First** | Transformar novas funções em plugins, testar ligar/desligar em runtime e homologar suíte. | 🟢 Baixo |
+
+---
+
+> *Documento atualizado com manual completo de desenvolvimento, servidores dedicados, Coolify, Ollama IA Local, Sistema Anti-Ban / Anti-Spam WhatsApp, Prospecção Ativa Google Maps, Resposta Automática Inteligente com Debounce, Painel Gráfico em Tempo Real, Nova Interface de Configuração do Bot, Central de Backup Completo, Captura Ativa de Mensagens do WhatsApp, Enriquecimento Progressivo de Leads, Sistema de Busca Inteligente com Filtros, Novo Padrão de Cards Proporcionais no Funil Kanban, Layout Otimizado na Prospecção Ativa, Padronização Visual Global, Procedimento de Recuperação WAHA, Painel Avançado de Calibração e Treinamento RAG, Plano de Modularização e Feature Flags, Correção/Normalização de Telefones WhatsApp, Aprendizado Contínuo com Conversas & RAG Estrito, Ingestão Semântica de Websites, Skills & Diretrizes de Atendimento, Central de Integrações Desacopladas com Módulo ERP Bling, Guia do Desenvolvedor para Novas Integrações e Plano Diretor de Refatoração Faseada por Setores & Arquitetura de Plugins Desligáveis.*
+
+
 
 
 

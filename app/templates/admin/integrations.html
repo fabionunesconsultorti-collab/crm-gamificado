@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% if is_integration_active('bling') %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('integrations.bling_dashboard') }}" class="btn-warning btn-sm">
+        <i class="fa-solid fa-boxes-packing me-1"></i> Bling Analytics
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- KPI Header de Integrações -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-plug"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ integrations|length }}</span>
+            <span class="kpi-label">Provedores Registrados</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ integrations | selectattr('is_active', 'equalto', True) | list | length }}</span>
+            <span class="kpi-label">Integrações Ativas</span>
+        </div>
+    </div>
+
+    {% if is_integration_active('bling') %}
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-copyright"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-warning">{{ summary.brands_count or 0 }}</span>
+            <span class="kpi-label">Marcas no Bling</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+            <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-info">{{ summary.categories_count or 0 }}</span>
+            <span class="kpi-label">Categorias / Tipos</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;">
+            <i class="fa-solid fa-ruler-combined"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-primary">{{ summary.sizes_count or 0 }}</span>
+            <span class="kpi-label">Grades / Tamanhos</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+            <i class="fa-solid fa-truck-field"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ summary.suppliers_count or 0 }}</span>
+            <span class="kpi-label">Fornecedores</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Integration Cards Grid (Native CRM CSS Grid) -->
+<div class="grid grid-cols-auto-fit gap-4 mb-4">
+    {% for item in integrations %}
+    <div class="card" style="display:flex; flex-direction:column; justify-content: space-between; position:relative;">
+        <div>
+            <!-- Header do Card -->
+            <div class="d-flex align-center justify-between mb-3 border-bottom pb-3">
+                <div class="d-flex align-center gap-3">
+                    <div class="avatar avatar-lg" style="background: rgba(99, 102, 241, 0.2); color: var(--primary-color);">
+                        {% if item.provider == 'bling' %}
+                            <i class="fa-solid fa-boxes-packing text-warning" style="font-size:1.3rem;"></i>
+                        {% else %}
+                            <i class="fa-solid fa-cube text-info" style="font-size:1.3rem;"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-main m-0" style="font-size: 1.1rem;">{{ item.name }}</h4>
+                        <span class="badge {{ 'badge-success' if item.is_active else 'badge-secondary' }} mt-1" style="font-size:0.68rem;">
+                            <i class="fa-solid {{ 'fa-circle-check' if item.is_active else 'fa-circle-pause' }} me-1"></i>
+                            {{ 'ATIVO (ON)' if item.is_active else 'INATIVO (OFF)' }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Custom Switch Toggle -->
+                <label class="switch-toggle" title="Ligar/Desligar Integração">
+                    <input type="checkbox" class="integration-toggle" data-provider="{{ item.provider }}" {{ 'checked' if item.is_active else '' }} onchange="toggleIntegration(this, '{{ item.provider }}')">
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+
+            <p class="text-muted text-sm mb-3" style="line-height:1.45; min-height: 42px;">
+                {{ item.description }}
+            </p>
+
+            <!-- Box de Status de Autenticação -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem;" class="text-xs">
+                <div class="d-flex justify-between mb-1">
+                    <span class="text-muted">Autenticação:</span>
+                    <span class="font-semibold text-main">{{ item.auth_type | upper }}</span>
+                </div>
+                <div class="d-flex justify-between mb-1">
+                    <span class="text-muted">Client ID:</span>
+                    <span class="text-main font-semibold">{{ item.client_id or 'Não configurado' }}</span>
+                </div>
+                <div class="d-flex justify-between">
+                    <span class="text-muted">Conexão API:</span>
+                    <span class="font-bold {{ 'text-success' if item.has_access_token or item.has_api_key else 'text-warning' }}">
+                        {{ 'Conectado / Token Salvo' if item.has_access_token or item.has_api_key else 'Credenciais Pendentes' }}
+                    </span>
+                </div>
+            </div>
+
+            {% if item.provider == 'bling' and item.is_active %}
+            <!-- Painel de Progressão de Sincronização Acoplado (Apenas quando Ativado) -->
+            <div class="mb-3 p-3 rounded text-xs" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(245, 158, 11, 0.3);">
+                <div class="d-flex justify-between align-center mb-2">
+                    <span class="font-bold text-main text-xs uppercase">
+                        <i class="fa-solid fa-chart-line text-warning me-1"></i> Progresso de Sincronização
+                    </span>
+                    <span class="text-muted text-xs" id="syncStatusText">{{ summary.progress_pct }}% Completo</span>
+                </div>
+
+                <div style="height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; position: relative;" class="mb-2">
+                    <div id="syncProgressBar" style="height: 100%; width: {{ summary.progress_pct }}%; background: linear-gradient(90deg, #f59e0b, #10b981); transition: width 0.5s ease; border-radius: 5px;"></div>
+                </div>
+
+                <div class="d-flex justify-between text-muted text-xs mb-2" id="syncCountsText">
+                    <span>Local: {{ summary.total_local }}</span>
+                    <span>ERP Total: {{ summary.total_remote }}</span>
+                    <span>Faltam: {{ summary.remaining }}</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-1 border-top pt-2 mt-1">
+                    <div class="d-flex justify-between text-xs">
+                        <span class="text-muted"><i class="fa-solid fa-boxes-stacked text-warning me-1"></i>Produtos:</span>
+                        <span class="font-bold text-main" id="lblProductsCount">{{ summary.products_count }} / {{ summary.remote_totals.total_products or summary.products_count }}</span>
+                    </div>
+                    <div class="d-flex justify-between text-xs">
+                        <span class="text-muted"><i class="fa-solid fa-users text-primary me-1"></i>Clientes:</span>
+                        <span class="font-bold text-main" id="lblClientsCount">{{ summary.clients_count }} / {{ summary.remote_totals.total_contacts or summary.clients_count }}</span>
+                    </div>
+                    <div class="d-flex justify-between text-xs">
+                        <span class="text-muted"><i class="fa-solid fa-receipt text-success me-1"></i>Pedidos:</span>
+                        <span class="font-bold text-main" id="lblSalesCount">{{ summary.sales_count }} / {{ summary.remote_totals.total_sales or summary.sales_count }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Painel Detalhado de Atributos Identificados (Marcas, Categorias, Tamanhos) -->
+            <div class="mb-3 p-3 rounded text-xs" style="background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border);">
+                <div class="font-bold text-main mb-2 uppercase text-xs">
+                    <i class="fa-solid fa-tags text-warning me-1"></i> Atributos da Base Bling
+                </div>
+                <div class="mb-2">
+                    <span class="text-muted">Marcas ({{ summary.brands_count }}):</span>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for b in summary.brands_list[:8] %}
+                        <span class="badge badge-secondary" style="font-size:0.65rem;">{{ b }}</span>
+                        {% else %}
+                        <span class="text-muted text-xs">Nenhuma marca importada</span>
+                        {% endfor %}
+                        {% if summary.brands_list|length > 8 %}
+                        <span class="badge badge-primary" style="font-size:0.65rem;">+{{ summary.brands_list|length - 8 }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <span class="text-muted">Categorias / Tipos ({{ summary.categories_count }}):</span>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for cat in summary.categories_list[:8] %}
+                        <span class="badge badge-secondary" style="font-size:0.65rem;">{{ cat }}</span>
+                        {% else %}
+                        <span class="text-muted text-xs">Nenhuma categoria importada</span>
+                        {% endfor %}
+                        {% if summary.categories_list|length > 8 %}
+                        <span class="badge badge-info" style="font-size:0.65rem;">+{{ summary.categories_list|length - 8 }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <span class="text-muted">Grades / Tamanhos ({{ summary.sizes_count }}):</span>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for sz in summary.sizes_list[:10] %}
+                        <span class="badge badge-primary font-bold" style="font-size:0.65rem;">{{ sz }}</span>
+                        {% else %}
+                        <span class="text-muted text-xs">Nenhum tamanho importado</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Botões de Ação Padronizados e Centralizados nas Configurações -->
+        <div class="d-flex flex-col gap-2 border-top pt-3">
+            <div class="d-flex gap-2">
+                <button class="btn-secondary btn-sm flex-1" onclick="openConfigModal('{{ item.provider }}', '{{ item.name }}', '{{ item.client_id }}', '{{ item.auth_type }}')">
+                    <i class="fa-solid fa-sliders me-1"></i> Configurar
+                </button>
+                <button class="btn-info btn-sm flex-1" onclick="testConnection('{{ item.provider }}')">
+                    <i class="fa-solid fa-network-wired me-1"></i> Testar Conexão
+                </button>
+            </div>
+            
+            {% if item.provider == 'bling' %}
+            <!-- Central Unificada de Ações de Sincronização e Importação -->
+            <div class="p-2 rounded mt-1 border" style="background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2) !important;">
+                <div class="font-semibold text-warning text-xs mb-2 uppercase text-center">
+                    <i class="fa-solid fa-rotate me-1"></i> Painel de Sincronização & Importação
+                </div>
+                {% if not item.is_active %}
+                <div class="text-center p-2 mb-2 text-xs text-muted" style="background: rgba(255,255,255,0.03); border-radius: 6px;">
+                    <i class="fa-solid fa-lock text-warning me-1"></i> Integração inativa. Ative a chave no topo do card para sincronizar.
+                </div>
+                {% endif %}
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn-primary btn-sm flex-1 text-xs" onclick="runClientSync('bling', 'inbound')" {{ 'disabled' if not item.is_active else '' }} title="Puxar contatos da base do Bling ERP para o CRM">
+                        <i class="fa-solid fa-download me-1"></i> Puxar Clientes
+                    </button>
+                    <button class="btn-success btn-sm flex-1 text-xs" onclick="runClientSync('bling', 'outbound')" {{ 'disabled' if not item.is_active else '' }} title="Subir contatos do CRM para o Bling ERP">
+                        <i class="fa-solid fa-upload me-1"></i> Subir Clientes
+                    </button>
+                </div>
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn-warning btn-sm flex-1 text-xs" onclick="runSalesSync('bling')" {{ 'disabled' if not item.is_active else '' }} title="Sincronizar histórico de pedidos de venda do Bling">
+                        <i class="fa-solid fa-cart-shopping me-1"></i> Pedidos Venda
+                    </button>
+                    <button class="btn-info btn-sm flex-1 text-xs" onclick="runProductsSync('bling')" {{ 'disabled' if not item.is_active else '' }} title="Sincronizar cadastro completo de produtos e saldos de estoque">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> Produtos & Estoque
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn-primary btn-sm flex-1 text-xs" onclick="runSyncAll('bling')" {{ 'disabled' if not item.is_active else '' }} style="background: linear-gradient(90deg, #f59e0b, #10b981); border:none;" title="Importar tudo simultaneamente de forma rápida">
+                        <i class="fa-solid fa-bolt me-1"></i> Sincronização Completa
+                    </button>
+                    {% if item.is_active %}
+                    <a href="{{ url_for('integrations.bling_reports') }}" class="btn-outline btn-sm flex-1 text-center text-xs" style="display:inline-flex; align-items:center; justify-content:center;">
+                        <i class="fa-solid fa-chart-pie me-1"></i> Relatórios Decisão
+                    </a>
+                    {% else %}
+                    <button class="btn-outline btn-sm flex-1 text-center text-xs" disabled style="display:inline-flex; align-items:center; justify-content:center; opacity:0.5;">
+                        <i class="fa-solid fa-chart-pie me-1"></i> Relatórios Decisão
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Tabela de Logs de Integração Padronizada -->
+<div class="card table-card mb-4">
+    <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+        <h4 class="font-bold text-main m-0 text-sm uppercase">
+            <i class="fa-solid fa-scroll text-primary me-2"></i> Histórico Recente de Auditoria
+        </h4>
+        <span class="text-xs text-muted">Últimas 30 ações de integração</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table-glass">
+            <thead>
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>Provedor</th>
+                    <th>Ação Executada</th>
+                    <th>Status</th>
+                    <th>Detalhes de Auditoria</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="text-xs text-muted nowrap">{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                    <td><span class="badge badge-secondary uppercase font-bold">{{ log.provider }}</span></td>
+                    <td class="font-medium text-main text-sm">{{ log.action }}</td>
+                    <td>
+                        {% if log.status == 'success' %}
+                            <span class="badge badge-success"><i class="fa-solid fa-check me-1"></i> Sucesso</span>
+                        {% elif log.status == 'warning' %}
+                            <span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i> Alerta</span>
+                        {% elif log.status == 'error' %}
+                            <span class="badge badge-danger"><i class="fa-solid fa-xmark me-1"></i> Erro</span>
+                        {% else %}
+                            <span class="badge badge-primary">{{ log.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-xs text-muted" style="max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ log.details }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="p-4 text-center text-muted">Nenhum log gravado até o momento.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal de Configuração Customizado (Estilo Native CRM Glass) -->
+<div id="configModalOverlay" class="custom-modal-overlay d-none">
+    <div class="custom-modal-card">
+        <div class="d-flex justify-between align-center border-bottom pb-3 mb-3">
+            <h3 class="font-bold text-main m-0" id="configModalTitle">Configurar Integração</h3>
+            <button onclick="closeConfigModal()" class="icon-btn text-muted p-0"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form id="configForm">
+            <input type="hidden" id="configProvider" name="provider">
+
+            <div class="form-group mb-3">
+                <label>Tipo de Autenticação</label>
+                <select class="input-glass" id="configAuthType" name="auth_type">
+                    <option value="oauth2">OAuth 2.0 (Bling API v3 Recomendado)</option>
+                    <option value="api_key">API Key (v2 Legacy)</option>
+                </select>
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Client ID</label>
+                <input type="text" class="input-glass" id="configClientId" name="client_id" placeholder="ID do aplicativo no ERP">
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Client Secret</label>
+                <input type="password" class="input-glass" id="configClientSecret" name="client_secret" placeholder="Secret do aplicativo (deixe em branco se não alterar)">
+            </div>
+
+            <div class="form-group mb-3">
+                <label>Access Token / Bearer Token (OAuth2)</label>
+                <textarea class="input-glass" id="configAccessToken" name="access_token" rows="3" placeholder="Token OAuth2 ativo"></textarea>
+            </div>
+
+            <div class="form-group mb-3">
+                <label>API Key (Fallback v2)</label>
+                <input type="password" class="input-glass" id="configApiKey" name="api_key" placeholder="Chave de API Legacy">
+            </div>
+        </form>
+
+        <div class="d-flex gap-2 justify-end border-top pt-3 mt-4">
+            <button type="button" class="btn-secondary btn-sm" onclick="closeConfigModal()">Cancelar</button>
+            <button type="button" class="btn-primary btn-sm" onclick="saveConfig()"><i class="fa-solid fa-floppy-disk me-1"></i> Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Toggle Switch Custom CSS (Native Glass) */
+.switch-toggle {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.switch-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--glass-border);
+    transition: .3s;
+    border-radius: 34px;
+}
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+input:checked + .switch-slider {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+input:checked + .switch-slider:before {
+    transform: translateX(22px);
+}
+
+/* Modal Custom CSS Glass Overlay */
+.custom-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.custom-modal-card {
+    background: var(--card-bg, #0f172a);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle Switch ON/OFF AJAX
+function toggleIntegration(checkbox, provider) {
+    const active = checkbox.checked;
+    
+    // Atualiza o badge visual do card
+    const card = checkbox.closest('.card');
+    if (card) {
+        const badge = card.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge ${active ? 'badge-success' : 'badge-secondary'} mt-1`;
+            badge.innerHTML = `<i class="fa-solid ${active ? 'fa-circle-check' : 'fa-circle-pause'} me-1"></i> ${active ? 'ATIVO (ON)' : 'INATIVO (OFF)'}`;
+        }
+    }
+
+    fetch(`/integrations/${provider}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({active: active})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = window.location.pathname + '?t=' + new Date().getTime();
+        } else {
+            alert(data.message || 'Erro ao alterar status.');
+            checkbox.checked = !active;
+        }
+    })
+    .catch(err => {
+        console.error('Erro no toggle:', err);
+        alert('Erro ao alterar status.');
+        checkbox.checked = !active;
+    });
+}
+
+// Modal Configuração
+function openConfigModal(provider, name, clientId, authType) {
+    document.getElementById('configProvider').value = provider;
+    document.getElementById('configModalTitle').innerText = `Configurar ${name}`;
+    document.getElementById('configClientId').value = clientId || '';
+    document.getElementById('configAuthType').value = authType || 'oauth2';
+    
+    document.getElementById('configModalOverlay').classList.remove('d-none');
+}
+
+function closeConfigModal() {
+    document.getElementById('configModalOverlay').classList.add('d-none');
+}
+
+function saveConfig() {
+    const provider = document.getElementById('configProvider').value;
+    const authType = document.getElementById('configAuthType').value;
+    const clientId = document.getElementById('configClientId').value;
+    const clientSecret = document.getElementById('configClientSecret').value;
+    const accessToken = document.getElementById('configAccessToken').value;
+    const apiKey = document.getElementById('configApiKey').value;
+
+    fetch(`/integrations/${provider}/config`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            auth_type: authType,
+            client_id: clientId,
+            client_secret: clientSecret,
+            access_token: accessToken,
+            api_key: apiKey
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+        if(data.success) location.reload();
+    });
+}
+
+function testConnection(provider) {
+    fetch(`/integrations/${provider}/test`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+    });
+}
+
+function runClientSync(provider, direction) {
+    const dirText = direction === 'inbound' ? 'puxar contatos do Bling' : 'subir contatos para o Bling';
+    if(!confirm(`Deseja iniciar a sincronização para ${dirText}?`)) return;
+
+    fetch(`/integrations/${provider}/sync-clients`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({direction: direction})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    });
+}
+
+function runSalesSync(provider) {
+    showSyncSpinner(true);
+    fetch(`/integrations/${provider}/sync-sales`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        showSyncSpinner(false);
+        alert(data.message);
+        location.reload();
+    })
+    .catch(() => showSyncSpinner(false));
+}
+
+function runProductsSync(provider) {
+    if(!confirm('Deseja iniciar a sincronização de Produtos & Estoque com o Bling ERP?')) return;
+    showSyncSpinner(true);
+    fetch('/integrations/bling/sync-products', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        showSyncSpinner(false);
+        alert(data.message);
+        location.reload();
+    })
+    .catch(() => {
+        showSyncSpinner(false);
+        alert('Erro ao sincronizar produtos.');
+    });
+}
+
+function runSyncAll(provider) {
+    if(!confirm('Deseja iniciar a Sincronização Completa (Clientes, Pedidos de Venda, Produtos & Estoque)?')) return;
+    showSyncSpinner(true);
+    fetch('/integrations/bling/sync-all', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        showSyncSpinner(false);
+        alert(data.message);
+        location.reload();
+    })
+    .catch(() => {
+        showSyncSpinner(false);
+        alert('Erro na sincronização completa.');
+    });
+}
+
+function showSyncSpinner(show) {
+    const sp = document.getElementById('syncSpinner');
+    if(sp) {
+        if(show) sp.classList.remove('d-none');
+        else sp.classList.add('d-none');
+    }
+}
+
+function updateSyncProgress() {
+    fetch('/integrations/bling/status-summary')
+    .then(r => r.json())
+    .then(data => {
+        if(!data.active) return;
+        const pBar = document.getElementById('syncProgressBar');
+        const stText = document.getElementById('syncStatusText');
+        const cntText = document.getElementById('syncCountsText');
+        const lblP = document.getElementById('lblProductsCount');
+        const lblC = document.getElementById('lblClientsCount');
+        const lblS = document.getElementById('lblSalesCount');
+
+        if(pBar) pBar.style.width = data.progress_pct + '%';
+        if(stText) stText.innerText = `Progresso Geral da Base: ${data.progress_pct}% Sincronizado`;
+        if(cntText) cntText.innerText = `${data.total_local} importados de ${data.total_remote} totais no Bling (Faltam: ${data.remaining})`;
+
+        if(lblP) lblP.innerText = `${data.products_count} / ${data.remote_totals.total_products || data.products_count}`;
+        if(lblC) lblC.innerText = `${data.clients_count} / ${data.remote_totals.total_contacts || data.clients_count}`;
+        if(lblS) lblS.innerText = `${data.sales_count} / ${data.remote_totals.total_sales || data.sales_count}`;
+    })
+    .catch(() => {});
+}
+
+// Atualiza o progresso em segundo plano na abertura da tela
+document.addEventListener('DOMContentLoaded', updateSyncProgress);
+</script>
+{% endblock %}

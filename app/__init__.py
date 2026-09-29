@@ -42,6 +42,16 @@ def create_app(config_class=Config):
     from app.api import bp as api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
+    from app.integrations import bp as integrations_bp
+    app.register_blueprint(integrations_bp)
+
+    # ── Descoberta e Inicialização dos Plugins Extensíveis ──
+    try:
+        from app.core.plugins.manager import PluginManager
+        PluginManager.discover_and_load(app)
+    except Exception as e:
+        app.logger.error(f"[Plugins] Erro ao carregar motor de plugins: {e}")
+
     if not app.config.get('TESTING'):
         try:
             from app.tasks.backup_scheduler import start_backup_scheduler
@@ -86,11 +96,36 @@ def create_app(config_class=Config):
         except Exception:
             custom_theme_vars = {}
 
+        def is_integration_active(provider):
+            try:
+                from app.integrations.manager import IntegrationManager
+                adapter = IntegrationManager.get_adapter(provider)
+                return bool(adapter and adapter.is_enabled())
+            except Exception:
+                return False
+
+        def is_module_enabled(module_path):
+            try:
+                from app.core.module_registry import is_module_enabled as check_enabled
+                return check_enabled(module_path)
+            except Exception:
+                return True
+
+        def user_has_permission(resource, action):
+            try:
+                from app.core.permissions import user_has_permission as check_perm
+                return check_perm(resource, action)
+            except Exception:
+                return True
+
         return dict(
             get_setting=get_setting,
             active_theme=active_theme,
             custom_theme_vars=custom_theme_vars,
-            custom_theme_json=custom_theme_json or '{}'
+            custom_theme_json=custom_theme_json or '{}',
+            is_integration_active=is_integration_active,
+            is_module_enabled=is_module_enabled,
+            user_has_permission=user_has_permission
         )
 
     return app

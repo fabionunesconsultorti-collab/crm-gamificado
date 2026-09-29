@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('admin.list_users') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left me-1"></i> Voltar para Usuários
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-1 text-main font-bold"><i class="fa-solid fa-user-shield text-primary me-2"></i>Permissões de {{ user.username }}</h2>
+            <p class="text-muted text-sm mb-0">Gerencie o grupo atribuído e configure <strong>permissões sobrescritas individualmente</strong> para este usuário.</p>
+        </div>
+    </div>
+
+    <form method="POST">
+        <!-- Grupo de Permissões -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <div class="row align-items-center g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-main">Grupo de Permissões Herdado</label>
+                        <select name="group_id" class="form-select">
+                            <option value="">-- Sem Grupo (Apenas Permissões de Papel/Custom) --</option>
+                            {% for group in groups %}
+                            <option value="{{ group.id }}" {% if user.group_id == group.id %}selected{% endif %}>
+                                {{ group.name }} ({% if group.description %}{{ group.description }}{% else %}Sem descrição{% endif %})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded text-sm text-muted border border-opacity-10">
+                            <i class="fa-solid fa-info-circle text-primary me-1"></i>
+                            O grupo define a matriz base. As opções marcadas como <em>"Herdar"</em> abaixo assumirão o valor configurado no grupo.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matriz de Sobressalentes / Custom Overrides -->
+        {% set custom_perms = user.get_custom_permissions() %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 font-bold text-main"><i class="fa-solid fa-sliders text-primary me-2"></i>Permissões Específicas e Intercambiáveis do Usuário</h5>
+                <span class="badge bg-primary px-3 py-2"><i class="fa-solid fa-user me-1"></i> {{ user.role | upper }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Recurso do Sistema</th>
+                                {% for act_key, act_label in action_labels.items() %}
+                                <th class="text-center" style="width: 220px;">{{ act_label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res_key, res in resources.items() %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-main">{{ res.name }}</div>
+                                    <small class="text-muted text-xs">Chave: <code>{{ res_key }}</code></small>
+                                </td>
+                                {% for act in res.actions %}
+                                {% set perm_key = res_key + '.' + act %}
+                                {% set custom_val = custom_perms.get(perm_key) %}
+                                {% set effective_val = user.has_permission(res_key, act) %}
+                                <td class="text-center">
+                                    <select name="custom_{{ perm_key }}" class="form-select form-select-sm text-xs mb-1">
+                                        <option value="inherit" {% if custom_val is none %}selected{% endif %}>
+                                            🔄 Herdar do Grupo
+                                        </option>
+                                        <option value="allow" {% if custom_val is true %}selected{% endif %}>
+                                            ✅ PERMITIR (Ativar)
+                                        </option>
+                                        <option value="deny" {% if custom_val is false %}selected{% endif %}>
+                                            🚫 NEGAR (Bloquear)
+                                        </option>
+                                    </select>
+                                    <div>
+                                        {% if effective_val %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 fs-xs py-0 px-2">Efetivo: Permitido</span>
+                                        {% else %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fs-xs py-0 px-2">Efetivo: Negado</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer py-3 text-end bg-light border-top">
+                <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary btn-sm me-2">Cancelar</a>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk me-1"></i> Salvar Permissões do Usuário</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

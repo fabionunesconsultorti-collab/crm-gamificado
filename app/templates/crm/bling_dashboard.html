@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    {% if is_active %}
+    <button class="btn-primary btn-sm" onclick="syncSalesNow()">
+        <i class="fa-solid fa-rotate me-1"></i> Atualizar Bling
+    </button>
+    <a href="{{ url_for('integrations.export_bling_sales') }}" class="btn-success btn-sm">
+        <i class="fa-solid fa-file-excel me-1"></i> Exportar CSV
+    </a>
+    {% else %}
+    <a href="{{ url_for('integrations.admin_integrations') }}" class="btn-warning btn-sm">
+        <i class="fa-solid fa-power-off me-1"></i> Ativar Bling
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not is_active %}
+<!-- Banner de Integração Desativada -->
+<div class="card text-center p-5 mb-4" style="border: 1px solid rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.05);">
+    <div class="avatar avatar-lg mx-auto mb-3" style="width:60px; height:60px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size:1.8rem;">
+        <i class="fa-solid fa-plug-circle-xmark"></i>
+    </div>
+    <h3 class="font-bold text-main mb-2">A integração com o ERP Bling está DESATIVADA</h3>
+    <p class="text-muted text-sm max-w-lg mx-auto mb-4" style="line-height:1.5;">
+        Para visualizar faturamento em tempo real, pedidos de venda, ticket médio e curva ABC de clientes, ative o módulo do Bling ERP na Central de Integrações.
+    </p>
+    <div>
+        <a href="{{ url_for('integrations.admin_integrations') }}" class="btn-primary btn-sm" style="display:inline-flex; width:auto; padding: 0.6rem 1.5rem;">
+            <i class="fa-solid fa-sliders me-2"></i> Ir para Central de Integrações
+        </a>
+    </div>
+</div>
+{% else %}
+
+<!-- Grid de KPIs Nativos -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-sack-dollar"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-success">R$ {{ "{:,.2f}".format(metrics.total_faturamento or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+            <span class="kpi-label">Faturamento Total Bling</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-cart-flatbed"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ metrics.total_pedidos or 0 }}</span>
+            <span class="kpi-label">Pedidos de Venda</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+            <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-info">R$ {{ "{:,.2f}".format(metrics.ticket_medio or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+            <span class="kpi-label">Ticket Médio</span>
+        </div>
+    </div>
+
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-warning">{{ metrics.synced_clients or 0 }}</span>
+            <span class="kpi-label">Clientes Sincronizados</span>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos -->
+<div class="grid grid-main-layout gap-4 mb-4">
+    <!-- Top 10 Clientes (Curva ABC) -->
+    <div class="card p-4">
+        <h4 class="font-bold text-main mb-3 uppercase text-sm" style="letter-spacing:0.05em;">
+            <i class="fa-solid fa-crown text-warning me-2"></i> Curva ABC — Top 10 Clientes (Faturamento)
+        </h4>
+        <div style="position: relative; height:300px;">
+            <canvas id="topClientsChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Distribuição por Status -->
+    <div class="card p-4">
+        <h4 class="font-bold text-main mb-3 uppercase text-sm" style="letter-spacing:0.05em;">
+            <i class="fa-solid fa-pie-chart text-info me-2"></i> Status dos Pedidos
+        </h4>
+        <div style="position: relative; height:300px;">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Vendas Recentes -->
+<div class="card table-card mb-4">
+    <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+        <h4 class="font-bold text-main m-0 text-sm uppercase">
+            <i class="fa-solid fa-receipt text-success me-2"></i> Últimos Pedidos Sincronizados
+        </h4>
+        <div class="search-bar-glass">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="salesSearchInput" placeholder="Buscar por cliente ou pedido..." autocomplete="off">
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table-glass" id="salesTable">
+            <thead>
+                <tr>
+                    <th>Nº Pedido</th>
+                    <th>Cliente</th>
+                    <th>CPF / CNPJ</th>
+                    <th>Valor Total</th>
+                    <th>Data Venda</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in metrics.recent_sales %}
+                <tr>
+                    <td class="font-bold text-primary">#{{ s.order_number or s.bling_order_id }}</td>
+                    <td class="font-semibold text-main">{{ s.client_name or 'N/I' }}</td>
+                    <td class="text-muted text-xs">{{ s.client_cpf_cnpj or '-' }}</td>
+                    <td class="font-bold text-success">R$ {{ "{:,.2f}".format(s.total_value or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    <td class="text-muted text-xs nowrap">{{ s.order_date }}</td>
+                    <td>
+                        <span class="badge badge-info">{{ s.status or 'Atendido' }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="p-4 text-center text-muted">
+                        Nenhum pedido de venda sincronizado ainda. Clique em "Atualizar Bling" no topo.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if is_active %}
+<script>
+const topClientsData = {{ metrics.top_clients | tojson }};
+const statusData = {{ metrics.status_chart | tojson }};
+
+// Gráfico Top Clientes
+const ctxTop = document.getElementById('topClientsChart').getContext('2d');
+new Chart(ctxTop, {
+    type: 'bar',
+    data: {
+        labels: topClientsData.map(d => d.name),
+        datasets: [{
+            label: 'Total Faturado (R$)',
+            data: topClientsData.map(d => d.total),
+            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 1,
+            borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+    }
+});
+
+// Gráfico Status dos Pedidos
+const ctxStatus = document.getElementById('statusChart').getContext('2d');
+new Chart(ctxStatus, {
+    type: 'doughnut',
+    data: {
+        labels: statusData.map(d => d.status),
+        datasets: [{
+            data: statusData.map(d => d.count),
+            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+            borderWidth: 0
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+    }
+});
+
+// Filtro de Busca na Tabela
+document.getElementById('salesSearchInput').addEventListener('input', function() {
+    const val = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#salesTable tbody tr');
+    rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(val) ? '' : 'none';
+    });
+});
+
+function syncSalesNow() {
+    fetch('/integrations/bling/sync-sales', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

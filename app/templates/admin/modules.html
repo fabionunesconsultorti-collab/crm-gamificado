@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('admin.plugins_panel') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-puzzle-piece me-1"></i> Motor de Plugins
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-1 text-main font-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i>Módulos por Setor</h2>
+            <p class="text-muted text-sm mb-0">Controle a ativação independente dos módulos divididos pelos 5 Setores da ferramenta.</p>
+        </div>
+    </div>
+
+    {% for sector_key, sector in sectors.items() %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light border-0 py-3 px-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="p-2 bg-primary bg-opacity-10 text-primary rounded">
+                    <i class="fa-solid {{ sector.icon }} fa-lg"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 font-bold text-main" style="font-size: 1.1rem;">{{ sector.name }}</h5>
+                    <small class="text-muted text-xs">{{ sector.description }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-3">
+                {% for mod_key, mod in sector.modules.items() %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="p-3 border border-opacity-10 rounded-3 bg-body d-flex justify-content-between align-items-center h-100">
+                        <div>
+                            <h6 class="mb-1 font-semibold text-main">{{ mod.name }}</h6>
+                            <p class="text-muted text-xs mb-0">{{ mod.desc }}</p>
+                        </div>
+                        <div class="form-check form-switch ms-3 flex-shrink-0">
+                            <input class="form-check-input module-toggle-switch" type="checkbox" role="switch"
+                                   data-key="{{ mod.key }}"
+                                   id="mod_switch_{{ sector_key }}_{{ mod_key }}"
+                                   {% if mod.enabled %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.module-toggle-switch').forEach(function(switchEl) {
+        switchEl.addEventListener('change', function() {
+            const flagKey = this.getAttribute('data-key');
+            const enable = this.checked;
+
+            fetch('{{ url_for("admin.api_toggle_module") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: flagKey, enable: enable })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof showToast === 'function') {
+                        showToast(data.message, 'success');
+                    } else {
+                        alert(data.message);
+                    }
+                } else {
+                    this.checked = !enable;
+                    alert('Erro: ' + (data.message || 'Falha ao alterar módulo'));
+                }
+            })
+            .catch(err => {
+                this.checked = !enable;
+                alert('Erro de conexão ao comunicar com o servidor.');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+

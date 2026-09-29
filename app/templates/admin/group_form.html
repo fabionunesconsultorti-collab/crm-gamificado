@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('admin.list_groups') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left me-1"></i> Voltar para Grupos
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-1 text-main font-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Editar Grupo: {{ group.name }}</h2>
+            <p class="text-muted text-sm mb-0">Ajuste os privilégios do grupo. Todos os usuários vinculados a este perfil herdarão essas permissões.</p>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h5 class="card-title text-main font-bold mb-3"><i class="fa-solid fa-id-card text-primary me-2"></i>Informações Básicas</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nome do Grupo *</label>
+                        <input type="text" name="name" class="form-control" value="{{ group.name }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <input type="text" name="description" class="form-control" value="{{ group.description or '' }}" placeholder="Descreva as atribuições deste grupo">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% set current_perms = group.get_permissions() %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light py-3 border-bottom">
+                <h5 class="card-title mb-0 font-bold text-main"><i class="fa-solid fa-table-cells text-primary me-2"></i>Matriz de Permissões (Visualizar, Editar, Excluir)</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Recurso do Sistema</th>
+                                {% for act_key, act_label in action_labels.items() %}
+                                <th class="text-center" style="width: 160px;">{{ act_label }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for res_key, res in resources.items() %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-main">{{ res.name }}</div>
+                                    <small class="text-muted text-xs">Módulo: <code>{{ res_key }}</code></small>
+                                </td>
+                                {% for act in res.actions %}
+                                {% set perm_key = res_key + '.' + act %}
+                                <td class="text-center">
+                                    <div class="form-check form-switch justify-content-center">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                               name="{{ perm_key }}"
+                                               {% if current_perms.get(perm_key, True) %}checked{% endif %}>
+                                    </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer py-3 text-end bg-light border-top">
+                <a href="{{ url_for('admin.list_groups') }}" class="btn btn-secondary btn-sm me-2">Cancelar</a>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk me-1"></i> Salvar Alterações</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

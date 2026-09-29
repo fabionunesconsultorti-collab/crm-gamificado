@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    {% if is_active %}
+    <button class="btn-primary btn-sm" onclick="syncProductsNow()">
+        <i class="fa-solid fa-boxes-stacked me-1"></i> Sincronizar Estoque
+    </button>
+    <a href="{{ url_for('integrations.export_bling_reports', type=filters.active_tab, brand=filters.brand, supplier=filters.supplier, category=filters.category, min_days=filters.min_days, rfm_status=filters.rfm_status, size=filters.size) }}" class="btn-success btn-sm">
+        <i class="fa-solid fa-file-csv me-1"></i> Exportar CSV
+    </a>
+    <a href="{{ url_for('integrations.export_bling_reports_pdf', type=filters.active_tab, brand=filters.brand, supplier=filters.supplier, category=filters.category, min_days=filters.min_days, rfm_status=filters.rfm_status, size=filters.size) }}" class="btn-secondary btn-sm" style="background:#ef4444; color:#ffffff; border:none;">
+        <i class="fa-solid fa-file-pdf me-1"></i> Exportar PDF
+    </a>
+    <button class="btn-secondary btn-sm" onclick="window.print()">
+        <i class="fa-solid fa-print me-1"></i> Imprimir
+    </button>
+    {% else %}
+    <a href="{{ url_for('integrations.admin_integrations') }}" class="btn-warning btn-sm">
+        <i class="fa-solid fa-power-off me-1"></i> Ativar Bling
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-between align-center mb-4">
+        <div>
+            <h2 class="font-bold text-main m-0"><i class="fa-solid fa-chart-pie text-warning me-2"></i>Relatórios para Tomada de Decisão — Bling ERP</h2>
+            <p class="text-muted text-sm m-0">Análise estratégica de estoque parado, comportamento de compra de clientes e distribuição por tamanho/tipo.</p>
+        </div>
+    </div>
+
+    {% if not is_active %}
+    <!-- Banner de Integração Desativada -->
+    <div class="card text-center p-5 mb-4" style="border: 1px solid rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.05);">
+        <div class="avatar avatar-lg mx-auto mb-3" style="width:60px; height:60px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size:1.8rem;">
+            <i class="fa-solid fa-plug-circle-xmark"></i>
+        </div>
+        <h3 class="font-bold text-main mb-2">A integração com o ERP Bling está DESATIVADA</h3>
+        <p class="text-muted text-sm max-w-lg mx-auto mb-4">
+            Ative o módulo do Bling ERP na Central de Integrações para visualizar relatórios de decisão e controle de estoque.
+        </p>
+        <div>
+            <a href="{{ url_for('integrations.admin_integrations') }}" class="btn-primary btn-sm" style="display:inline-flex; width:auto; padding: 0.6rem 1.5rem;">
+                <i class="fa-solid fa-sliders me-2"></i> Ir para Central de Integrações
+            </a>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Navegação por Abas (Tabs) -->
+    <div class="d-flex gap-2 border-bottom pb-3 mb-4 overflow-x-auto">
+        <a href="{{ url_for('integrations.bling_reports', tab='stock', brand=filters.brand, supplier=filters.supplier, category=filters.category, min_days=filters.min_days) }}"
+           class="btn-sm {{ 'btn-primary' if filters.active_tab == 'stock' else 'btn-secondary' }}" style="display:inline-flex; align-items:center;">
+            <i class="fa-solid fa-boxes-packing me-2"></i> Estoque Parado (Marca / Fornecedor)
+        </a>
+        <a href="{{ url_for('integrations.bling_reports', tab='clients', rfm_status=filters.rfm_status) }}"
+           class="btn-sm {{ 'btn-primary' if filters.active_tab == 'clients' else 'btn-secondary' }}" style="display:inline-flex; align-items:center;">
+            <i class="fa-solid fa-users-viewfinder me-2"></i> Análise de Clientes & Compras
+        </a>
+        <a href="{{ url_for('integrations.bling_reports', tab='size', size=filters.size) }}"
+           class="btn-sm {{ 'btn-primary' if filters.active_tab == 'size' else 'btn-secondary' }}" style="display:inline-flex; align-items:center;">
+            <i class="fa-solid fa-ruler-combined me-2"></i> Filtro por Tamanho & Tipo
+        </a>
+    </div>
+
+    {% if filters.active_tab == 'stock' %}
+    <!-- ── ABA 1: RELATÓRIO DE ESTOQUE PARADO ───────────────────────────── -->
+    <div class="grid grid-cols-auto-fit gap-3 mb-4">
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                <i class="fa-solid fa-hand-holding-dollar"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-val text-danger">R$ {{ "{:,.2f}".format(data.total_capital_parado or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+                <span class="kpi-label">Capital Parado no Estoque</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <i class="fa-solid fa-cubes-stacked"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-val text-warning">{{ data.total_pecas_paradas or 0 }}</span>
+                <span class="kpi-label">Peças Sem Giro em Estoque</span>
+            </div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                <i class="fa-solid fa-tags"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-val">{{ data.stock_report|length }}</span>
+                <span class="kpi-label">Produtos Listados</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de Estoque Parado -->
+    <div class="card p-3 mb-4">
+        <form method="get" action="{{ url_for('integrations.bling_reports') }}" class="grid grid-cols-auto-fit gap-3 align-center">
+            <input type="hidden" name="tab" value="stock">
+            
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Marca</label>
+                <select name="brand" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todas as Marcas</option>
+                    {% for b in data.filters_options.brands %}
+                    <option value="{{ b }}" {{ 'selected' if filters.brand == b else '' }}>{{ b }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Fornecedor</label>
+                <select name="supplier" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todos os Fornecedores</option>
+                    {% for s in data.filters_options.suppliers %}
+                    <option value="{{ s }}" {{ 'selected' if filters.supplier == s else '' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Categoria / Tipo</label>
+                <select name="category" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todas as Categorias</option>
+                    {% for cat in data.filters_options.categories %}
+                    <option value="{{ cat }}" {{ 'selected' if filters.category == cat else '' }}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Dias Mínimos Sem Venda</label>
+                <select name="min_days" class="input-glass" onchange="this.form.submit()">
+                    <option value="0" {{ 'selected' if filters.min_days == '0' else '' }}>Todos (Qualquer dia)</option>
+                    <option value="30" {{ 'selected' if filters.min_days == '30' else '' }}>30+ dias sem venda</option>
+                    <option value="60" {{ 'selected' if filters.min_days == '60' else '' }}>60+ dias sem venda</option>
+                    <option value="90" {{ 'selected' if filters.min_days == '90' else '' }}>90+ dias (Estoque Crítico)</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabela de Estoque Parado -->
+    <div class="card table-card mb-4">
+        <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+            <h4 class="font-bold text-main m-0 text-sm uppercase">
+                <i class="fa-solid fa-boxes-packing text-danger me-2"></i> Produtos em Estoque Parado
+            </h4>
+            <div class="search-bar-glass">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="stockSearchInput" placeholder="Filtrar produto, SKU ou marca..." autocomplete="off">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table-glass" id="stockTable">
+                <thead>
+                    <tr>
+                        <th>SKU / Código</th>
+                        <th>Produto</th>
+                        <th>Marca</th>
+                        <th>Fornecedor</th>
+                        <th>Categoria / Tipo</th>
+                        <th>Tamanho</th>
+                        <th>Estoque Atual</th>
+                        <th>Capital Parado</th>
+                        <th>Dias Sem Venda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in data.stock_report %}
+                    <tr>
+                        <td class="font-bold text-primary">{{ p.code or 'N/I' }}</td>
+                        <td class="font-semibold text-main">{{ p.name }}</td>
+                        <td><span class="badge badge-secondary">{{ p.brand }}</span></td>
+                        <td class="text-sm text-muted">{{ p.supplier_name }}</td>
+                        <td class="text-sm text-muted">{{ p.category }}</td>
+                        <td><span class="badge badge-primary">{{ p.size }}</span></td>
+                        <td class="font-bold text-warning">{{ p.current_stock }} un</td>
+                        <td class="font-bold text-danger">R$ {{ "{:,.2f}".format(p.capital_locked or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                        <td>
+                            {% if p.days_without_sale >= 90 %}
+                                <span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ p.days_without_sale }}d (Crítico)</span>
+                            {% elif p.days_without_sale >= 60 %}
+                                <span class="badge badge-warning">{{ p.days_without_sale }}d</span>
+                            {% else %}
+                                <span class="badge badge-secondary">{{ p.days_without_sale }}d</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="p-4 text-center text-muted">
+                            Nenhum produto em estoque parado com os filtros selecionados. Clique em "Sincronizar Estoque".
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif filters.active_tab == 'clients' %}
+    <!-- ── ABA 2: ANÁLISE DE CLIENTES E COMPRAS ─────────────────────────── -->
+    <div class="card p-3 mb-4">
+        <form method="get" action="{{ url_for('integrations.bling_reports') }}" class="d-flex align-center gap-3">
+            <input type="hidden" name="tab" value="clients">
+            
+            <div class="form-group m-0 flex-1">
+                <label class="text-xs font-semibold text-muted uppercase">Classificação de Compra (RFM)</label>
+                <select name="rfm_status" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todos os Clientes</option>
+                    <option value="Melhor Comprador (VIP)" {{ 'selected' if filters.rfm_status == 'Melhor Comprador (VIP)' else '' }}>Melhores Compradores (VIP)</option>
+                    <option value="Novo Cliente" {{ 'selected' if filters.rfm_status == 'Novo Cliente' else '' }}>Novos Clientes (Primeira Compra)</option>
+                    <option value="Risco de Churn" {{ 'selected' if filters.rfm_status == 'Risco de Churn' else '' }}>Em Risco de Churn (Inativos há >60 dias)</option>
+                    <option value="Recorrente" {{ 'selected' if filters.rfm_status == 'Recorrente' else '' }}>Clientes Recorrentes</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="card table-card mb-4">
+        <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+            <h4 class="font-bold text-main m-0 text-sm uppercase">
+                <i class="fa-solid fa-users-viewfinder text-primary me-2"></i> Análise de Clientes, Últimas Compras e Ticket Médio
+            </h4>
+            <div class="search-bar-glass">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="clientsSearchInput" placeholder="Buscar cliente ou CPF/CNPJ..." autocomplete="off">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table-glass" id="clientsReportTable">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>CPF / CNPJ</th>
+                        <th>Total Comprado</th>
+                        <th>Nº Pedidos</th>
+                        <th>Ticket Médio</th>
+                        <th>Última Compra</th>
+                        <th>Dias sem Comprar</th>
+                        <th>Classificação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in data.clients_report %}
+                    <tr>
+                        <td class="font-bold text-main">{{ c.client_name }}</td>
+                        <td class="text-muted text-xs">{{ c.cpf_cnpj or '-' }}</td>
+                        <td class="font-bold text-success">{{ c.total_spent_str }}</td>
+                        <td class="font-bold text-primary">{{ c.total_orders }} pedidos</td>
+                        <td class="font-bold text-info">{{ c.ticket_medio_str }}</td>
+                        <td class="text-muted text-xs nowrap">{{ c.last_purchase_str }}</td>
+                        <td class="text-sm font-semibold">{{ c.days_since_last }} dias</td>
+                        <td>
+                            {% if c.status_rfm == 'Melhor Comprador (VIP)' %}
+                                <span class="badge badge-warning"><i class="fa-solid fa-crown me-1"></i> {{ c.status_rfm }}</span>
+                            {% elif c.status_rfm == 'Risco de Churn' %}
+                                <span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ c.status_rfm }}</span>
+                            {% elif c.status_rfm == 'Novo Cliente' %}
+                                <span class="badge badge-success"><i class="fa-solid fa-sparkles me-1"></i> {{ c.status_rfm }}</span>
+                            {% else %}
+                                <span class="badge badge-primary">{{ c.status_rfm }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="p-4 text-center text-muted">Nenhum histórico de clientes encontrado para os filtros.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif filters.active_tab == 'size' %}
+    <!-- ── ABA 3: RELATÓRIO POR TAMANHO E TIPO DE PRODUTO ──────────────── -->
+    <div class="card p-3 mb-4">
+        <form method="get" action="{{ url_for('integrations.bling_reports') }}" class="grid grid-cols-auto-fit gap-3 align-center">
+            <input type="hidden" name="tab" value="size">
+            
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Tamanho / Grade</label>
+                <select name="size" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todos os Tamanhos</option>
+                    {% for sz in data.filters_options.sizes %}
+                    <option value="{{ sz }}" {{ 'selected' if filters.size == sz else '' }}>Tamanho {{ sz }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Categoria / Tipo</label>
+                <select name="category" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todas as Categorias</option>
+                    {% for cat in data.filters_options.categories %}
+                    <option value="{{ cat }}" {{ 'selected' if filters.category == cat else '' }}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Marca</label>
+                <select name="brand" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todas as Marcas</option>
+                    {% for b in data.filters_options.brands %}
+                    <option value="{{ b }}" {{ 'selected' if filters.brand == b else '' }}>{{ b }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Fornecedor</label>
+                <select name="supplier" class="input-glass" onchange="this.form.submit()">
+                    <option value="all">Todos os Fornecedores</option>
+                    {% for s in data.filters_options.suppliers %}
+                    <option value="{{ s }}" {{ 'selected' if filters.supplier == s else '' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group m-0">
+                <label class="text-xs font-semibold text-muted uppercase">Dias Mínimos Sem Venda</label>
+                <select name="min_days" class="input-glass" onchange="this.form.submit()">
+                    <option value="0" {{ 'selected' if filters.min_days == '0' else '' }}>Todos (Qualquer dia)</option>
+                    <option value="30" {{ 'selected' if filters.min_days == '30' else '' }}>30+ dias sem venda</option>
+                    <option value="60" {{ 'selected' if filters.min_days == '60' else '' }}>60+ dias sem venda</option>
+                    <option value="90" {{ 'selected' if filters.min_days == '90' else '' }}>90+ dias (Estoque Crítico)</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabela 1: Resumo por Categoria e Tamanho -->
+    <div class="card table-card mb-4">
+        <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+            <h4 class="font-bold text-main m-0 text-sm uppercase">
+                <i class="fa-solid fa-ruler-combined text-info me-2"></i> Resumo por Categoria & Tamanho
+            </h4>
+        </div>
+        <div class="table-responsive">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>Categoria / Tipo de Produto</th>
+                        <th>Tamanho / Grade</th>
+                        <th>Qtd de Produtos em Grade</th>
+                        <th>Estoque Total (Peças)</th>
+                        <th>Valor Total em Estoque</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in data.size_report %}
+                    <tr>
+                        <td class="font-bold text-main">{{ s.category }}</td>
+                        <td><span class="badge badge-primary font-bold">{{ s.size }}</span></td>
+                        <td class="text-muted text-sm">{{ s.products_count }} modelos</td>
+                        <td class="font-bold text-warning">{{ s.total_stock }} unidades</td>
+                        <td class="font-bold text-success">R$ {{ "{:,.2f}".format(s.total_value or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="p-4 text-center text-muted">Nenhum dado de resumo de tamanho/grade encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tabela 2: Listagem Completa dos Produtos Filtrados -->
+    <div class="card table-card mb-4">
+        <div class="card-header border-bottom p-3 d-flex align-center justify-between">
+            <h4 class="font-bold text-main m-0 text-sm uppercase">
+                <i class="fa-solid fa-boxes-stacked text-primary me-2"></i> Listagem Completa dos Produtos Filtrados por Tamanho & Tipo
+            </h4>
+            <div class="search-bar-glass">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="sizeSearchInput" placeholder="Filtrar produto, SKU, marca..." autocomplete="off">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table-glass" id="sizeProductsTable">
+                <thead>
+                    <tr>
+                        <th>SKU / Código</th>
+                        <th>Produto</th>
+                        <th>Marca</th>
+                        <th>Fornecedor</th>
+                        <th>Categoria / Tipo</th>
+                        <th>Tamanho</th>
+                        <th>Estoque Atual</th>
+                        <th>Preço Custo (R$)</th>
+                        <th>Preço Venda (R$)</th>
+                        <th>Valor Total em Estoque</th>
+                        <th>Dias sem Venda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in data.size_products_report %}
+                    <tr>
+                        <td class="font-bold text-primary">{{ p.code or 'N/I' }}</td>
+                        <td class="font-semibold text-main">{{ p.name }}</td>
+                        <td><span class="badge badge-secondary">{{ p.brand }}</span></td>
+                        <td class="text-sm text-muted">{{ p.supplier_name }}</td>
+                        <td class="text-sm text-muted">{{ p.category }}</td>
+                        <td><span class="badge badge-primary font-bold">{{ p.size }}</span></td>
+                        <td class="font-bold text-warning">{{ p.current_stock }} un</td>
+                        <td class="text-sm text-muted">R$ {{ "{:,.2f}".format(p.cost_price or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                        <td class="font-bold text-success">R$ {{ "{:,.2f}".format(p.price or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                        <td class="font-bold text-info">R$ {{ "{:,.2f}".format((p.current_stock or 0) * (p.price or 0)).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                        <td class="text-sm text-muted">{{ p.days_without_sale }}d</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="11" class="p-4 text-center text-muted">Nenhum produto cadastrado na base com o tamanho selecionado. Clique em "Sincronizar Estoque".</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_active %}
+<script>
+// Filtro de Busca Client-side nas tabelas
+if(document.getElementById('stockSearchInput')) {
+    document.getElementById('stockSearchInput').addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#stockTable tbody tr').forEach(r => {
+            r.style.display = r.innerText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+}
+
+if(document.getElementById('clientsSearchInput')) {
+    document.getElementById('clientsSearchInput').addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#clientsReportTable tbody tr').forEach(r => {
+            r.style.display = r.innerText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+}
+
+if(document.getElementById('sizeSearchInput')) {
+    document.getElementById('sizeSearchInput').addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('#sizeProductsTable tbody tr').forEach(r => {
+            r.style.display = r.innerText.toLowerCase().includes(val) ? '' : 'none';
+        });
+    });
+}
+
+function syncProductsNow() {
+    fetch('/integrations/bling/sync-products', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    });
+}
+</script>
+{% endif %}
+{% endblock %}
