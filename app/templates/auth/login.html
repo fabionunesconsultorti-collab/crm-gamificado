@@ -4,10 +4,21 @@
 <div class="auth-container">
     <div class="auth-card">
         <div class="text-center mb-4">
+            {%- set _logo_url = get_setting('company_logo_url', '') -%}
+            {%- set _co_name  = get_setting('company_name', 'CRM PRO') -%}
+            {% if _logo_url %}
+            <div class="mb-3 d-flex justify-center" style="display:flex;justify-content:center;">
+                <img src="{{ _logo_url }}" alt="{{ _co_name }}" style="max-height: 75px; max-width: 200px; object-fit: contain; border-radius: 12px; padding: 4px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border);">
+            </div>
+            {% endif %}
             <h2 class="font-bold text-main" style="font-size: 1.8rem;">
+                {% if _logo_url %}
+                <span class="text-primary">{{ _co_name }}</span>
+                {% else %}
                 <span class="text-primary">CRM</span> PRO
+                {% endif %}
             </h2>
-            <p class="text-muted text-sm mt-1">Faça login para continuar</p>
+            <p class="text-muted text-sm mt-1">{{ get_setting('company_tagline', 'Faça login para continuar') }}</p>
         </div>
 
         {% with messages = get_flashed_messages() %}

@@ -118,6 +118,10 @@ def create_app(config_class=Config):
             except Exception:
                 return True
 
+        app_version = get_setting('system_version', 'v2.5.0') or 'v2.5.0'
+        if not app_version.startswith('v') and app_version[0].isdigit():
+            app_version = f"v{app_version}"
+
         return dict(
             get_setting=get_setting,
             active_theme=active_theme,
@@ -125,7 +129,8 @@ def create_app(config_class=Config):
             custom_theme_json=custom_theme_json or '{}',
             is_integration_active=is_integration_active,
             is_module_enabled=is_module_enabled,
-            user_has_permission=user_has_permission
+            user_has_permission=user_has_permission,
+            app_version=app_version
         )
 
     return app

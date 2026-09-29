@@ -354,8 +354,14 @@
             if (e.target.classList.contains('modal')) {
                 e.target.classList.remove('show');
             }
-        });
     </script>
+
+    <!-- ── BADGE DE VERSÃO DO SISTEMA (CANTO INFERIOR DIREITO) ───────── -->
+    <div class="system-version-badge" id="systemVersionBadge" title="CRM Pro {{ app_version | default('v2.5.0') }} — Sistema Online">
+        <span class="version-status-dot"></span>
+        <span class="version-text">{{ app_version | default('v2.5.0') }}</span>
+    </div>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>
