@@ -354,12 +354,247 @@
             if (e.target.classList.contains('modal')) {
                 e.target.classList.remove('show');
             }
+        });
+
+        // Fechar modais ao pressionar tecla Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.show').forEach(m => m.classList.remove('show'));
+            }
+        });
     </script>
 
     <!-- ── BADGE DE VERSÃO DO SISTEMA (CANTO INFERIOR DIREITO) ───────── -->
-    <div class="system-version-badge" id="systemVersionBadge" title="CRM Pro {{ app_version | default('v2.5.0') }} — Sistema Online">
+    <div class="system-version-badge" id="systemVersionBadge" data-bs-toggle="modal" data-bs-target="#changelogModal" role="button" tabindex="0" title="CRM Pro {{ app_version | default('v2.5.0') }} — Clique para ver o Histórico de Versões (Changelog)">
         <span class="version-status-dot"></span>
         <span class="version-text">{{ app_version | default('v2.5.0') }}</span>
+        <i class="fa-solid fa-clock-rotate-left version-changelog-icon" title="Ver Histórico de Versões"></i>
+    </div>
+
+    <!-- ── MODAL: HISTÓRICO DE VERSÕES (CHANGELOG) ─────────────────────── -->
+    <div class="modal fade" id="changelogModal" tabindex="-1" aria-labelledby="changelogModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="d-flex align-center gap-2">
+                        <div class="avatar avatar-sm bg-primary-subtle text-primary">
+                            <i class="fa-solid fa-code-branch"></i>
+                        </div>
+                        <div>
+                            <h4 class="modal-title font-bold m-0" id="changelogModalLabel">Histórico de Versões & Atualizações</h4>
+                            <div class="text-xs text-muted">Acompanhe as melhorias contínuas, novos módulos e correções do sistema</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <span class="badge badge-primary font-bold">Atual: {{ app_version | default('v2.5.0') }}</span>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                </div>
+                <div class="modal-body changelog-modal-body">
+                    <div class="changelog-timeline">
+                        <!-- Versão 2.5.0 (Atual) -->
+                        <div class="changelog-item current">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.5.0</span>
+                                        <span class="badge badge-success text-xs font-semibold">Versão Atual</span>
+                                        <span class="badge badge-info text-xs font-semibold">Major Update</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Setembro / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">Módulo Bling ERP, Plugins Desligáveis, 5 Setores & Motor TensorFlow</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Integração ERP Bling (API v3):</strong> Sincronização bi-direcional de contatos e pedidos, Webhooks automáticos e relatórios avançados de Estoque Parado, Análise RFM de Clientes e Giro por Tamanho/Tipo com exportação CSV.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Arquitetura Modular em 5 Setores:</strong> Separação formal em Gestão de Clientes, IA & Automação, Configuração, Integrações e Motor de Plugins.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Feature Flags Dinâmicas & Motor de Plugins:</strong> Painel em <code>/admin/modules</code> e <code>/admin/plugins</code> para ligar/desligar funcionalidades e carregar extensões isoladas via EventBus.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Motor Neural TensorFlow Local:</strong> Módulo neural em <code>/admin/tensorflow</code> para scoring preditivo e classificação de propensão de fechamento de leads.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Gestão de Permissões Granulares:</strong> Controle hierárquico com grupos de usuários e matriz de permissões por ação e recurso.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-improve">Melhoria</span>
+                                        <strong>Suíte de Temas HSL:</strong> Seletor dinâmico de temas visuais (Modern Dark, Cyberpunk, Emerald, Sunset, Sapphire) e logo da empresa ampliado.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Versão 2.4.0 -->
+                        <div class="changelog-item">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.4.0</span>
+                                        <span class="badge badge-primary text-xs font-semibold">IA & RAG</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Setembro / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">RAG Híbrido, Aprendizado Contínuo & Ingestão Semântica</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>RAG Híbrido Avançado (Dense + BM25):</strong> Painel de calibração dinâmica com threshold de confiança e telemetria vetorial em <code>/admin/rag</code>.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Aprendizado Contínuo com WhatsApp:</strong> Mineração inteligente das conversas para extração automatizada de dúvidas e atualização de FAQ.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Crawler Semântico de Websites:</strong> Ingestão e vetorização direta de páginas web corporativas para ampliação da base de conhecimento.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-fix">Correção</span>
+                                        <strong>Normalização de Telefones & Resiliência WAHA:</strong> Correção automática de 9º dígito e rota de auto-recuperação de instâncias WhatsApp desconectadas.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Versão 2.3.0 -->
+                        <div class="changelog-item">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.3.0</span>
+                                        <span class="badge badge-info text-xs font-semibold">Automação</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Agosto / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">Bot Autônomo WhatsApp, Debounce em Thread & Anti-Ban</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Captura Ativa Autônoma via Webhook:</strong> Recepção e processamento em background de interações recebidas no WhatsApp.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Debounce Inteligente de Mensagens:</strong> Buffer para unificar sequências de mensagens e áudios consecutivos do cliente antes do envio ao LLM.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Qualificação Progressiva de Leads:</strong> Extração orgânica de dados do cliente durante a conversa e enriquecimento no banco de dados.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-security">Segurança</span>
+                                        <strong>Sistema Anti-Ban & Anti-Spam:</strong> Intervalos randômicos humanizados e restrição de envios ao horário comercial parametrizado.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Versão 2.2.0 -->
+                        <div class="changelog-item">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.2.0</span>
+                                        <span class="badge badge-secondary text-xs font-semibold">Prospecção</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Agosto / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">Prospecção Ativa no Google Maps & Central de Backups</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Scraper Google Maps:</strong> Prospecção ativa de empresas locais por cidade/categoria com extração de telefone, Instagram e website.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Central de Backup Completo:</strong> Exportação de dados e banco de dados com opção de sincronização com o Google Drive.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-improve">Melhoria</span>
+                                        <strong>Cards Proporcionais no Funil:</strong> Redesenho do Kanban com métricas consolidadas por estágio e drag-and-drop aprimorado.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Versão 2.1.0 -->
+                        <div class="changelog-item">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.1.0</span>
+                                        <span class="badge badge-secondary text-xs font-semibold">Infraestrutura</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Julho / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">Suporte a PostgreSQL, Ollama Local e Filas Assíncronas RQ</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>LLM Multi-Provedor:</strong> Suporte nativo a Ollama local (DeepSeek, Llama) e Google Gemini em nuvem com diretrizes anti-recusa.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Migração PostgreSQL:</strong> Suporte a PostgreSQL 15 e script de migração transparente a partir do SQLite.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-improve">Melhoria</span>
+                                        <strong>Processamento Assíncrono com Redis Queue (RQ):</strong> Fila para evitar travamentos de requisições de mensageria.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Versão 2.0.0 -->
+                        <div class="changelog-item">
+                            <div class="changelog-marker"></div>
+                            <div class="changelog-card">
+                                <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="changelog-version">v2.0.0</span>
+                                        <span class="badge badge-secondary text-xs font-semibold">Fundação</span>
+                                    </div>
+                                    <span class="text-xs text-muted"><i class="fa-regular fa-calendar me-1"></i>Junho / 2026</span>
+                                </div>
+                                <h5 class="changelog-release-title">Lançamento do CRM Pro Gamificado</h5>
+                                <ul class="changelog-list">
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Gestão de Clientes & Gamificação:</strong> Pontuação de experiência (XP), tiers de fidelidade (Bronze, Prata, Ouro, VIP) e ranking comercial.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Funil de Vendas Kanban:</strong> Visualização de oportunidades por fases com suporte a drag-and-drop.
+                                    </li>
+                                    <li>
+                                        <span class="changelog-tag tag-feat">Novo</span>
+                                        <strong>Integração WAHA API via Docker:</strong> Gateway integrado de WhatsApp com disparo de mensagens e templates dinâmicos.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-primary btn-sm" data-bs-dismiss="modal">
+                        <i class="fa-solid fa-check me-1"></i> Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     {% block extra_js %}{% endblock %}
