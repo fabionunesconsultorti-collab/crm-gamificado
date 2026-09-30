@@ -47,6 +47,7 @@ SECTORS = {
         'description': 'Gateways de mensageria, ERPs e Webhooks',
         'modules': {
             'waha': {'name': 'Gateway WAHA WhatsApp', 'default': True, 'desc': 'API HTTP para WhatsApp'},
+            'waha_bulk': {'name': 'Disparo em Lote WAHA', 'default': True, 'desc': 'Campanhas em segundo plano, filtros de leads e anti-ban'},
             'bling': {'name': 'ERP Bling', 'default': True, 'desc': 'Sincronização de pedidos e produtos'},
             'webhooks': {'name': 'Webhooks Customizados', 'default': True, 'desc': 'Recebimento e disparo de eventos'}
         }

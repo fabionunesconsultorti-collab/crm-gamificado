@@ -2,46 +2,79 @@
 
 {% block extra_css %}
 <style>
-    .terminal-log {
-        background: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+    /* Estilos do Painel de Disparo Desacoplado */
+    .master-switch-bar {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: 0.85rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .switch-toggle {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 26px;
+    }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .switch-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #64748b;
+        transition: .3s;
+        border-radius: 34px;
+    }
+    .switch-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+    input:checked + .switch-slider {
+        background-color: #10b981;
+    }
+    input:checked + .switch-slider:before {
+        transform: translateX(24px);
+    }
+
+    /* Termômetro Anti-Ban */
+    .thermometer-container {
+        background: rgba(0, 0, 0, 0.25);
         border-radius: 8px;
-        padding: 1rem;
-        height: 250px;
-        overflow-y: auto;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 0.85rem;
-        color: #10b981; /* Green */
+        padding: 0.75rem;
+        border: 1px solid var(--glass-border);
     }
-    .terminal-log .error { color: #ef4444; }
-    .terminal-log .info { color: #3b82f6; }
-    .terminal-log .warning { color: #eab308; }
-
-    .progress-wrapper {
-        background: rgba(0, 0, 0, 0.2);
+    .thermometer-bar-wrapper {
+        height: 10px;
+        background: rgba(255, 255, 255, 0.1);
         border-radius: 9999px;
-        height: 12px;
         overflow: hidden;
-        margin-top: 0.5rem;
+        margin-top: 0.35rem;
     }
-    .progress-bar {
+    .thermometer-bar {
         height: 100%;
-        background: #25D366;
-        width: 0%;
-        transition: width 0.3s ease;
-    }
-    .status-badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        background: rgba(255,255,255,0.1);
+        width: 15%;
+        background: linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #ef4444 100%);
+        transition: width 0.4s ease;
     }
 
+    /* Tabs */
     .tabs-header {
         display: flex;
         gap: 0.5rem;
         border-bottom: 1px solid var(--glass-border);
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.25rem;
         overflow-x: auto;
         padding-bottom: 0.5rem;
     }
@@ -65,248 +98,796 @@
         background: rgba(255,255,255,0.05);
     }
     .tab-btn.active {
-        color: #25D366;
-        border-bottom-color: #25D366;
-        background: rgba(37, 211, 102, 0.1);
+        color: #25D366 !important;
+        border-bottom: 2px solid #25D366 !important;
+        border-color: transparent transparent #25D366 transparent !important;
+        background: rgba(37, 211, 102, 0.12) !important;
+        box-shadow: none !important;
     }
     .tab-content {
         display: none;
-        animation: fadeIn 0.3s ease;
+        animation: fadeIn 0.25s ease;
     }
     .tab-content.active {
         display: block;
     }
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(5px); }
+        from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Pílulas de Tags Rápidas */
+    .tag-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.25rem 0.65rem;
+        border-radius: 6px;
+        background: rgba(37, 211, 102, 0.12);
+        color: #25D366;
+        border: 1px solid rgba(37, 211, 102, 0.3);
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.15s ease;
+    }
+    .tag-pill:hover {
+        background: rgba(37, 211, 102, 0.25);
+        transform: translateY(-1px);
+    }
+
+    .formatting-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--glass-border);
+        color: var(--text-main);
+        border-radius: 6px;
+        padding: 0.25rem 0.55rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .formatting-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+    }
+
+    /* Multi-Select de Segmentos */
+    .multi-select-container {
+        position: relative;
+    }
+    .dropdown-panel-glass {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.96);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        z-index: 100;
+        margin-top: 4px;
+        backdrop-filter: blur(12px);
+    }
+    .segments-checklist {
+        max-height: 190px;
+        overflow-y: auto;
+    }
+    .segment-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.35);
+        border-radius: 5px;
+        padding: 0.18rem 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 500;
+    }
+    .segment-chip-close {
+        cursor: pointer;
+        opacity: 0.75;
+    }
+    .segment-chip-close:hover {
+        opacity: 1;
+        color: #ef4444;
+    }
+
+    /* Mockup WhatsApp Simulador */
+    .wa-mockup {
+        background: #0b141a;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-height: 480px;
+    }
+    .wa-header {
+        background: #202c33;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .wa-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #25D366;
+        color: #0b141a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    .wa-body {
+        flex: 1;
+        background-color: #0b141a;
+        background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+        background-size: 16px 16px;
+        padding: 1rem;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+    }
+    .wa-bubble {
+        align-self: flex-end;
+        background: #005c4b;
+        color: #e9edef;
+        padding: 0.65rem 0.85rem;
+        border-radius: 8px 0px 8px 8px;
+        max-width: 88%;
+        font-size: 0.875rem;
+        line-height: 1.35;
+        position: relative;
+        word-break: break-word;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .wa-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.3rem;
+        font-size: 0.65rem;
+        color: rgba(233, 237, 239, 0.6);
+        margin-top: 0.25rem;
+    }
+    .wa-meta i { color: #53bdeb; }
+
+    /* Terminal de Logs com Filtros */
+    .terminal-header {
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        padding: 0.5rem 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .terminal-log {
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0 0 8px 8px;
+        padding: 0.85rem;
+        height: 240px;
+        overflow-y: auto;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.83rem;
+        color: #10b981;
+    }
+    .terminal-log .error { color: #ef4444; }
+    .terminal-log .info { color: #38bdf8; }
+    .terminal-log .warning { color: #fbbf24; }
+    .terminal-log .success { color: #34d399; }
+
+    /* Indicador do Motor */
+    .engine-pulse {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .pulse-green {
+        background: #10b981;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse 1.8s infinite;
+    }
+    .pulse-orange {
+        background: #f59e0b;
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+        animation: pulse 1.8s infinite;
+    }
+    .pulse-gray { background: #64748b; }
+    @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .metric-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 0.65rem 0.85rem;
+        text-align: center;
+        flex: 1;
+    }
 </style>
 {% endblock %}
 
 {% block topbar_actions %}
 <div class="d-flex align-center gap-2">
     <span class="badge badge-success">
-        <i class="fa-solid fa-satellite-dish"></i> Fila de Disparo WAHA
+        <i class="fa-solid fa-satellite-dish"></i> Disparo em Lote Desacoplado
     </span>
 </div>
 {% endblock %}
 
 {% block content %}
+
+<!-- Barra do Master Switch Global do Motor -->
+<div class="master-switch-bar">
+    <div class="d-flex align-center gap-3">
+        <span class="engine-pulse {% if master_switch_enabled %}pulse-green{% else %}pulse-gray{% endif %}" id="master_switch_pulse"></span>
+        <div>
+            <div class="font-bold text-sm text-main" id="master_switch_title">
+                {% if master_switch_enabled %}
+                    MOTOR DE DISPARO: ATIVO
+                {% else %}
+                    MOTOR DE DISPARO: DESLIGADO (GLOBAL)
+                {% endif %}
+            </div>
+            <div class="text-xs text-muted" id="master_switch_sub">
+                {% if master_switch_enabled %}
+                    O motor roda de forma autônoma em segundo plano no servidor. Você pode fechar o navegador.
+                {% else %}
+                    Disparos em lote pausados pelo Administrador. Ligue para habilitar novas campanhas.
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="d-flex align-center gap-2">
+        <span class="text-xs font-semibold text-muted">Ligar/Desligar Motor:</span>
+        <label class="switch-toggle m-0">
+            <input type="checkbox" id="master_switch_checkbox" {% if master_switch_enabled %}checked{% endif %} onchange="toggleMasterSwitch(this.checked)">
+            <span class="switch-slider"></span>
+        </label>
+    </div>
+</div>
+
+<!-- Tabs de Navegação -->
 <div class="tabs-header">
     <button class="tab-btn {% if active_tab == 'disparo' or not active_tab %}active{% endif %}" onclick="switchTab('disparo', this)">
         <i class="fa-solid fa-rocket text-success"></i> Motor de Disparo
     </button>
+    <button class="tab-btn {% if active_tab == 'campanhas' %}active{% endif %}" onclick="switchTab('campanhas', this)">
+        <i class="fa-solid fa-layer-group text-primary"></i> Campanhas Salvas (<span id="saved_camp_count">{{ recent_campaigns|length }}</span>)
+    </button>
     <button class="tab-btn {% if active_tab == 'historico' %}active{% endif %}" onclick="switchTab('historico', this)">
-        <i class="fa-solid fa-satellite-dish text-info"></i> Histórico (WA)
+        <i class="fa-solid fa-clock-rotate-left text-info"></i> Histórico de Envios
     </button>
 </div>
 
-<!-- Tab: Disparo -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- ABA 1: MOTOR DE DISPARO DESACOPLADO                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
 <div id="tab-disparo" class="tab-content {% if active_tab == 'disparo' or not active_tab %}active{% endif %}">
 
-
-<div class="d-grid grid-cols-1 md:grid-cols-2 gap-4">
-    <!-- Configuração de Disparo -->
-    <div class="card m-0">
-        <div class="card-header">
-            <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
-                <i class="fa-solid fa-gears text-primary"></i> Configurações da Fila
-            </h4>
-        </div>
+    <div class="d-grid grid-cols-1 lg:grid-cols-12 gap-4">
         
-        <div class="form-group w-100">
-            <label for="template_id">1. Escolha o Template</label>
-            <select id="template_id" class="input-glass" onchange="updateTextPreview()">
-                <option value="">-- Mensagem Avulsa (Em branco) --</option>
-                {% for t in templates %}
-                <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-group w-100">
-            <label for="waha_instance_id">2. Servidor de Envio (WAHA)</label>
-            <select id="waha_instance_id" class="input-glass" onchange="renderInstanceAntiBanInfo()">
-                {% for instance in waha_instances %}
-                <option value="{{ instance.id }}" {% if instance.is_default %}selected{% endif %}>{{ instance.name }} ({{ instance.session_name }})</option>
-                {% else %}
-                <option value="">Nenhum servidor configurado</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Card de Monitoramento Anti-Ban da Instância -->
-        <div id="antiban_card" class="p-3 mb-4 rounded-md" style="background: rgba(15, 23, 42, 0.45); border: 1px solid var(--glass-border); display: none;">
-            <div class="d-flex align-center justify-between flex-wrap gap-2 mb-2">
-                <div class="d-flex align-center gap-2">
-                    <i class="fa-solid fa-shield-halved text-success" id="antiban_shield_icon"></i>
-                    <span class="text-sm font-semibold">Proteção Anti-Ban:</span>
-                    <span id="antiban_status_badge" class="badge" style="font-size: 0.72rem;">ATIVO</span>
-                    <span id="antiban_warmup_badge" class="badge d-none" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; font-size: 0.72rem;">
-                        <i class="fa-solid fa-fire"></i> MODO AQUECIMENTO
-                    </span>
-                    <span id="antiban_quiet_badge" class="badge d-none" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa; font-size: 0.72rem;">
-                        <i class="fa-solid fa-moon"></i> HORÁRIO SILENCIOSO
-                    </span>
+        <!-- ── COLUNA ESQUERDA: Filtro de Leads e Redação (7 colunas) ── -->
+        <div class="lg:col-span-7 d-flex flex-column gap-4">
+            
+            <!-- Card 1: Filtro Avançado de Leads -->
+            <div class="card m-0">
+                <div class="card-header pb-2 mb-3">
+                    <h4 class="m-0 text-main font-bold d-flex align-center justify-between w-100">
+                        <span class="d-flex align-center gap-2">
+                            <i class="fa-solid fa-filter text-primary"></i> 1. Filtro & Segmentação de Destinatários
+                        </span>
+                        <span class="badge badge-primary text-xs" id="leads_estimate_badge">
+                            <i class="fa-solid fa-users"></i> {{ total_clients_count }} contatos na base
+                        </span>
+                    </h4>
                 </div>
-                <a href="{{ url_for('admin.settings') }}?tab=waha" class="text-xs text-primary text-decoration-none">
-                    <i class="fa-solid fa-gear"></i> Ajustar Limites
-                </a>
-            </div>
 
-            <div id="antiban_quiet_warning" class="p-2 mb-2 text-xs d-none" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; color: #fbbf24;">
-                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atenção:</strong> Esta instância está no <strong>Horário Silencioso</strong> (<span id="antiban_quiet_time"></span>). Disparos em lote fora do expediente aumentam o risco de denúncias de spam.
-            </div>
-
-            <!-- Medidores de Cota -->
-            <div class="d-grid grid-cols-2 gap-3 mt-2">
-                <div>
-                    <div class="d-flex justify-between text-xs mb-1">
-                        <span class="text-muted">Limite da Hora Atual:</span>
-                        <strong id="antiban_hourly_label">0 / 80</strong>
-                    </div>
-                    <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
-                        <div id="antiban_hourly_bar" class="progress-bar" style="width: 0%; background: #3b82f6;"></div>
+                <div class="form-group w-100 mb-3">
+                    <label class="text-xs font-bold text-muted mb-1 d-block">Etapa do Funil / Status:</label>
+                    <div class="d-flex flex-wrap gap-2" id="status_checkboxes">
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="lead" checked onchange="triggerEstimate()"> Lead
+                        </label>
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="contato" checked onchange="triggerEstimate()"> Contato
+                        </label>
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="proposta" checked onchange="triggerEstimate()"> Proposta
+                        </label>
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="regularizacao" onchange="triggerEstimate()"> Regularização
+                        </label>
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="fechado" onchange="triggerEstimate()"> Fechado
+                        </label>
+                        <label class="tag-pill" style="cursor:pointer;">
+                            <input type="checkbox" value="perdido" onchange="triggerEstimate()"> Perdido
+                        </label>
                     </div>
                 </div>
-                <div>
-                    <div class="d-flex justify-between text-xs mb-1">
-                        <span class="text-muted">Limite do Dia:</span>
-                        <strong id="antiban_daily_label">0 / 500</strong>
+
+                <div class="d-grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div class="form-group w-100 m-0 position-relative">
+                        <div class="d-flex justify-between align-center mb-1">
+                            <label class="text-xs font-semibold m-0">Segmentos / Categorias:</label>
+                            <span class="text-xs text-primary font-bold" id="selected_segments_badge">Todos ({{ segments|length }})</span>
+                        </div>
+
+                        <!-- Dropdown Multi-Select Personalizado -->
+                        <div class="multi-select-container">
+                            <button type="button" class="input-glass w-100 d-flex justify-between align-center text-xs py-2 px-3 text-left cursor-pointer" onclick="toggleSegmentsDropdown(event)" id="btn_toggle_segments">
+                                <span id="segments_button_label" class="text-truncate">-- Todos os Segmentos --</span>
+                                <i class="fa-solid fa-chevron-down text-xs text-muted"></i>
+                            </button>
+
+                            <div id="segments_dropdown_panel" class="dropdown-panel-glass d-none">
+                                <div class="p-2 border-bottom border-glass d-flex gap-2">
+                                    <input type="text" id="search_segment_input" class="input-glass py-1 px-2 text-xs flex-1" placeholder="Buscar segmento..." oninput="filterSegmentsList(this.value)">
+                                    <button type="button" class="btn-secondary py-1 px-2 text-xs" onclick="selectAllSegments(true)">Todos</button>
+                                    <button type="button" class="btn-secondary py-1 px-2 text-xs" onclick="selectAllSegments(false)">Limpar</button>
+                                </div>
+                                <div class="segments-checklist p-2" id="segments_checklist">
+                                    {% for seg in segments %}
+                                    <label class="d-flex align-center gap-2 p-1 rounded hover-glass cursor-pointer text-xs mb-1 segment-item" data-name="{{ seg | lower }}">
+                                        <input type="checkbox" class="segment-checkbox checkbox-glass" value="{{ seg }}" onchange="onSegmentCheckChanged()">
+                                        <span>{{ seg }}</span>
+                                    </label>
+                                    {% else %}
+                                    <div class="text-muted text-xs p-2">Nenhum segmento cadastrado</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pílulas dos segmentos ativos selecionados -->
+                        <div class="d-flex flex-wrap gap-1 mt-1" id="selected_segments_chips"></div>
                     </div>
-                    <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
-                        <div id="antiban_daily_bar" class="progress-bar" style="width: 0%; background: #10b981;"></div>
+
+                    <div class="form-group w-100 m-0">
+                        <label for="filter_source" class="text-xs font-semibold">Origem do Lead:</label>
+                        <select id="filter_source" class="input-glass" onchange="triggerEstimate()">
+                            <option value="all">-- Todas as Origens --</option>
+                            {% for src in lead_sources %}
+                            <option value="{{ src }}">{{ src }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div class="form-group w-100 m-0">
+                        <label for="filter_seller" class="text-xs font-semibold">Vendedor / Carteira:</label>
+                        <select id="filter_seller" class="input-glass" onchange="triggerEstimate()">
+                            <option value="all">-- Qualquer Vendedor --</option>
+                            <option value="unassigned">Sem Vendedor Atribuído</option>
+                            {% for u in assigned_users %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group w-100 m-0">
+                        <label for="filter_ddds" class="text-xs font-semibold">Filtrar DDDs (Ex: 11, 21):</label>
+                        <input type="text" id="filter_ddds" class="input-glass" placeholder="Ex: 11, 19, 21" oninput="triggerEstimate()">
+                    </div>
+
+                    <div class="form-group w-100 m-0">
+                        <label for="filter_anti_fatigue" class="text-xs font-semibold text-warning" title="Não envia para clientes contatados recentemente">
+                            <i class="fa-solid fa-shield"></i> Anti-Fadiga (dias):
+                        </label>
+                        <select id="filter_anti_fatigue" class="input-glass" onchange="triggerEstimate()">
+                            <option value="0">Desativado (enviar todos)</option>
+                            <option value="1">Ignorar contatados hoje</option>
+                            <option value="3" selected>Sem contato há 3 dias</option>
+                            <option value="7">Sem contato há 7 dias</option>
+                            <option value="15">Sem contato há 15 dias</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Detalhes Expansíveis: Lista Manual e Importação CSV -->
+                <details class="mb-2" style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.5rem 0.75rem;">
+                    <summary class="cursor-pointer text-xs font-bold text-muted d-flex align-center justify-between">
+                        <span><i class="fa-solid fa-plus-circle text-primary"></i> Adicionar Lista Manual ou Planilha CSV (Opcional)</span>
+                        <i class="fa-solid fa-chevron-down text-xs"></i>
+                    </summary>
+                    <div class="mt-3">
+                        <div class="form-group w-100 mb-2">
+                            <label for="manual_list" class="text-xs">Lista Manual (Nome, Telefone):</label>
+                            <textarea id="manual_list" class="input-glass" rows="2" placeholder="Carlos, 11999991111&#10;Mariana, 21988882222" oninput="triggerEstimate()"></textarea>
+                        </div>
+                        <div class="form-group w-100 m-0">
+                            {% with target_module='bulk', system_fields=[
+                                {'key': 'name', 'label': 'Nome do Cliente', 'required': true},
+                                {'key': 'phone', 'label': 'Celular/WhatsApp', 'required': true}
+                            ] %}
+                                {% include 'crm/mapping_tool.html' %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                </details>
+
+                <div class="d-flex align-center justify-between mt-2 pt-2 border-top border-glass">
+                    <div class="text-xs text-muted" id="estimate_preview_text">
+                        Pronto para compilar fila.
+                    </div>
+                    <button type="button" class="btn-secondary py-1 px-3 text-xs" onclick="calculateEstimateNow()">
+                        <i class="fa-solid fa-calculator"></i> Recalcular Destinatários
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 2: Editor Amigável de Mensagens com Spintax -->
+            <div class="card m-0">
+                <div class="card-header pb-2 mb-2">
+                    <h4 class="m-0 text-main font-bold d-flex align-center justify-between w-100">
+                        <span class="d-flex align-center gap-2">
+                            <i class="fa-solid fa-pen-to-square text-success"></i> 2. Conteúdo da Mensagem
+                        </span>
+                        <span class="text-xs text-muted">Variáveis & Spintax Suportados</span>
+                    </h4>
+                </div>
+
+                <div class="form-group w-100 mb-3">
+                    <div class="d-flex justify-between align-center mb-1">
+                        <label for="template_id" class="text-xs font-semibold">Carregar de Template:</label>
+                        <a href="{{ url_for('admin.settings') }}?tab=templates" class="text-xs text-primary text-decoration-none">
+                            <i class="fa-solid fa-plus"></i> Gerenciar Templates
+                        </a>
+                    </div>
+                    <select id="template_id" class="input-glass" onchange="applyTemplateText()">
+                        <option value="">-- Mensagem Personalizada (Em Branco) --</option>
+                        {% for t in templates %}
+                        <option value="{{ t.id }}" data-text="{{ t.text }}">{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Barra de Ferramentas: Pílulas de Tags Rápidas -->
+                <div class="mb-2">
+                    <span class="text-xs font-semibold text-muted d-block mb-1">Inserir Variável (1-Clique):</span>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="tag-pill" onclick="insertVariable('[PRIMEIRO_NOME]')">+ [PRIMEIRO_NOME]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[NOME_COMPLETO]')">+ [NOME_COMPLETO]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[SAUDACAO_HORARIO]')">+ [SAUDACAO_HORARIO]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[STATUS]')">+ [STATUS]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[EMPRESA]')">+ [EMPRESA]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[CIDADE]')">+ [CIDADE]</button>
+                        <button type="button" class="tag-pill" onclick="insertVariable('[DATA]')">+ [DATA]</button>
+                    </div>
+                </div>
+
+                <!-- Barra de Formatação e Emojis -->
+                <div class="d-flex align-center justify-between gap-1 mb-2 flex-wrap">
+                    <div class="d-flex align-center gap-1">
+                        <button type="button" class="formatting-btn font-bold" onclick="wrapSelection('*', '*')">B</button>
+                        <button type="button" class="formatting-btn italic" onclick="wrapSelection('_', '_')">I</button>
+                        <button type="button" class="formatting-btn" style="text-decoration:line-through;" onclick="wrapSelection('~', '~')">S</button>
+                        <button type="button" class="formatting-btn" onclick="insertSpintaxExample()" title="Insere sintaxe de variação de texto Spintax">
+                            <i class="fa-solid fa-arrows-split-up-and-left text-warning"></i> +Spintax
+                        </button>
+                    </div>
+                    <div class="d-flex align-center gap-1">
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('👋')">👋</button>
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('🚀')">🚀</button>
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('💬')">💬</button>
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('📅')">📅</button>
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('✅')">✅</button>
+                        <button type="button" class="formatting-btn" onclick="insertEmoji('⭐')">⭐</button>
+                    </div>
+                </div>
+
+                <div class="form-group w-100 mb-2">
+                    <textarea id="message_text" class="input-glass font-sans" rows="5" placeholder="{Olá|Oi|Bom dia} [PRIMEIRO_NOME]! Como está? Segue sua atualização..." style="resize:vertical;" oninput="updateLivePreview()"></textarea>
+                </div>
+
+                <div class="d-flex align-center justify-between gap-2 flex-wrap mb-2">
+                    <label class="d-flex align-center gap-2 cursor-pointer m-0">
+                        <input type="checkbox" id="use_ai" class="checkbox-glass">
+                        <span class="text-xs font-semibold">🔄 Personalizar com IA (Ollama / DeepSeek)</span>
+                    </label>
+                    <button type="button" class="btn-secondary py-1 px-2 text-xs" onclick="testSpintaxVariations()">
+                        <i class="fa-solid fa-wand-magic-sparkles text-warning"></i> Testar 3 Variações Spintax
+                    </button>
+                </div>
+
+                <div id="spintax_samples_box" class="p-2 rounded-md text-xs d-none" style="background: rgba(0,0,0,0.3); border: 1px dashed var(--glass-border);">
+                    <div class="font-bold text-muted mb-1"><i class="fa-solid fa-dice"></i> Amostras Geradas pelo Motor:</div>
+                    <ul class="m-0 pl-3" id="spintax_samples_list"></ul>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── COLUNA DIREITA: Simulador, Proteção Anti-Ban e Motor (5 colunas) ── -->
+        <div class="lg:col-span-5 d-flex flex-column gap-4">
+            
+            <!-- Card 3: Simulador WhatsApp em Tempo Real -->
+            <div class="card m-0 p-0 overflow-hidden">
+                <div class="wa-mockup">
+                    <div class="wa-header">
+                        <div class="wa-avatar">C</div>
+                        <div>
+                            <div class="text-sm font-semibold text-white">Cliente (Simulação)</div>
+                            <div class="text-xs text-muted" style="color: #25D366 !important;">online</div>
+                        </div>
+                    </div>
+                    <div class="wa-body" id="wa_mockup_body">
+                        <div class="wa-bubble" id="wa_preview_bubble">
+                            <span id="wa_preview_text">Sua mensagem aparecerá aqui em tempo real...</span>
+                            <div class="wa-meta">
+                                <span id="wa_preview_time">16:30</span>
+                                <i class="fa-solid fa-check-double"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="text-xs text-muted mt-2 d-flex justify-between flex-wrap gap-2">
-                <span><i class="fa-solid fa-stopwatch"></i> Latência Segura: <strong id="antiban_delay_label" class="text-primary">5s a 15s</strong></span>
-                <span id="antiban_warmup_detail" class="text-warning"></span>
+            <!-- Card 4: Termômetro Anti-Ban & Instância -->
+            <div class="card m-0">
+                <div class="card-header pb-2 mb-2">
+                    <h4 class="m-0 text-main font-bold d-flex align-center justify-between w-100">
+                        <span class="d-flex align-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-success"></i> 3. Proteção Anti-Ban WAHA
+                        </span>
+                        <a href="{{ url_for('admin.settings') }}?tab=waha" class="text-xs text-primary text-decoration-none">
+                            <i class="fa-solid fa-gear"></i> Ajustar
+                        </a>
+                    </h4>
+                </div>
+
+                <div class="form-group w-100 mb-2">
+                    <label for="waha_instance_id" class="text-xs font-semibold">Instância / Chip de Disparo:</label>
+                    <select id="waha_instance_id" class="input-glass" onchange="renderInstanceAntiBanInfo()">
+                        {% for inst in waha_instances %}
+                        <option value="{{ inst.id }}" {% if inst.is_default %}selected{% endif %}>{{ inst.name }} ({{ inst.session_name }})</option>
+                        {% else %}
+                        <option value="">Nenhuma instância configurada</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Termômetro de Risco -->
+                <div class="thermometer-container mb-3">
+                    <div class="d-flex justify-between align-center text-xs">
+                        <span class="font-bold">Termômetro de Risco:</span>
+                        <span class="badge" id="risk_score_badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">BAIXO RISCO (15%)</span>
+                    </div>
+                    <div class="thermometer-bar-wrapper">
+                        <div class="thermometer-bar" id="risk_bar"></div>
+                    </div>
+                    <div class="text-xs text-muted mt-1" id="risk_advice">
+                        ✓ Disparo seguro. Cotas e horários adequados.
+                    </div>
+                </div>
+
+                <!-- Cotas da Instância -->
+                <div class="d-grid grid-cols-2 gap-2 mb-2">
+                    <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                        <div class="d-flex justify-between text-xs mb-1">
+                            <span class="text-muted">Cota Horária:</span>
+                            <strong id="antiban_hourly_label">0 / 80</strong>
+                        </div>
+                        <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
+                            <div id="antiban_hourly_bar" class="progress-bar" style="width: 0%; background: #3b82f6;"></div>
+                        </div>
+                    </div>
+                    <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                        <div class="d-flex justify-between text-xs mb-1">
+                            <span class="text-muted">Cota Diária:</span>
+                            <strong id="antiban_daily_label">0 / 500</strong>
+                        </div>
+                        <div class="progress-wrapper" style="height: 6px; background: rgba(255,255,255,0.1);">
+                            <div id="antiban_daily_bar" class="progress-bar" style="width: 0%; background: #10b981;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <label class="text-muted">Intervalo Seguro:</label>
+                        <div class="d-flex align-center gap-1">
+                            <input type="number" id="min_delay" class="input-glass py-1 px-2 text-xs text-center" value="6" min="3" max="60" style="width:55px;">
+                            <span>a</span>
+                            <input type="number" id="max_delay" class="input-glass py-1 px-2 text-xs text-center" value="15" min="5" max="180" style="width:55px;">
+                            <span>seg</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-muted">Pausa Tática:</label>
+                        <div class="text-xs font-semibold text-primary pt-1">
+                            Descanso a cada 25 msgs
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <!-- Card 5: Central de Comando do Motor Desacoplado -->
+            <div class="card m-0" style="border: 1px solid rgba(37, 211, 102, 0.3);">
+                <div class="card-header pb-2 mb-2">
+                    <h4 class="m-0 text-main font-bold d-flex align-center justify-between w-100">
+                        <span class="d-flex align-center gap-2">
+                            <i class="fa-solid fa-gauge-high text-success"></i> 4. Motor Desacoplado
+                        </span>
+                        <span class="status-badge" id="engine_status_badge">AGUARDANDO FILA</span>
+                    </h4>
+                </div>
+
+                <!-- Progresso e Métricas -->
+                <div class="mb-3">
+                    <div class="d-flex justify-between text-xs font-semibold mb-1">
+                        <span>Progresso Geral: <strong id="progress_counts">0 / 0</strong></span>
+                        <span id="progress_pct_label">0%</span>
+                    </div>
+                    <div class="progress-wrapper w-100 mb-2" style="height: 10px;">
+                        <div class="progress-bar" id="progress_bar" style="width: 0%;"></div>
+                    </div>
+
+                    <div class="d-flex gap-2 w-100">
+                        <div class="metric-box">
+                            <div class="text-xs text-muted">SUCESSOS</div>
+                            <div class="text-base font-bold text-success" id="counter_success">0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="text-xs text-muted">ERROS</div>
+                            <div class="text-base font-bold text-danger" id="counter_errors">0</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="text-xs text-muted">VELOCIDADE</div>
+                            <div class="text-base font-bold text-primary" id="metric_speed">0 mpm</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="text-xs text-muted">ESTIMATIVA</div>
+                            <div class="text-base font-bold text-warning" id="metric_eta">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação do Motor -->
+                <div class="d-grid grid-cols-2 gap-2 mb-3">
+                    <button id="btn_compile_queue" class="btn-secondary py-2 text-xs font-bold" onclick="compileAndSaveCampaign()">
+                        <i class="fa-solid fa-layer-group"></i> 1. COMPILAR FILA
+                    </button>
+                    <button id="btn_start_engine" class="btn-primary py-2 text-xs font-bold" style="background:#25D366; color:#0f172a;" onclick="startCampaignEngine()" disabled>
+                        <i class="fa-solid fa-play"></i> 2. INICIAR DISPARO
+                    </button>
+                    <button id="btn_pause_engine" class="btn-primary py-2 text-xs font-bold d-none" style="background:#f59e0b; color:#0f172a;" onclick="pauseCampaignEngine()">
+                        <i class="fa-solid fa-pause"></i> PAUSAR MOTOR
+                    </button>
+                    <button id="btn_cancel_engine" class="btn-danger py-2 text-xs font-bold d-none" onclick="cancelCampaignEngine()">
+                        <i class="fa-solid fa-stop"></i> CANCELAR FILA
+                    </button>
+                </div>
+
+                <!-- Terminal de Telemetria com Filtro de Logs -->
+                <div class="terminal-header">
+                    <div class="d-flex align-center gap-1 text-xs">
+                        <i class="fa-solid fa-terminal text-muted"></i>
+                        <span class="font-bold">Telemetria ao Vivo</span>
+                    </div>
+                    <div class="d-flex align-center gap-1">
+                        <button type="button" class="formatting-btn py-0 px-2 text-xs" onclick="filterTerminal('all')">Todos</button>
+                        <button type="button" class="formatting-btn py-0 px-2 text-xs text-success" onclick="filterTerminal('success')">Sucesso</button>
+                        <button type="button" class="formatting-btn py-0 px-2 text-xs text-danger" onclick="filterTerminal('error')">Erros</button>
+                    </div>
+                </div>
+                <div class="terminal-log" id="terminal">
+                    <div><span class="info">[SISTEMA]</span> Motor desacoplado pronto. Compile a fila para iniciar.</div>
+                </div>
+            </div>
+
         </div>
 
-        <div class="form-group w-100 mb-4">
-            <label for="message_text">Texto da Mensagem</label>
-            <textarea id="message_text" class="input-glass" rows="4" placeholder="Sua mensagem. Use [NOME] para personalizar automaticamente." style="resize:vertical;"></textarea>
-            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-circle-info"></i> Variáveis suportadas: [NOME], [NOME_COMPLETO], [STATUS], [DATA], [HORA]</div>
-        </div>
-
-        <h4 class="m-0 mt-2 mb-3 text-main"><i class="fa-solid fa-address-book"></i> Destinatários</h4>
-        
-        <div class="form-group w-100">
-            <label for="crm_filter">A. Adicionar Base do CRM</label>
-            <select id="crm_filter" class="input-glass">
-                <option value="">-- Não usar CRM --</option>
-                <option value="all">Todos os clientes ({{ clients_json|length }})</option>
-                <option value="lead">Apenas Leads</option>
-                <option value="contato">Apenas Contatos</option>
-                <option value="proposta">Apenas Propostas</option>
-            </select>
-        </div>
-
-                <div class="form-group w-100 mb-0">
-            <label for="manual_list">B. Adicionar Lista Manual <span class="text-xs font-normal text-muted">(Opcional)</span></label>
-            <textarea id="manual_list" class="input-glass" rows="4" placeholder="Nome, Telefone&#10;Maria Silva, 11999999999&#10;João S., 21988888888" style="resize:vertical;"></textarea>
-            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-triangle-exclamation text-warning"></i> Formato rigoroso: Um contato por linha, separados por vírgula.</div>
-        </div>
-
-        <div class="form-group w-100 mt-4 mb-4">
-            <label>C. Importar Planilha / CSV <span class="text-xs font-normal text-muted">(Opcional)</span></label>
-            {% with target_module='bulk', system_fields=[
-                {'key': 'name', 'label': 'Nome do Cliente', 'required': true},
-                {'key': 'phone', 'label': 'Celular/WhatsApp', 'required': true}
-            ] %}
-                {% include 'crm/mapping_tool.html' %}
-            {% endwith %}
-        </div>
     </div>
 
-    </div>
+</div>
 
-    <!-- Engine / Execução -->
-    <div class="card m-0">
-        <div class="card-header">
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- ABA 2: CAMPANHAS SALVAS & HISTÓRICO                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div id="tab-campanhas" class="tab-content {% if active_tab == 'campanhas' %}active{% endif %}">
+    <div class="card table-card m-0">
+        <div class="card-header p-4 m-0 d-flex justify-between align-center">
             <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
-                <i class="fa-solid fa-rocket text-success"></i> Motor de Envio
+                <i class="fa-solid fa-layer-group text-primary"></i> Campanhas Salvas no Servidor
             </h4>
         </div>
-        
-        <div class="d-flex align-center justify-between w-100 mb-2">
-            <div class="text-sm font-semibold">Progresso: <span id="progress_text">0 / 0</span></div>
-            <div class="status-badge" id="engine_status">AGUARDANDO</div>
-        </div>
-        <div class="progress-wrapper w-100 mb-3">
-            <div class="progress-bar" id="progress_bar"></div>
-        </div>
 
-        <div class="d-flex gap-2 w-100 mb-3">
-            <div class="header-glass flex-1 m-0 p-2 text-center" style="background: rgba(16, 185, 129, 0.1);">
-                <div class="text-xs text-muted mb-0">SUCESSO</div>
-                <div class="text-lg font-bold text-success" id="counter_success">0</div>
-            </div>
-            <div class="header-glass flex-1 m-0 p-2 text-center" style="background: rgba(239, 68, 68, 0.1);">
-                <div class="text-xs text-muted mb-0">ERROS</div>
-                <div class="text-lg font-bold text-danger" id="counter_errors">0</div>
-            </div>
-        </div>
-
-        <!-- Botões de Download Rápido removidos da aba de envio (movidos para o histórico) -->
-
-        <div class="form-group w-100">
-            <div class="d-flex justify-between align-center mb-1">
-                <label class="m-0">Latência entre mensagens (Segundos)</label>
-                <button type="button" class="btn-secondary py-0 px-2 text-xs" onclick="applyRecommendedDelay()">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Usar Latência Anti-Ban
-                </button>
-            </div>
-            <input type="number" id="delay_seconds" class="input-glass" value="6" min="1" max="180">
-            <div class="text-xs text-muted mt-1">O sistema adiciona micro-variações aleatórias para simular digitação e comportamento humano autêntico.</div>
-        </div>
-
-        <div class="form-group w-100 mb-4">
-            <label class="d-flex align-center gap-2 cursor-pointer">
-                <input type="checkbox" id="use_ai" class="checkbox-glass">
-                <span class="text-sm font-semibold">🔄 Personalizar com IA (Evitar Spam)</span>
-            </label>
-            <div class="text-xs text-muted mt-1"><i class="fa-solid fa-sparkles text-warning"></i> Reescreve e humaniza cada mensagem usando IA (Ollama Local / DeepSeek / Gemini) para evitar bloqueios no WhatsApp.</div>
-        </div>
-
-        <div class="d-flex gap-2 w-100 mb-4">
-            <button id="btn_compile" class="btn-secondary flex-1" onclick="compileQueue()">
-                <i class="fa-solid fa-layer-group"></i> COMPILAR FILA
-            </button>
-            <button id="btn_start" class="btn-primary flex-1" style="background:#25D366; color:#0f172a;" onclick="startEngine()" disabled>
-                <i class="fa-solid fa-play"></i> INICIAR DISPARO
-            </button>
-            <button id="btn_pause" class="btn-primary flex-1" style="background:#f59e0b; color:#0f172a; display:none;" onclick="pauseEngine()">
-                <i class="fa-solid fa-pause"></i> PAUSAR
-            </button>
-        </div>
-
-        <div class="terminal-log w-100" id="terminal">
-            <div><span class="info">[SYSTEM]</span> Engine carregado. Aguardando compilação da fila...</div>
+        <div class="table-responsive w-100">
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome da Campanha</th>
+                        <th>Data Criação</th>
+                        <th>Instância</th>
+                        <th>Total</th>
+                        <th>Progresso</th>
+                        <th>Sucessos / Erros</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camp in recent_campaigns %}
+                    <tr>
+                        <td class="font-bold text-muted">#{{ camp.id }}</td>
+                        <td class="font-semibold">{{ camp.name }}</td>
+                        <td class="text-xs text-muted">{{ camp.created_at }}</td>
+                        <td class="text-xs">{{ camp.waha_instance_name }}</td>
+                        <td class="font-bold">{{ camp.total_count }}</td>
+                        <td>
+                            <div class="d-flex align-center gap-2" style="min-width: 100px;">
+                                <div class="progress-wrapper flex-1" style="height: 6px;">
+                                    <div class="progress-bar" style="width: {{ camp.progress_pct }}%;"></div>
+                                </div>
+                                <span class="text-xs">{{ camp.progress_pct }}%</span>
+                            </div>
+                        </td>
+                        <td class="text-xs">
+                            <span class="text-success font-bold">{{ camp.success_count }}</span> / 
+                            <span class="text-danger font-bold">{{ camp.error_count }}</span>
+                        </td>
+                        <td>
+                            {% if camp.status == 'running' %}
+                            <span class="badge badge-primary"><i class="fa-solid fa-play"></i> Rodando</span>
+                            {% elif camp.status == 'paused' %}
+                            <span class="badge badge-warning"><i class="fa-solid fa-pause"></i> Pausado</span>
+                            {% elif camp.status == 'completed' %}
+                            <span class="badge badge-success"><i class="fa-solid fa-check"></i> Concluído</span>
+                            {% elif camp.status == 'cancelled' %}
+                            <span class="badge badge-danger"><i class="fa-solid fa-ban"></i> Cancelado</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ camp.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button type="button" class="btn-secondary py-1 px-2 text-xs" onclick="loadCampaignToPanel({{ camp.id }})">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted p-4">Nenhuma campanha registrada no banco de dados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-
-</div>
-
-<!-- Tab: Histórico -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- ABA 3: HISTÓRICO DE ENVIOS DE MENSAGENS                                      -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
 <div id="tab-historico" class="tab-content {% if active_tab == 'historico' %}active{% endif %}">
     <div class="card table-card m-0">
-        <div class="card-header p-4 m-0">
+        <div class="card-header p-4 m-0 d-flex justify-between align-center">
             <h4 class="m-0 text-main font-bold d-flex align-center gap-2">
-                <i class="fa-solid fa-list text-primary"></i> Histórico de Disparos
+                <i class="fa-solid fa-list text-primary"></i> Mensagens Registradas (WhatsApp)
             </h4>
             <div class="d-flex gap-2">
-                <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm d-flex align-center justify-center gap-2" style="padding: 0.5rem 1rem;">
+                <a href="{{ url_for('admin.export_messages', format='csv') }}" class="btn-secondary text-sm d-flex align-center gap-2 py-1 px-3">
                     <i class="fa-solid fa-file-csv"></i> Exportar CSV
-                </a>
-                <a href="{{ url_for('admin.export_messages', format='pdf') }}" class="btn-secondary text-sm d-flex align-center justify-center gap-2" style="padding: 0.5rem 1rem;">
-                    <i class="fa-solid fa-file-pdf"></i> Exportar PDF
                 </a>
             </div>
         </div>
@@ -316,30 +897,22 @@
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
-                        <th>Recebedor</th>
-                        <th>Envio por</th>
-                        <th>Mensagem</th>
-                        <th>Canal</th>
+                        <th>Destinatário</th>
+                        <th>Operador</th>
+                        <th>Conteúdo</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td class="nowrap text-sm text-muted">{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td class="font-semibold">{{ log.client.name if log.client else 'Deletado' }}</td>
-                        <td class="text-sm">{{ log.user.username if log.user else 'API/Bot' }}</td>
-                        <td class="text-sm">
-                            <div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ log.content }}">
+                        <td class="nowrap text-xs text-muted">{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="font-semibold text-sm">{{ log.client.name if log.client else 'Contato Avulso' }}</td>
+                        <td class="text-xs">{{ log.user.username if log.user else 'Motor/Bot' }}</td>
+                        <td class="text-xs">
+                            <div style="max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ log.content }}">
                                 {{ log.content }}
                             </div>
-                        </td>
-                        <td>
-                            {% if log.channel in ['evolution_api', 'waha_api', 'whatsapp_waha'] %}
-                            <span class="badge badge-primary"><i class="fa-solid fa-robot"></i> API</span>
-                            {% else %}
-                            <span class="badge badge-success"><i class="fa-brands fa-whatsapp"></i> ZAP Link</span>
-                            {% endif %}
                         </td>
                         <td>
                             {% if log.status == 'sent' %}
@@ -353,7 +926,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted p-4">Nenhum registro de disparo encontrado.</td>
+                        <td colspan="5" class="text-center text-muted p-4">Nenhum log registrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -362,82 +935,82 @@
     </div>
 </div>
 
-<!-- Dados do CRM em JSON oculto para o JS -->
-<script id="crm_data" type="application/json">
-    {{ clients_json | tojson }}
-</script>
-
 <script>
-    
+    // ── Estado Global da Aplicação ─────────────────────────────────────────────
+    let activeCampaignId = {{ active_campaign.id if active_campaign else 'null' }};
+    let activeCampaignState = {{ (active_campaign or {}) | tojson }};
+    let pollingTimer = null;
+    let importedFileClients = [];
+    const instancesData = {{ (waha_instances_stats or {}) | tojson }};
+    let lastLogsRendered = [];
+    let currentLogFilter = 'all';
+
+    // ── Alternância de Abas ───────────────────────────────────────────────────
     function switchTab(tabId, btn) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         
-        document.getElementById('tab-' + tabId).classList.add('active');
-        if(btn) {
-            btn.classList.add('active');
-        }
+        const target = document.getElementById('tab-' + tabId);
+        if (target) target.classList.add('active');
+        if (btn) btn.classList.add('active');
         
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.set('tab', tabId);
         window.history.pushState({}, '', newUrl);
     }
 
-    // Instâncias WAHA e Configurações Anti-Ban
-    const instancesData = {{ (waha_instances_stats or []) | tojson }};
+    // ── Inicialização ao Carregar a Página ─────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        renderInstanceAntiBanInfo();
+        updateLivePreview();
+        calculateEstimateNow();
 
+        if (activeCampaignId) {
+            logTerminal(`Campanha ativa #${activeCampaignId} detectada. Conectando telemetria...`, 'info');
+            loadCampaignToPanel(activeCampaignId);
+        }
+    });
+
+    // ── Master Switch Global do Motor ─────────────────────────────────────────
+    async function toggleMasterSwitch(enabled) {
+        try {
+            const resp = await fetch("{{ url_for('crm.api_bulk_toggle_master_switch') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                const pulse = document.getElementById('master_switch_pulse');
+                const title = document.getElementById('master_switch_title');
+                const sub = document.getElementById('master_switch_sub');
+                if (enabled) {
+                    pulse.className = 'engine-pulse pulse-green';
+                    title.textContent = 'MOTOR DE DISPARO: ATIVO';
+                    sub.textContent = 'O motor roda de forma autônoma em segundo plano no servidor. Você pode fechar o navegador.';
+                    logTerminal('✓ Motor de Disparo ativado globalmente.', 'success');
+                } else {
+                    pulse.className = 'engine-pulse pulse-gray';
+                    title.textContent = 'MOTOR DE DISPARO: DESLIGADO (GLOBAL)';
+                    sub.textContent = 'Disparos em lote pausados pelo Administrador. Ligue para habilitar novas campanhas.';
+                    logTerminal('⛔ Motor de Disparo desativado globalmente pelo Administrador.', 'warning');
+                }
+            }
+        } catch (e) {
+            alert('Falha ao alternar Master Switch: ' + e);
+        }
+    }
+
+    // ── Renderização das Informações Anti-Ban & Termômetro ─────────────────────
     function getSelectedInstance() {
-        const select = document.getElementById('waha_instance_id');
-        if (!select || !select.value) return null;
-        return instancesData.find(i => String(i.id) === String(select.value)) || null;
+        const sel = document.getElementById('waha_instance_id');
+        if (!sel || !sel.value) return null;
+        return instancesData[sel.value] || null;
     }
 
     function renderInstanceAntiBanInfo() {
-        const card = document.getElementById('antiban_card');
-        if (!card) return;
         const inst = getSelectedInstance();
-        if (!inst) {
-            card.style.display = 'none';
-            return;
-        }
-        card.style.display = 'block';
-
-        const statusBadge = document.getElementById('antiban_status_badge');
-        const warmupBadge = document.getElementById('antiban_warmup_badge');
-        const quietBadge = document.getElementById('antiban_quiet_badge');
-        const quietWarning = document.getElementById('antiban_quiet_warning');
-        const quietTime = document.getElementById('antiban_quiet_time');
-        const delayLabel = document.getElementById('antiban_delay_label');
-        const warmupDetail = document.getElementById('antiban_warmup_detail');
-
-        if (inst.enable_anti_ban) {
-            statusBadge.textContent = 'ATIVO';
-            statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-            statusBadge.style.color = '#34d399';
-            document.getElementById('antiban_shield_icon').className = 'fa-solid fa-shield-halved text-success';
-        } else {
-            statusBadge.textContent = 'DESATIVADO';
-            statusBadge.style.background = 'rgba(148, 163, 184, 0.2)';
-            statusBadge.style.color = '#94a3b8';
-            document.getElementById('antiban_shield_icon').className = 'fa-solid fa-shield-slash text-muted';
-        }
-
-        if (inst.warmup_mode) {
-            warmupBadge.classList.remove('d-none');
-            warmupDetail.innerHTML = `<i class="fa-solid fa-fire"></i> Aquecimento progressivo ativo`;
-        } else {
-            warmupBadge.classList.add('d-none');
-            warmupDetail.innerHTML = '';
-        }
-
-        if (inst.is_in_quiet_hours) {
-            quietBadge.classList.remove('d-none');
-            quietWarning.classList.remove('d-none');
-            quietTime.textContent = `${inst.quiet_hours_start} às ${inst.quiet_hours_end}`;
-        } else {
-            quietBadge.classList.add('d-none');
-            quietWarning.classList.add('d-none');
-        }
+        if (!inst) return;
 
         const hourlySent = inst.hourly_sent_count || 0;
         const hourlyMax = inst.max_messages_per_hour || 80;
@@ -455,342 +1028,551 @@
         dailyBar.style.width = `${dailyPct}%`;
         dailyBar.style.background = dailyPct > 85 ? '#ef4444' : (dailyPct > 60 ? '#f59e0b' : '#10b981');
 
-        delayLabel.textContent = `${inst.min_delay_seconds || 5}s a ${inst.max_delay_seconds || 15}s`;
-    }
+        // Cálculo Dinâmico do Termômetro de Risco Anti-Ban
+        let riskScore = 15;
+        if (hourlyPct > 80) riskScore += 35;
+        else if (hourlyPct > 50) riskScore += 15;
 
-    function applyRecommendedDelay() {
-        const inst = getSelectedInstance();
-        if (inst && inst.enable_anti_ban) {
-            const avg = Math.round(((inst.min_delay_seconds || 5) + (inst.max_delay_seconds || 15)) / 2);
-            document.getElementById('delay_seconds').value = avg;
-            logTerminal(`Latência ajustada para ${avg}s (intervalo seguro: ${inst.min_delay_seconds}s - ${inst.max_delay_seconds}s).`);
+        if (dailyPct > 85) riskScore += 35;
+        else if (dailyPct > 60) riskScore += 15;
+
+        if (inst.is_in_quiet_hours) riskScore += 30;
+        if (inst.warmup_mode) riskScore += 10;
+
+        riskScore = Math.min(100, riskScore);
+
+        const riskBadge = document.getElementById('risk_score_badge');
+        const riskBar = document.getElementById('risk_bar');
+        const riskAdvice = document.getElementById('risk_advice');
+
+        riskBar.style.width = `${riskScore}%`;
+        if (riskScore >= 70) {
+            riskBadge.textContent = `ALTO RISCO (${riskScore}%)`;
+            riskBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+            riskBadge.style.color = '#ef4444';
+            riskAdvice.innerHTML = '<span class="text-danger font-bold">⚠️ Risco crítico:</span> Cotas elevadas ou horário de silêncio. Considere pausar o motor.';
+        } else if (riskScore >= 40) {
+            riskBadge.textContent = `MODERADO (${riskScore}%)`;
+            riskBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+            riskBadge.style.color = '#f59e0b';
+            riskAdvice.innerHTML = '<span class="text-warning font-bold">Atenção:</span> Aumento de cadência detectado. Mantenha os intervalos recomendados.';
         } else {
-            document.getElementById('delay_seconds').value = 6;
+            riskBadge.textContent = `BAIXO RISCO (${riskScore}%)`;
+            riskBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            riskBadge.style.color = '#34d399';
+            riskAdvice.innerHTML = '✓ Disparo seguro. Cotas e horários adequados.';
         }
     }
 
-    // Configurações e Estado do Motor
-    let queue = [];
-    let importedFileClients = [];
-    let currentIndex = 0;
-    let successCount = 0;
-    let errorCount = 0;
-    let engineRunning = false;
-    const crmClients = JSON.parse(document.getElementById('crm_data').textContent);
-    
-    // UI Elements
-    const terminal = document.getElementById('terminal');
-    const progressBar = document.getElementById('progress_bar');
-    const progressText = document.getElementById('progress_text');
-    const statusBadge = document.getElementById('engine_status');
-    const btnCompile = document.getElementById('btn_compile');
-    const btnStart = document.getElementById('btn_start');
-    const btnPause = document.getElementById('btn_pause');
+    // ── Filtro Inteligente & Estimativa de Destinatários ───────────────────────
+    let estimateTimeout = null;
+    function triggerEstimate() {
+        clearTimeout(estimateTimeout);
+        estimateTimeout = setTimeout(calculateEstimateNow, 400);
+    }
 
-    // Inicializar visualização do Anti-Ban ao carregar
-    document.addEventListener('DOMContentLoaded', () => {
-        renderInstanceAntiBanInfo();
+    // ── Controle do Multi-Select de Segmentos ─────────────────────────────────
+    function toggleSegmentsDropdown(e) {
+        if (e) e.stopPropagation();
+        const panel = document.getElementById('segments_dropdown_panel');
+        if (panel) panel.classList.toggle('d-none');
+    }
+
+    document.addEventListener('click', (e) => {
+        const container = document.querySelector('.multi-select-container');
+        const panel = document.getElementById('segments_dropdown_panel');
+        if (container && panel && !container.contains(e.target)) {
+            panel.classList.add('d-none');
+        }
     });
 
-    function logTerminal(message, type = '') {
+    function filterSegmentsList(q) {
+        const term = q.trim().toLowerCase();
+        document.querySelectorAll('.segment-item').forEach(item => {
+            const name = item.dataset.name || '';
+            item.style.display = name.includes(term) ? 'flex' : 'none';
+        });
+    }
+
+    function selectAllSegments(select) {
+        document.querySelectorAll('.segment-checkbox').forEach(cb => {
+            cb.checked = select;
+        });
+        onSegmentCheckChanged();
+    }
+
+    function getSelectedSegments() {
+        const checked = [];
+        document.querySelectorAll('.segment-checkbox:checked').forEach(cb => {
+            checked.push(cb.value);
+        });
+        return checked;
+    }
+
+    function onSegmentCheckChanged() {
+        const selected = getSelectedSegments();
+        const total = document.querySelectorAll('.segment-checkbox').length;
+        const btnLabel = document.getElementById('segments_button_label');
+        const badge = document.getElementById('selected_segments_badge');
+        const chipsContainer = document.getElementById('selected_segments_chips');
+
+        if (!btnLabel || !badge || !chipsContainer) return;
+        chipsContainer.innerHTML = '';
+
+        if (selected.length === 0 || selected.length === total) {
+            btnLabel.textContent = '-- Todos os Segmentos --';
+            badge.textContent = `Todos (${total})`;
+        } else {
+            btnLabel.textContent = `${selected.length} segmento(s) selecionado(s)`;
+            badge.textContent = `${selected.length} de ${total}`;
+
+            selected.forEach(seg => {
+                const chip = document.createElement('span');
+                chip.className = 'segment-chip';
+                chip.innerHTML = `${seg} <i class="fa-solid fa-xmark segment-chip-close" onclick="uncheckSegment('${seg.replace(/'/g, "\\'")}')"></i>`;
+                chipsContainer.appendChild(chip);
+            });
+        }
+
+        triggerEstimate();
+    }
+
+    function uncheckSegment(segName) {
+        document.querySelectorAll('.segment-checkbox').forEach(cb => {
+            if (cb.value === segName) cb.checked = false;
+        });
+        onSegmentCheckChanged();
+    }
+
+    function getFilterCriteria() {
+        const statuses = [];
+        document.querySelectorAll('#status_checkboxes input:checked').forEach(cb => statuses.push(cb.value));
+
+        const segments = getSelectedSegments();
+        const source = document.getElementById('filter_source').value;
+        const seller = document.getElementById('filter_seller').value;
+        const dddsRaw = document.getElementById('filter_ddds').value;
+        const ddds = dddsRaw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        const antiFatigue = document.getElementById('filter_anti_fatigue').value;
+
+        return {
+            apply_crm: true,
+            statuses: statuses.length > 0 ? statuses : ['lead', 'contato'],
+            segments: segments, // Array com múltiplos segmentos selecionados
+            sources: source !== 'all' ? [source] : [],
+            assigned_to: seller,
+            ddds: ddds,
+            anti_fatigue_days: parseInt(antiFatigue) || 0
+        };
+    }
+
+    async function calculateEstimateNow() {
+        const filters = getFilterCriteria();
+        const badge = document.getElementById('leads_estimate_badge');
+        const previewText = document.getElementById('estimate_preview_text');
+        
+        try {
+            const resp = await fetch("{{ url_for('crm.api_bulk_estimate') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(filters)
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                const manualText = document.getElementById('manual_list').value.trim();
+                let manualCount = manualText ? manualText.split('\n').filter(l => l.trim().length > 0).length : 0;
+                let totalEstimate = data.count + manualCount + importedFileClients.length;
+
+                badge.innerHTML = `<i class="fa-solid fa-users"></i> ${totalEstimate} contatos qualificados`;
+                
+                let sampleHtml = '';
+                if (data.sample && data.sample.length > 0) {
+                    sampleHtml = `Amostra: ${data.sample.map(s => s.name || s.phone).slice(0, 3).join(', ')}`;
+                }
+                previewText.innerHTML = `<strong>${totalEstimate} leads</strong> no filtro (${data.count} do CRM, ${manualCount} manual, ${importedFileClients.length} planilha). ${sampleHtml}`;
+            }
+        } catch (e) {
+            console.warn('Erro ao estimar leads:', e);
+        }
+    }
+
+    // Ouvinte para upload de arquivos CSV/Planilha
+    document.addEventListener('FileProcessed', (e) => {
+        const clients = e.detail.data;
+        if (clients && clients.length > 0) {
+            importedFileClients = clients.map(c => ({
+                name: c.name || 'Contato',
+                phone: String(c.phone || '').replace(/\D/g, '')
+            })).filter(c => c.phone.length >= 10);
+            calculateEstimateNow();
+            alert(`📥 ${importedFileClients.length} contatos carregados da planilha!`);
+        }
+    });
+
+    // ── Editor de Mensagens & Live Mockup do WhatsApp ─────────────────────────
+    function insertVariable(tag) {
+        const textarea = document.getElementById('message_text');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + tag + text.substring(end);
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+        updateLivePreview();
+    }
+
+    function insertEmoji(emoji) {
+        insertVariable(emoji);
+    }
+
+    function wrapSelection(prefix, suffix) {
+        const textarea = document.getElementById('message_text');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selected = text.substring(start, end) || 'texto';
+        const wrapped = prefix + selected + suffix;
+        textarea.value = text.substring(0, start) + wrapped + text.substring(end);
+        textarea.focus();
+        textarea.selectionStart = start + prefix.length;
+        textarea.selectionEnd = textarea.selectionStart + selected.length;
+        updateLivePreview();
+    }
+
+    function insertSpintaxExample() {
+        insertVariable('{Olá|Oi|Bom dia}');
+    }
+
+    function applyTemplateText() {
+        const sel = document.getElementById('template_id');
+        const opt = sel.options[sel.selectedIndex];
+        if (opt && opt.dataset.text) {
+            document.getElementById('message_text').value = opt.dataset.text;
+            updateLivePreview();
+        }
+    }
+
+    function updateLivePreview() {
+        const raw = document.getElementById('message_text').value;
+        const bubbleText = document.getElementById('wa_preview_text');
+        const bubbleTime = document.getElementById('wa_preview_time');
+        
+        const now = new Date();
+        bubbleTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (!raw.trim()) {
+            bubbleText.innerHTML = '<em>Sua mensagem aparecerá aqui em tempo real...</em>';
+            return;
+        }
+
+        // Simula resolução básica para preview
+        let rendered = raw
+            .replace(/\[PRIMEIRO_NOME\]/gi, 'Lucas')
+            .replace(/\[NOME\]/gi, 'Lucas')
+            .replace(/\[NOME_COMPLETO\]/gi, 'Lucas Andrade')
+            .replace(/\[SAUDACAO_HORARIO\]/gi, 'Boa tarde')
+            .replace(/\[STATUS\]/gi, 'Lead')
+            .replace(/\[EMPRESA\]/gi, 'Tecnologia')
+            .replace(/\[CIDADE\]/gi, 'São Paulo')
+            .replace(/\[DATA\]/gi, now.toLocaleDateString('pt-BR'));
+
+        // Resolve primeira opção de Spintax no preview
+        rendered = rendered.replace(/\{([^{}]+)\}/g, (match, choices) => choices.split('|')[0]);
+
+        // Formatação simples do WhatsApp
+        rendered = rendered
+            .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+            .replace(/_(.*?)_/g, '<em>$1</em>')
+            .replace(/~(.*?)~/g, '<del>$1</del>')
+            .replace(/\n/g, '<br>');
+
+        bubbleText.innerHTML = rendered;
+    }
+
+    async function testSpintaxVariations() {
+        const text = document.getElementById('message_text').value;
+        if (!text.trim()) {
+            alert('Digite um texto antes de testar variações.');
+            return;
+        }
+
+        try {
+            const resp = await fetch("{{ url_for('crm.api_bulk_spintax_preview') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            const data = await resp.json();
+            if (data.ok && data.variations) {
+                const box = document.getElementById('spintax_samples_box');
+                const list = document.getElementById('spintax_samples_list');
+                list.innerHTML = '';
+                data.variations.forEach((v, idx) => {
+                    const li = document.createElement('li');
+                    li.className = 'mb-1';
+                    li.innerHTML = `<strong>#${idx+1}:</strong> "${v}"`;
+                    list.appendChild(li);
+                });
+                box.classList.remove('d-none');
+            }
+        } catch (e) {
+            alert('Falha ao gerar variações Spintax: ' + e);
+        }
+    }
+
+    // ── Motor Desacoplado: Compilação, Início, Pausa e Cancelamento ────────────
+    async function compileAndSaveCampaign() {
+        const text = document.getElementById('message_text').value;
+        if (!text.trim()) {
+            alert('O texto da mensagem é obrigatório.');
+            return;
+        }
+
+        const btnCompile = document.getElementById('btn_compile_queue');
+        btnCompile.disabled = true;
+        btnCompile.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Compilando...';
+        logTerminal('Compilando fila com base nos filtros e desduplicando contatos...', 'info');
+
+        const payload = {
+            name: `Disparo ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`,
+            message_text: text,
+            template_id: document.getElementById('template_id').value || null,
+            waha_instance_id: document.getElementById('waha_instance_id').value || null,
+            min_delay: parseInt(document.getElementById('min_delay').value) || 6,
+            max_delay: parseInt(document.getElementById('max_delay').value) || 15,
+            use_ai: document.getElementById('use_ai').checked,
+            use_spintax: true,
+            filters: getFilterCriteria(),
+            manual_list: document.getElementById('manual_list').value,
+            imported_clients: importedFileClients
+        };
+
+        try {
+            const resp = await fetch("{{ url_for('crm.api_bulk_create_campaign') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+
+            if (data.ok && data.campaign) {
+                activeCampaignId = data.campaign.id;
+                activeCampaignState = data.campaign;
+                logTerminal(`🎉 Fila gravada no servidor! Campanha #${activeCampaignId} com ${data.campaign.total_count} contatos únicos.`, 'success');
+                
+                document.getElementById('btn_start_engine').disabled = false;
+                document.getElementById('btn_compile_queue').textContent = 'RECOMPILAR FILA';
+                document.getElementById('engine_status_badge').textContent = 'FILA PRONTA';
+                document.getElementById('engine_status_badge').style.color = '#38bdf8';
+                updateCountersUI(data.campaign);
+            } else {
+                alert('Erro ao compilar fila: ' + (data.error || 'Nenhum lead qualificado.'));
+                logTerminal('✗ ' + (data.error || 'Erro na compilação.'), 'error');
+            }
+        } catch (e) {
+            alert('Falha de rede ao compilar campanha: ' + e);
+        } finally {
+            btnCompile.disabled = false;
+        }
+    }
+
+    async function startCampaignEngine() {
+        if (!activeCampaignId) {
+            alert('Compile uma fila antes de iniciar.');
+            return;
+        }
+
+        const inst = getSelectedInstance();
+        if (inst && inst.is_in_quiet_hours) {
+            const proceed = confirm(`⚠️ ATENÇÃO: Esta instância está no Horário Silencioso (${inst.quiet_hours_start} às ${inst.quiet_hours_end}).\n\nDisparar fora do expediente aumenta o risco de bloqueio.\nDeseja iniciar mesmo assim?`);
+            if (!proceed) {
+                logTerminal('Envio cancelado pelo operador devido ao Horário Silencioso.', 'warning');
+                return;
+            }
+        }
+
+        try {
+            const resp = await fetch(`/crm/api/bulk/campaigns/${activeCampaignId}/start`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.ok) {
+                logTerminal('🚀 Motor em segundo plano INICIADO no servidor!', 'success');
+                setEngineUIRunning(true);
+                startPollingTelemetry();
+            } else {
+                alert('Não foi possível iniciar: ' + data.message);
+                logTerminal('✗ ' + data.message, 'error');
+            }
+        } catch (e) {
+            alert('Erro ao acionar motor: ' + e);
+        }
+    }
+
+    async function pauseCampaignEngine() {
+        if (!activeCampaignId) return;
+        try {
+            const resp = await fetch(`/crm/api/bulk/campaigns/${activeCampaignId}/pause`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.ok) {
+                logTerminal('⏸ Comando de pausa enviado ao motor...', 'warning');
+                setEngineUIRunning(false);
+            }
+        } catch (e) {
+            alert('Erro ao pausar: ' + e);
+        }
+    }
+
+    async function cancelCampaignEngine() {
+        if (!activeCampaignId) return;
+        if (!confirm('Deseja realmente cancelar esta campanha? Os contatos pendentes serão descartados.')) return;
+
+        try {
+            const resp = await fetch(`/crm/api/bulk/campaigns/${activeCampaignId}/cancel`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.ok) {
+                logTerminal('⏹ Campanha cancelada.', 'warning');
+                setEngineUIRunning(false);
+                stopPollingTelemetry();
+            }
+        } catch (e) {
+            alert('Erro ao cancelar: ' + e);
+        }
+    }
+
+    function setEngineUIRunning(isRunning) {
+        const btnStart = document.getElementById('btn_start_engine');
+        const btnPause = document.getElementById('btn_pause_engine');
+        const btnCancel = document.getElementById('btn_cancel_engine');
+        const statusBadge = document.getElementById('engine_status_badge');
+
+        if (isRunning) {
+            btnStart.classList.add('d-none');
+            btnPause.classList.remove('d-none');
+            btnCancel.classList.remove('d-none');
+            statusBadge.textContent = 'RODANDO NO SERVIDOR';
+            statusBadge.style.color = '#10b981';
+        } else {
+            btnStart.classList.remove('d-none');
+            btnPause.classList.add('d-none');
+            statusBadge.textContent = 'PAUSADO';
+            statusBadge.style.color = '#f59e0b';
+        }
+    }
+
+    function loadCampaignToPanel(campaignId) {
+        activeCampaignId = campaignId;
+        switchTab('disparo', document.querySelectorAll('.tab-btn')[0]);
+        startPollingTelemetry(true);
+    }
+
+    // ── Telemetria e Polling Contínuo em Tempo Real ────────────────────────────
+    function startPollingTelemetry(fetchImmediately = false) {
+        stopPollingTelemetry();
+        if (fetchImmediately) pollStatus();
+        pollingTimer = setInterval(pollStatus, 1500);
+    }
+
+    function stopPollingTelemetry() {
+        if (pollingTimer) {
+            clearInterval(pollingTimer);
+            pollingTimer = null;
+        }
+    }
+
+    async function pollStatus() {
+        if (!activeCampaignId) return;
+
+        try {
+            const resp = await fetch(`/crm/api/bulk/campaigns/${activeCampaignId}/status`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (data.ok && data.campaign) {
+                const camp = data.campaign;
+                updateCountersUI(camp);
+
+                document.getElementById('metric_speed').textContent = `${data.speed_mpm} mpm`;
+                if (data.eta_seconds > 0) {
+                    const min = Math.ceil(data.eta_seconds / 60);
+                    document.getElementById('metric_eta').textContent = `${min} min`;
+                } else {
+                    document.getElementById('metric_eta').textContent = '--';
+                }
+
+                // Renderiza novos logs da telemetria
+                if (data.logs && data.logs.length > 0) {
+                    renderTelemetryLogs(data.logs);
+                }
+
+                if (camp.status === 'running') {
+                    setEngineUIRunning(true);
+                } else if (camp.status === 'paused') {
+                    setEngineUIRunning(false);
+                    if (camp.circuit_breaker_triggered) {
+                        document.getElementById('engine_status_badge').textContent = 'CIRCUIT BREAKER ATIVADO';
+                        document.getElementById('engine_status_badge').style.color = '#ef4444';
+                    }
+                } else if (camp.status === 'completed') {
+                    setEngineUIRunning(false);
+                    document.getElementById('engine_status_badge').textContent = 'CONCLUÍDO';
+                    document.getElementById('engine_status_badge').style.color = '#10b981';
+                    stopPollingTelemetry();
+                } else if (camp.status === 'cancelled') {
+                    setEngineUIRunning(false);
+                    document.getElementById('engine_status_badge').textContent = 'CANCELADO';
+                    document.getElementById('engine_status_badge').style.color = '#ef4444';
+                    stopPollingTelemetry();
+                }
+            }
+        } catch (e) {
+            console.warn('Erro ao obter telemetria da campanha:', e);
+        }
+    }
+
+    function updateCountersUI(camp) {
+        document.getElementById('counter_success').textContent = camp.success_count || 0;
+        document.getElementById('counter_errors').textContent = camp.error_count || 0;
+        document.getElementById('progress_counts').textContent = `${camp.processed_count || 0} / ${camp.total_count || 0}`;
+        const pct = camp.progress_pct || 0;
+        document.getElementById('progress_pct_label').textContent = `${pct}%`;
+        document.getElementById('progress_bar').style.width = `${pct}%`;
+    }
+
+    function renderTelemetryLogs(logs) {
+        const terminal = document.getElementById('terminal');
+        // Adiciona apenas logs novos
+        const newLogs = logs.slice(lastLogsRendered.length);
+        if (newLogs.length === 0) return;
+
+        newLogs.forEach(entry => {
+            const div = document.createElement('div');
+            div.dataset.level = entry.level;
+            div.innerHTML = `<span class="text-xs text-muted">[${entry.time}]</span> <span class="${entry.level}">${entry.message}</span>`;
+            terminal.appendChild(div);
+        });
+        lastLogsRendered = logs;
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function logTerminal(message, type = 'info') {
+        const terminal = document.getElementById('terminal');
         const time = new Date().toLocaleTimeString();
         const div = document.createElement('div');
+        div.dataset.level = type;
         div.innerHTML = `<span class="text-xs text-muted">[${time}]</span> <span class="${type}">${message}</span>`;
         terminal.appendChild(div);
         terminal.scrollTop = terminal.scrollHeight;
     }
 
-    function updateTextPreview() {
-        const select = document.getElementById('template_id');
-        const selectedOption = select.options[select.selectedIndex];
-        const textArea = document.getElementById('message_text');
-        
-        if (selectedOption && selectedOption.dataset.text) {
-            textArea.value = selectedOption.dataset.text;
-        } else {
-            textArea.value = '';
-        }
-    }
-
-    function interpolate(text, contact) {
-        let result = text;
-        const namePart = (contact.name || "Cliente").trim();
-        const firstName = namePart.split(' ')[0];
-        const status = (contact.status || "").toUpperCase();
-        
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('pt-BR');
-        const timeStr = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-
-        result = result.replace(/\[NOME\]/gi, firstName);
-        result = result.replace(/\[NOME_COMPLETO\]/gi, namePart);
-        result = result.replace(/\[STATUS\]/gi, status);
-        result = result.replace(/\[DATA\]/gi, dateStr);
-        result = result.replace(/\[HORA\]/gi, timeStr);
-        return result;
-    }
-
-    
-    document.addEventListener('FileProcessed', (e) => {
-        const clients = e.detail.data;
-        if (clients && clients.length > 0) {
-            importedFileClients = clients.map(c => ({
-                source: 'file',
-                client_id: null,
-                name: c.name,
-                phone: c.phone.replace(/\D/g, ''),
-                status: ''
-            })).filter(c => c.phone.length >= 10);
-            alert(`${importedFileClients.length} contatos prontos! Clique em "COMPILAR FILA" para adicionar.`);
-        }
-    });
-
-    function compileQueue() {
-
-        queue = [];
-        currentIndex = 0;
-        successCount = 0;
-        errorCount = 0;
-        document.getElementById('counter_success').innerText = '0';
-        document.getElementById('counter_errors').innerText = '0';
-        updateProgressUI();
-        
-        logTerminal("Iniciando compilação de fila...", "info");
-
-        // 1. CRM Filter
-        const crmFilter = document.getElementById('crm_filter').value;
-        if (crmFilter) {
-            let filtered = [];
-            if (crmFilter === 'all') {
-                filtered = crmClients;
+    function filterTerminal(level) {
+        currentLogFilter = level;
+        const items = document.querySelectorAll('#terminal > div');
+        items.forEach(item => {
+            if (level === 'all' || item.dataset.level === level) {
+                item.style.display = 'block';
             } else {
-                filtered = crmClients.filter(c => c.status === crmFilter);
+                item.style.display = 'none';
             }
-            logTerminal(`Adicionados ${filtered.length} clientes via filtro do CRM (${crmFilter}).`);
-            
-            filtered.forEach(c => {
-                queue.push({
-                    source: 'crm',
-                    client_id: c.id,
-                    name: c.name,
-                    phone: c.phone,
-                    status: c.status
-                });
-            });
-        }
-
-        // 2. Manual List
-        const manualText = document.getElementById('manual_list').value.trim();
-        if (manualText) {
-            const lines = manualText.split('\n');
-            let addedManual = 0;
-            lines.forEach((line, index) => {
-                const parts = line.split(',');
-                if (parts.length >= 2) {
-                    const name = parts[0].trim();
-                    const phone = parts[1].replace(/\D/g, ''); // limpa não numéricos
-                    if (phone.length >= 10) {
-                        queue.push({
-                            source: 'manual',
-                            client_id: null,
-                            name: name,
-                            phone: phone,
-                            status: ''
-                        });
-                        addedManual++;
-                    } else {
-                        logTerminal(`Linha ${index+1} inválida: Telefone muito curto.`, "warning");
-                    }
-                } else if(line.trim().length > 0) {
-                    logTerminal(`Linha ${index+1} inválida: Falta vírgula.`, "warning");
-                }
-            });
-            logTerminal(`Adicionados ${addedManual} clientes via Lista Manual.`);
-        }
-
-        
-        // 3. File Import
-        if (importedFileClients.length > 0) {
-            importedFileClients.forEach(c => queue.push(c));
-            logTerminal(`Adicionados ${importedFileClients.length} clientes via Arquivo Importado.`);
-        }
-
-        if (queue.length > 0) {
-
-            const msg = document.getElementById('message_text').value;
-            if(!msg.trim()){
-                logTerminal("ERRO: O texto da mensagem está vazio!", "error");
-                return;
-            }
-            logTerminal(`Fila pronta! Total: ${queue.length} destinatários.`, "info");
-            btnStart.disabled = false;
-            btnCompile.innerText = "RECOMPILAR FILA";
-        } else {
-            logTerminal("Fila vazia. Selecione clientes ou adicione à lista manual.", "warning");
-            btnStart.disabled = true;
-        }
-        
-        updateProgressUI();
-    }
-
-    function updateProgressUI() {
-        progressText.innerText = `${currentIndex} / ${queue.length}`;
-        const pct = queue.length > 0 ? (currentIndex / queue.length) * 100 : 0;
-        progressBar.style.width = `${pct}%`;
-        
-        if(queue.length > 0 && currentIndex === queue.length) {
-            statusBadge.innerText = "CONCLUÍDO";
-            statusBadge.style.color = "#34d399";
-        }
-    }
-
-    function pauseEngine() {
-        engineRunning = false;
-        statusBadge.innerText = "PAUSADO";
-        statusBadge.style.color = "#f59e0b";
-        btnPause.style.display = 'none';
-        btnStart.style.display = 'block';
-        logTerminal("Motor pausado pelo usuário.", "warning");
-    }
-
-    async function startEngine() {
-        if (queue.length === 0 || currentIndex >= queue.length) return;
-        
-        const inst = getSelectedInstance();
-        if (inst && inst.enable_anti_ban) {
-            if (inst.is_in_quiet_hours) {
-                const proceed = confirm(`⚠️ ATENÇÃO: Esta instância (${inst.name}) está no Horário Silencioso configurado (${inst.quiet_hours_start} às ${inst.quiet_hours_end}).\n\nDisparar fora do horário comercial aumenta expressivamente o risco de denúncias de spam e bloqueio do chip.\n\nDeseja continuar mesmo assim?`);
-                if (!proceed) {
-                    logTerminal("Envio abortado pelo usuário devido ao Horário Silencioso.", "warning");
-                    return;
-                }
-            }
-
-            const maxHour = inst.max_messages_per_hour || 80;
-            const maxDay = inst.effective_daily_limit || inst.max_messages_per_day || 500;
-
-            if (inst.hourly_sent_count >= maxHour) {
-                alert(`⛔ Limite horário da instância atingido (${inst.hourly_sent_count}/${maxHour} msgs). Aguarde o início da próxima hora para continuar com segurança.`);
-                logTerminal(`⛔ Bloqueado pelo Anti-Ban: Cota horária esgotada (${inst.hourly_sent_count}/${maxHour}).`, "error");
-                return;
-            }
-
-            if (inst.daily_sent_count >= maxDay) {
-                alert(`⛔ Limite diário da instância atingido (${inst.daily_sent_count}/${maxDay} msgs). O envio foi bloqueado para proteger sua conta.`);
-                logTerminal(`⛔ Bloqueado pelo Anti-Ban: Cota diária esgotada (${inst.daily_sent_count}/${maxDay}).`, "error");
-                return;
-            }
-        }
-
-        engineRunning = true;
-        btnStart.style.display = 'none';
-        btnPause.style.display = 'block';
-        btnCompile.disabled = true;
-        statusBadge.innerText = "RODANDO";
-        statusBadge.style.color = "#3b82f6";
-        
-        logTerminal("🚀 Motor iniciado...", "info");
-        
-        const useAI = document.getElementById('use_ai').checked;
-        if (useAI) {
-            logTerminal("🤖 IA Personalização Ativa: As mensagens serão reescritas para cada cliente.", "info");
-        }
-        
-        while (currentIndex < queue.length && engineRunning) {
-            const contact = queue[currentIndex];
-            const baseText = document.getElementById('message_text').value;
-            const finalMessage = interpolate(baseText, contact);
-            
-            logTerminal(`Processando [${currentIndex+1}/${queue.length}] — ${contact.name} (${contact.phone})...`);
-            
-            try {
-                const response = await fetch("{{ url_for('crm.api_external_send') }}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: contact.phone,
-                        text: finalMessage,
-                        client_id: contact.client_id,
-                        name: contact.name,
-                        source: contact.source,
-                        use_ai: useAI,
-                        instance_id: document.getElementById('waha_instance_id').value
-                    })
-                });
-
-                const data = await response.json();
-
-                // Detecção de Bloqueio por Anti-Ban / Rate Limiting
-                if (response.status === 429 || data.anti_ban_blocked) {
-                    errorCount++;
-                    document.getElementById('counter_errors').innerText = errorCount;
-                    logTerminal(`  ⛔ [PROTEÇÃO ANTI-BAN ATIVADA] ${data.error}`, "error");
-                    logTerminal(`  ⚠️ Disparo pausado automaticamente para resguardar seu número contra banimento.`, "warning");
-                    pauseEngine();
-                    alert(`[ANTI-BAN WAHA ATIVADO]\n${data.error}\n\nO motor de envio foi pausado automaticamente.`);
-                    break;
-                }
-
-                if (response.ok && data.ok) {
-                    successCount++;
-                    document.getElementById('counter_success').innerText = successCount;
-                    logTerminal(`  ✓ Sucesso ao enviar para ${contact.name}`);
-                    
-                    // Atualiza contador local da instância e medidores
-                    if (inst) {
-                        inst.hourly_sent_count = (inst.hourly_sent_count || 0) + 1;
-                        inst.daily_sent_count = (inst.daily_sent_count || 0) + 1;
-                        renderInstanceAntiBanInfo();
-                    }
-
-                    if (data.ai_used && data.final_text && data.final_text !== finalMessage) {
-                        logTerminal(`  ✨ IA reescreveu: "${data.final_text.substring(0, 40)}..."`);
-                    }
-                } else {
-                    errorCount++;
-                    document.getElementById('counter_errors').innerText = errorCount;
-                    logTerminal(`  ✗ Erro: ${data.error}`, "error");
-                }
-            } catch (error) {
-                logTerminal(`  ✗ Erro de Conexão: ${error}`, "error");
-            }
-            
-            currentIndex++;
-            updateProgressUI();
-            
-            // Wait for delay if not finished and still running
-            if (currentIndex < queue.length && engineRunning) {
-                let userDelay = parseInt(document.getElementById('delay_seconds').value) || 6;
-                let minAllowed = 2;
-                let maxAllowed = 30;
-
-                if (inst && inst.enable_anti_ban) {
-                    minAllowed = inst.min_delay_seconds || 5;
-                    maxAllowed = inst.max_delay_seconds || 15;
-                    if (maxAllowed < minAllowed) maxAllowed = minAllowed + 2;
-                }
-
-                // Variação humana randômica (jitter)
-                const jitterRange = Math.max(1, (maxAllowed - minAllowed) * 0.4);
-                const randomJitter = (Math.random() * jitterRange) - (jitterRange / 2);
-                let appliedDelay = Math.max(minAllowed, userDelay + randomJitter);
-
-                const totalDelayMs = Math.round(appliedDelay * 1000);
-                
-                logTerminal(`  ...Aguardando ${(totalDelayMs/1000).toFixed(1)}s (proteção anti-spam/anti-ban)`);
-                await new Promise(r => setTimeout(r, totalDelayMs));
-            }
-        }
-        
-        if (currentIndex >= queue.length) {
-            engineRunning = false;
-            btnStart.style.display = 'block';
-            btnStart.disabled = true;
-            btnPause.style.display = 'none';
-            btnCompile.disabled = false;
-            logTerminal("🎉 Disparo finalizado com sucesso!", "info");
-            updateProgressUI();
-        }
+        });
     }
 </script>
 {% endblock %}

@@ -167,7 +167,7 @@
                     </a>
                 </li>
                 {% endif %}
-                {% if is_module_enabled('waha') %}
+                {% if is_module_enabled('waha') and is_module_enabled('waha_bulk') %}
                 <li>
                     <a href="{{ url_for('crm.bulk_message') }}" class="nav-link {{ 'active' if request.endpoint == 'crm.bulk_message' }}" data-tooltip="Disparo WAHA">
                         <i class="fa-solid fa-paper-plane nav-icon text-success"></i>

@@ -50,12 +50,18 @@ def check_and_run_scheduled_backup(app):
                 logger.error(f"[Backup Scheduler] Falha no backup automático: {result.get('error')}")
 
         except Exception as e:
-            logger.error(f"[Backup Scheduler] Erro durante verificação de backup: {e}", exc_info=True)
+            err_msg = str(e).lower()
+            if "does not exist" in err_msg or "undefinedtable" in err_msg or "no such table" in err_msg:
+                logger.debug(f"[Backup Scheduler] Tabelas ainda não inicializadas no banco: {e}")
+            else:
+                logger.error(f"[Backup Scheduler] Erro durante verificação de backup: {e}", exc_info=True)
 
 
 def _scheduler_loop(app):
     global _scheduler_running
     logger.info("[Backup Scheduler] Thread de agendamento de backups iniciada.")
+    # Aguarda 15 segundos para dar tempo do app e migrações concluírem
+    time.sleep(15)
     while _scheduler_running:
         try:
             check_and_run_scheduled_backup(app)

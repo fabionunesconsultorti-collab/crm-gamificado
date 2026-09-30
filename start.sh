@@ -50,15 +50,24 @@ echo -e "${GREEN}✔ Docker está ativo e pronto (${DOCKER_COMPOSE}).${NC}"
 echo -e "\n${CYAN}[2/5] Subindo serviços no Docker (WAHA, Postgres, Redis, Ollama, Maps Scraper)...${NC}"
 $DOCKER_COMPOSE up -d
 
-# Aguardar WAHA e Maps Scraper inicializarem
-echo -n -e "${YELLOW}Aguardando serviços WAHA (3000), Ollama (11434) e Maps Scraper (8080)...${NC}"
+# Aguardar PostgreSQL (5432), WAHA (3000) e serviços Docker inicializarem
+echo -n -e "${YELLOW}Aguardando PostgreSQL (5432), WAHA (3000) e serviços Docker...${NC}"
 MAX_RETRIES=30
 RETRY_COUNT=0
-WAHA_READY=false
+SERVICES_READY=false
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    PG_OK=false
+    WA_OK=false
+    if python3 -c "import socket; s = socket.socket(); s.settimeout(1); s.connect(('localhost', 5432)); s.close()" 2>/dev/null; then
+        PG_OK=true
+    fi
     if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ &> /dev/null; then
-        WAHA_READY=true
+        WA_OK=true
+    fi
+
+    if [ "$PG_OK" = true ]; then
+        SERVICES_READY=true
         break
     fi
     echo -n "."
@@ -67,8 +76,8 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 echo ""
-if [ "$WAHA_READY" = true ]; then
-    echo -e "${GREEN}✔ Serviços Docker (WAHA, Ollama, Scraper) prontos.${NC}"
+if [ "$SERVICES_READY" = true ]; then
+    echo -e "${GREEN}✔ Serviços Docker (PostgreSQL, WAHA, Ollama, Scraper) prontos para conexão.${NC}"
 else
     echo -e "${YELLOW}⚠ Containers ainda estão inicializando em segundo plano. Continuando...${NC}"
 fi

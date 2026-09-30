@@ -32,10 +32,32 @@ body {
 .gap-3 { gap: 1rem; }
 .gap-4 { gap: 1.5rem; }
 
-.grid { display: grid; }
-.grid-cols-2 { grid-template-columns: 1fr 1fr; }
+.grid,
+.d-grid { display: grid; }
+
+.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .grid-cols-auto-fit { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .grid-main-layout { grid-template-columns: 2fr 1fr; }
+
+@media (min-width: 768px) {
+    .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+    .lg\:grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+    .lg\:col-span-12 { grid-column: span 12 / span 12; }
+    .lg\:col-span-8  { grid-column: span 8 / span 8; }
+    .lg\:col-span-7  { grid-column: span 7 / span 7; }
+    .lg\:col-span-6  { grid-column: span 6 / span 6; }
+    .lg\:col-span-5  { grid-column: span 5 / span 5; }
+    .lg\:col-span-4  { grid-column: span 4 / span 4; }
+}
 
 .w-100 { width: 100%; }
 .h-100 { height: 100%; }
@@ -540,6 +562,154 @@ select.input-glass:focus {
 .btn-sm  { padding: 0.45rem 1rem    !important; font-size: 0.8rem  !important; width: auto !important; }
 .btn-lg  { padding: 0.9rem  1.5rem  !important; font-size: 1rem    !important; }
 .btn-full { width: 100% !important; }
+.btn-auto { width: auto !important; }
+
+/* Estado Desabilitado Universal */
+button:disabled,
+.btn:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-success:disabled,
+.btn-warning:disabled,
+.btn-info:disabled,
+.btn-tab:disabled,
+.tab-btn:disabled,
+button[disabled],
+.btn[disabled] {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    filter: grayscale(40%) !important;
+}
+
+/* Ajuste de flex para botões dentro de layouts flexíveis */
+.d-flex > .btn-primary:not(.w-100),
+.d-flex > .btn-secondary:not(.w-100),
+.d-flex > .btn-danger:not(.w-100),
+.d-flex > .btn-success:not(.w-100),
+.d-flex > .btn-warning:not(.w-100),
+.d-flex > .btn-info:not(.w-100),
+.d-flex > .btn-tab:not(.w-100),
+.d-flex > .tab-btn:not(.w-100) {
+    width: auto;
+}
+
+/* Botões dentro de layouts de grid preenchem a coluna */
+.grid > .btn-primary,
+.grid > .btn-secondary,
+.grid > .btn-danger,
+.grid > .btn-success,
+.grid > .btn-warning,
+.grid > .btn-info,
+.d-grid > .btn-primary,
+.d-grid > .btn-secondary,
+.d-grid > .btn-danger,
+.d-grid > .btn-success,
+.d-grid > .btn-warning,
+.d-grid > .btn-info {
+    width: 100%;
+}
+
+/* ── Tab Buttons ─────────────────────────────────────────── */
+.btn-tab,
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.15rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    text-decoration: none;
+    outline: none;
+    width: auto;
+}
+
+.btn-tab:hover,
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f8fafc;
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+}
+
+/* Estado Ativo padrão do TensorFlow / Admin */
+.btn-tab.active {
+    background: rgba(255, 115, 0, 0.16);
+    border-color: #ff7300;
+    color: #ff9d42;
+    box-shadow: 0 0 14px rgba(255, 115, 0, 0.25);
+}
+
+/* Estado Ativo padrão para tab-btn (pode ser sobrescrito por views específicas) */
+.tab-btn.active {
+    background: rgba(99, 102, 241, 0.16);
+    border-color: var(--primary-color, #6366f1);
+    color: #a5b4fc;
+}
+
+/* ── Icon Action Buttons ─────────────────────────────────── */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    text-decoration: none;
+    outline: none;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-icon.text-success:hover {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.45);
+    color: #10b981 !important;
+}
+
+.btn-icon.text-warning:hover {
+    background: rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.45);
+    color: #f59e0b !important;
+}
+
+.btn-icon.text-danger:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #ef4444 !important;
+}
+
+.btn-icon.text-info:hover {
+    background: rgba(14, 165, 233, 0.18);
+    border-color: rgba(14, 165, 233, 0.45);
+    color: #38bdf8 !important;
+}
+
 
 /* ── Card Component ──────────────────────────────────────── */
 .card {

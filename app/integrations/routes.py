@@ -11,17 +11,118 @@ from app.integrations.bling.adapter import BlingAdapter
 @bp.route('/admin', methods=['GET'])
 @login_required
 def admin_integrations():
-    """Página principal da Central de Integrações do Admin."""
+    """Página principal da Central de Integrações — Hub Limpo e Modular."""
     if current_user.role not in ['admin', 'gerente']:
         flash('Acesso negado.')
         return redirect(url_for('main.index'))
 
-    integrations = IntegrationManager.get_all_integrations()
-    logs = IntegrationLog.query.order_by(IntegrationLog.timestamp.desc()).limit(30).all()
-
-    # Métricas da base do Bling no CRM (Locais)
+    from app.core.module_registry import is_module_enabled
     adapter = IntegrationManager.get_adapter('bling')
     is_bling_active = adapter.is_enabled() if adapter else False
+
+    # Catálogo de Integrações Disponíveis no Sistema
+    hub_integrations = [
+        {
+            'id': 'waha_bulk',
+            'name': 'Disparo em Lote WAHA',
+            'description': 'Motor desacoplado de disparos massivos, campanhas em segundo plano, termômetro de risco e proteção anti-ban.',
+            'icon': 'fa-solid fa-rocket',
+            'icon_color': '#25D366',
+            'icon_bg': 'rgba(37, 211, 102, 0.15)',
+            'badge': 'Anti-Ban Ativo',
+            'category': 'Mensageria',
+            'is_active': is_module_enabled('waha_bulk'),
+            'tool_url': url_for('crm.bulk_message'),
+            'tool_label': 'Abrir Painel de Disparo'
+        },
+        {
+            'id': 'waha',
+            'name': 'WhatsApp WAHA Gateway',
+            'description': 'Gateway HTTP oficial para WhatsApp. Gerenciamento de instâncias, sessões conectadas e recepção de mensagens.',
+            'icon': 'fa-brands fa-whatsapp',
+            'icon_color': '#10b981',
+            'icon_bg': 'rgba(16, 185, 129, 0.15)',
+            'badge': 'API Oficial',
+            'category': 'Mensageria',
+            'is_active': is_module_enabled('waha'),
+            'tool_url': url_for('admin.settings') + '?tab=waha',
+            'tool_label': 'Gerenciar Instâncias'
+        },
+        {
+            'id': 'bling',
+            'name': 'Bling ERP',
+            'description': 'Sincronização bidirecional de produtos, catálogo de estoque, contatos e pedidos de venda com o Bling.',
+            'icon': 'fa-solid fa-boxes-packing',
+            'icon_color': '#f59e0b',
+            'icon_bg': 'rgba(245, 158, 11, 0.15)',
+            'badge': 'ERP & Estoque',
+            'category': 'ERP & Vendas',
+            'is_active': is_bling_active,
+            'tool_url': url_for('integrations.bling_tools'),
+            'tool_label': 'Abrir Ferramentas Bling'
+        },
+        {
+            'id': 'prospecting',
+            'name': 'Prospecção Google Maps',
+            'description': 'Scraper automatizado de leads qualificados, telefones comerciais e dados de empresas pelo Google Maps.',
+            'icon': 'fa-solid fa-map-location-dot',
+            'icon_color': '#3b82f6',
+            'icon_bg': 'rgba(59, 130, 246, 0.15)',
+            'badge': 'Lead Scraper',
+            'category': 'Aquisição de Leads',
+            'is_active': is_module_enabled('prospecting'),
+            'tool_url': url_for('crm.prospeccao'),
+            'tool_label': 'Abrir Prospecção Maps'
+        },
+        {
+            'id': 'ia_automacao',
+            'name': 'Inteligência Artificial (Ollama / LLMs)',
+            'description': 'Modelos locais neurais para atendimento automático, humanização anti-spam de mensagens e base RAG.',
+            'icon': 'fa-solid fa-robot',
+            'icon_color': '#8b5cf6',
+            'icon_bg': 'rgba(139, 92, 246, 0.15)',
+            'badge': 'Llama 3.2 / Ollama',
+            'category': 'Inteligência Artificial',
+            'is_active': is_module_enabled('auto_responder'),
+            'tool_url': url_for('admin.settings') + '?tab=ia',
+            'tool_label': 'Configurar Modelos IA'
+        },
+        {
+            'id': 'webhooks',
+            'name': 'Webhooks & APIs Externas',
+            'description': 'Recepção e disparo de eventos JSON em tempo real para automações externas (n8n, Typebot, Make).',
+            'icon': 'fa-solid fa-network-wired',
+            'icon_color': '#ec4899',
+            'icon_bg': 'rgba(236, 72, 153, 0.15)',
+            'badge': 'Automação',
+            'category': 'Webhooks',
+            'is_active': is_module_enabled('webhooks'),
+            'tool_url': url_for('admin.settings') + '?tab=webhooks',
+            'tool_label': 'Configurar Webhooks'
+        }
+    ]
+
+    logs = IntegrationLog.query.order_by(IntegrationLog.timestamp.desc()).limit(20).all()
+
+    return render_template(
+        'admin/integrations.html',
+        title='Central de Integrações',
+        integrations=hub_integrations,
+        logs=logs
+    )
+
+
+@bp.route('/bling/tools', methods=['GET'])
+@login_required
+def bling_tools():
+    """Tela distinta e dedicada para as ferramentas e sincronizações do Bling ERP."""
+    if current_user.role not in ['admin', 'gerente']:
+        flash('Acesso negado.')
+        return redirect(url_for('main.index'))
+
+    adapter = IntegrationManager.get_adapter('bling')
+    is_bling_active = adapter.is_enabled() if adapter else False
+    config = adapter.get_config() if adapter else None
 
     if is_bling_active:
         products_count = BlingProductCache.query.count()
@@ -48,7 +149,6 @@ def admin_integrations():
         categories_list = []
         sizes_list = []
 
-    # Totais locais para inicialização rápida sem bloquear o render HTTP
     total_local = products_count + clients_count + sales_count
     remote_totals = {"total_products": products_count, "total_contacts": clients_count, "total_sales": sales_count}
 
@@ -71,12 +171,63 @@ def admin_integrations():
     }
 
     return render_template(
-        'admin/integrations.html',
-        title='Central de Integrações',
-        integrations=integrations,
-        logs=logs,
-        summary=summary_stats
+        'crm/bling_tools.html',
+        title='Ferramentas Bling ERP',
+        summary=summary_stats,
+        config=config,
+        is_active=is_bling_active
     )
+
+
+@bp.route('/api/hub/toggle', methods=['POST'])
+@login_required
+def api_hub_toggle():
+    """Ativa ou desativa qualquer integração do Hub com segurança e sem prejuízo."""
+    if current_user.role not in ['admin', 'gerente']:
+        return jsonify({'success': False, 'message': 'Acesso negado'}), 403
+
+    from app.models import Setting
+    data = request.get_json(silent=True) or request.form or {}
+    provider = data.get('provider')
+    enable = str(data.get('enable', 'true')).lower() in ['true', '1', 'yes']
+
+    if not provider:
+        return jsonify({'success': False, 'message': 'Identificador da integração não informado.'}), 400
+
+    if provider == 'waha_bulk':
+        Setting.set_val('module_integracoes_waha_bulk_enabled', 'true' if enable else 'false')
+        if not enable:
+            from app.tasks.bulk_engine import freeze_engine_gracefully
+            freeze_engine_gracefully("Módulo desativado na Central de Integrações")
+        db.session.commit()
+        return jsonify({'success': True, 'enabled': enable, 'message': f"Disparo em Lote WAHA {'ativado' if enable else 'desativado com segurança'}!"})
+
+    elif provider == 'waha':
+        Setting.set_val('module_integracoes_waha_enabled', 'true' if enable else 'false')
+        db.session.commit()
+        return jsonify({'success': True, 'enabled': enable, 'message': f"Gateway WAHA {'ativado' if enable else 'desativado'}!"})
+
+    elif provider == 'bling':
+        result = IntegrationManager.toggle_integration('bling', enable)
+        return jsonify({'success': result.get('success', False), 'enabled': enable, 'message': result.get('message')})
+
+    elif provider == 'prospecting':
+        Setting.set_val('module_gestao_clientes_prospecting_enabled', 'true' if enable else 'false')
+        db.session.commit()
+        return jsonify({'success': True, 'enabled': enable, 'message': f"Prospecção Google Maps {'ativada' if enable else 'desativada'}!"})
+
+    elif provider == 'ia_automacao':
+        Setting.set_val('module_ia_automacao_auto_responder_enabled', 'true' if enable else 'false')
+        db.session.commit()
+        return jsonify({'success': True, 'enabled': enable, 'message': f"Modelos de IA {'ativados' if enable else 'desativados'}!"})
+
+    elif provider == 'webhooks':
+        Setting.set_val('module_integracoes_webhooks_enabled', 'true' if enable else 'false')
+        db.session.commit()
+        return jsonify({'success': True, 'enabled': enable, 'message': f"Webhooks {'ativados' if enable else 'desativados'}!"})
+
+    return jsonify({'success': False, 'message': 'Provedor não reconhecido.'}), 400
+
 
 
 @bp.route('/bling/status-summary', methods=['GET'])

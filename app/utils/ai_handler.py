@@ -361,6 +361,15 @@ class AIHandler:
             except Exception as e:
                 print(f"[AIHandler] Aviso TensorFlow inject: {e}")
 
+        # 5. Injeção de Orientação Neural TensorFlow sobre a Mensagem Atual (Intenção & Tática)
+        try:
+            from app.utils.tf_engine import TensorFlowEngine
+            query_guidance = TensorFlowEngine.get_rag_guidance_for_query(customer_message)
+            if query_guidance and query_guidance.get('prompt_block'):
+                prompt_sections.append(query_guidance['prompt_block'])
+        except Exception as e:
+            print(f"[AIHandler] Aviso TensorFlow query guidance inject: {e}")
+
         final_system_prompt = "\n\n".join(prompt_sections)
 
 

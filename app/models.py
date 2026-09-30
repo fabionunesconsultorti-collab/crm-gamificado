@@ -726,5 +726,176 @@ class BlingProductCache(db.Model):
         return f'<BlingProductCache {self.code}:{self.name} stock={self.current_stock}>'
 
 
+class BulkCampaign(db.Model):
+    __tablename__ = 'bulk_campaign'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    status = db.Column(db.String(32), default='draft', index=True) # draft, running, paused, completed, cancelled
+    message_text = db.Column(db.Text, nullable=False)
+    
+    waha_instance_id = db.Column(db.Integer, db.ForeignKey('waha_instance.id'), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    template_id = db.Column(db.Integer, db.ForeignKey('message_template.id'), nullable=True)
+    
+    # Parâmetros de Anti-Spam e Cadência
+    min_delay = db.Column(db.Integer, default=6)
+    max_delay = db.Column(db.Integer, default=16)
+    batch_pause_every = db.Column(db.Integer, default=25)
+    batch_pause_duration = db.Column(db.Integer, default=60)
+    use_ai = db.Column(db.Boolean, default=False)
+    use_spintax = db.Column(db.Boolean, default=True)
+
+    # Telemetria e Contadores
+    total_count = db.Column(db.Integer, default=0)
+    processed_count = db.Column(db.Integer, default=0)
+    success_count = db.Column(db.Integer, default=0)
+    error_count = db.Column(db.Integer, default=0)
+    consecutive_errors = db.Column(db.Integer, default=0)
+    circuit_breaker_triggered = db.Column(db.Boolean, default=False)
+    pause_reason = db.Column(db.String(256), nullable=True)
+    filter_criteria_json = db.Column(db.Text, nullable=True)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    # Relacionamentos
+    waha_instance = db.relationship('WahaInstance', backref='campaigns')
+    created_by = db.relationship('User', backref='created_campaigns')
+    template = db.relationship('MessageTemplate', backref='campaigns')
+    recipients = db.relationship('BulkCampaignRecipient', backref='campaign', cascade='all, delete-orphan', lazy='dynamic')
+
+    @property
+    def progress_pct(self):
+        if not self.total_count or self.total_count == 0:
+            return 0
+        return min(100, int((self.processed_count / self.total_count) * 100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'status': self.status,
+            'message_text': self.message_text,
+            'waha_instance_id': self.waha_instance_id,
+            'waha_instance_name': self.waha_instance.name if self.waha_instance else 'Padrão',
+            'min_delay': self.min_delay,
+            'max_delay': self.max_delay,
+            'use_ai': self.use_ai,
+            'use_spintax': self.use_spintax,
+            'total_count': self.total_count,
+            'processed_count': self.processed_count,
+            'success_count': self.success_count,
+            'error_count': self.error_count,
+            'consecutive_errors': self.consecutive_errors,
+            'circuit_breaker_triggered': self.circuit_breaker_triggered,
+            'pause_reason': self.pause_reason,
+            'progress_pct': self.progress_pct,
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else None,
+            'started_at': self.started_at.strftime('%d/%m/%Y %H:%M') if self.started_at else None,
+            'completed_at': self.completed_at.strftime('%d/%m/%Y %H:%M') if self.completed_at else None
+        }
+
+    def __repr__(self):
+        return f'<BulkCampaign {self.id}:{self.name} [{self.status}]>'
+
+
+class BulkCampaignRecipient(db.Model):
+    __tablename__ = 'bulk_campaign_recipient'
+
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('bulk_campaign.id', ondelete='CASCADE'), nullable=False, index=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id', ondelete='SET NULL'), nullable=True, index=True)
+    name = db.Column(db.String(128), default='')
+    phone = db.Column(db.String(32), nullable=False, index=True)
+    source = db.Column(db.String(32), default='crm') # crm, manual, file
+    status = db.Column(db.String(32), default='pending', index=True) # pending, processing, sent, failed, cancelled, skipped
+    custom_vars_json = db.Column(db.Text, nullable=True)
+    resolved_message = db.Column(db.Text, nullable=True)
+    error_message = db.Column(db.String(256), nullable=True)
+    waha_message_id = db.Column(db.String(128), nullable=True)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    attempts = db.Column(db.Integer, default=0)
+
+    client = db.relationship('Client')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'client_id': self.client_id,
+            'name': self.name,
+            'phone': self.phone,
+            'source': self.source,
+            'status': self.status,
+            'resolved_message': self.resolved_message,
+            'error_message': self.error_message,
+            'sent_at': self.sent_at.strftime('%d/%m/%Y %H:%M:%S') if self.sent_at else None
+        }
+
+    def __repr__(self):
+        return f'<BulkCampaignRecipient {self.id}:{self.phone} [{self.status}]>'
+
+
+class FineTuningPair(db.Model):
+    """
+    Par de Diálogo Curado para Aprendizado Contínuo e Fine-Tuning do Bot:
+    - Captura o que o contato perguntou/enviou (Lead Prompt)
+    - Captura o que o operador humano respondeu no WhatsApp (Human Response - Padrão Ouro)
+    - Rascunho que a IA havia gerado (Bot Draft)
+    - Classificações do TensorFlow (Intenção e Sentimento)
+    - Curadoria Humana: status 'pending', 'approved', 'rejected'
+    - Retroalimentação RAG: promovido a documento do ChromaDB / KnowledgeDoc
+    """
+    __tablename__ = 'finetuning_pair'
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey('client.id'), nullable=True)
+    chat_id = db.Column(db.String(64), index=True, nullable=False)
+    lead_prompt = db.Column(db.Text, nullable=False)
+    bot_draft = db.Column(db.Text, nullable=True)
+    human_response = db.Column(db.Text, nullable=True)
+    intent_detected = db.Column(db.String(64), nullable=True)
+    sentiment_detected = db.Column(db.String(64), nullable=True)
+    status = db.Column(db.String(32), default='pending')  # 'pending', 'approved', 'rejected'
+    quality_score = db.Column(db.Integer, default=5)       # 1 a 5
+    is_in_rag = db.Column(db.Boolean, default=False)
+    knowledge_doc_id = db.Column(db.Integer, db.ForeignKey('knowledge_doc.id'), nullable=True)
+    source = db.Column(db.String(32), default='waha_capture')  # 'waha_capture', 'manual', 'import'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = db.relationship('Client', backref='finetuning_pairs')
+    knowledge_doc = db.relationship('KnowledgeDoc', backref='finetuning_pairs')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'client_id': self.client_id,
+            'client_name': self.client.name if self.client else None,
+            'chat_id': self.chat_id,
+            'lead_prompt': self.lead_prompt,
+            'bot_draft': self.bot_draft,
+            'human_response': self.human_response,
+            'intent_detected': self.intent_detected,
+            'sentiment_detected': self.sentiment_detected,
+            'status': self.status,
+            'quality_score': self.quality_score,
+            'is_in_rag': self.is_in_rag,
+            'knowledge_doc_id': self.knowledge_doc_id,
+            'source': self.source,
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else '',
+            'updated_at': self.updated_at.strftime('%d/%m/%Y %H:%M') if self.updated_at else ''
+        }
+
+    def __repr__(self):
+        return f'<FineTuningPair {self.id}: {self.chat_id} [{self.status}]>'
+
+
+
+
 
 

@@ -63,9 +63,9 @@ def migrate(sqlite_path="crm.db", pg_url=None):
 
                 # Resetar sequence do ID no PostgreSQL se existir coluna id
                 if 'id' in dst_table.c:
-                    seq_check = dst_conn.execute(text(f"SELECT pg_get_serial_sequence('{table_name}', 'id');")).scalar()
+                    seq_check = dst_conn.execute(text(f"SELECT pg_get_serial_sequence('\"{table_name}\"', 'id');")).scalar()
                     if seq_check:
-                        dst_conn.execute(text(f"SELECT setval('{seq_check}', COALESCE((SELECT MAX(id) FROM {table_name}), 1));"))
+                        dst_conn.execute(text(f'SELECT setval(\'{seq_check}\', COALESCE((SELECT MAX(id) FROM "{table_name}"), 1));'))
 
             trans.commit()
             print("[+] Migração de dados concluída com sucesso!")

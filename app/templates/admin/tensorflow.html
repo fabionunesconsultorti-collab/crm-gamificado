@@ -3,269 +3,1043 @@
 {% block content %}
 <div class="container-fluid px-0">
     <!-- Header com Telemetria e Controle de Plugin -->
-    <div class="card-glass mb-4 p-4" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 115, 0, 0.3); border-radius: 16px;">
+    <div class="card-glass mb-4 p-4" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 115, 0, 0.3); border-radius: 16px;">
         <div class="d-flex flex-wrap align-center justify-between gap-3">
             <div class="d-flex align-center gap-3">
                 <div class="icon-avatar" style="background: rgba(255, 115, 0, 0.15); color: #ff7300; width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; border: 1px solid rgba(255, 115, 0, 0.3);">
-                    <i class="fa-solid fa-microchip"></i>
+                    <i class="fa-solid fa-brain"></i>
                 </div>
                 <div>
                     <h2 class="m-0 font-bold text-main d-flex align-center gap-2" style="font-size: 1.6rem;">
-                        Painel de Operação TensorFlow
+                        Motor de Aprendizado Contínuo & Fine-Tuning TensorFlow
                         <span class="badge" style="background: rgba(255, 115, 0, 0.2); color: #ff7300; border: 1px solid rgba(255, 115, 0, 0.4); font-size: 0.75rem; padding: 4px 10px; border-radius: 20px;">
-                            Plugin Keras v{{ tf_status.version }}
+                            Keras / TF {{ tf_status.version }}
                         </span>
                     </h2>
                     <p class="text-muted text-sm m-0 mt-1">
-                        Gerenciamento de Redes Neurais Locais, Treinamento de Modelos e Simulação de Predição em Tempo Real
+                        Captura de Diálogos Waha (Lead ↔ Humano), Transcrição Multimodal, Retroalimentação RAG e Redes Neurais
                     </p>
                 </div>
             </div>
 
-            <div class="d-flex align-center gap-2">
+            <div class="d-flex align-center gap-2 flex-wrap">
                 <div class="px-3 py-2 text-right" style="background: rgba(255,255,255,0.03); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-                    <div class="text-xs text-muted">Motor de Hardware</div>
+                    <div class="text-xs text-muted">Aceleração de Hardware</div>
                     <div class="font-bold text-sm text-warning d-flex align-center gap-1">
                         <i class="fa-solid fa-bolt"></i> {{ tf_status.device }}
                     </div>
                 </div>
 
+                <a href="{{ url_for('admin.tf_finetuning_export') }}" class="btn-secondary px-3 py-2 font-semibold text-sm d-flex align-center gap-2" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff;">
+                    <i class="fa-solid fa-file-export text-info"></i> Exportar Dataset (JSONL)
+                </a>
+
                 <button type="button" class="btn-primary" onclick="triggerTraining()" style="background: linear-gradient(135deg, #ff7300 0%, #e65100 100%); border: none; box-shadow: 0 4px 15px rgba(255, 115, 0, 0.3); border-radius: 10px; font-weight: 600; padding: 10px 18px;">
-                    <i class="fa-solid fa-rotate text-white"></i> Treinar Modelos
+                    <i class="fa-solid fa-rotate text-white"></i> Treinar Modelos & Sincronizar RAG
                 </button>
+            </div>
+        </div>
+
+        <!-- Abas Mestras de Navegação -->
+        <div class="d-flex gap-2 mt-4 pt-3 border-t border-glass flex-wrap main-nav-tabs">
+            <button type="button" class="btn-tab active" id="main-tab-finetuning" onclick="switchMainTab('finetuning')">
+                <i class="fa-solid fa-comments-dollar text-warning"></i> Curadoria & Fine-Tuning de Conversas
+                <span class="badge bg-warning-soft text-warning ms-1" id="badge-pending-count">{{ tf_status.finetuning_stats.pending_pairs }}</span>
+            </button>
+            <button type="button" class="btn-tab" id="main-tab-models" onclick="switchMainTab('models')">
+                <i class="fa-solid fa-network-wired text-info"></i> Redes Neurais Keras & Simulação
+            </button>
+            <button type="button" class="btn-tab" id="main-tab-multimodal" onclick="switchMainTab('multimodal')">
+                <i class="fa-solid fa-photo-film text-success"></i> Pipeline Multimodal (Áudio, Imagens, Vídeos)
+            </button>
+            <button type="button" class="btn-tab" id="main-tab-mindmap" onclick="switchMainTab('mindmap')">
+                <i class="fa-solid fa-diagram-project text-info"></i> Mapa Mental do Fluxo TensorFlow & RAG
+            </button>
+        </div>
+    </div>
+
+    <!-- SEÇÃO 1: CURADORIA E FINE-TUNING DE CONVERSAS (ABA PRINCIPAL) -->
+    <div id="section-finetuning" class="main-section">
+        <!-- Cards de Estatísticas do Dataset -->
+        <div class="grid grid-4 gap-3 mb-4">
+            <div class="card-glass p-3">
+                <div class="text-xs text-muted">Total de Diálogos Capturados</div>
+                <div class="font-bold text-2xl text-main mt-1">{{ tf_status.finetuning_stats.total_pairs }}</div>
+                <div class="text-xs text-muted mt-1"><i class="fa-brands fa-whatsapp text-success"></i> Via Webhook Waha</div>
+            </div>
+            <div class="card-glass p-3">
+                <div class="text-xs text-muted">Aprovados para Treino</div>
+                <div class="font-bold text-2xl text-success mt-1" id="stat-approved">{{ tf_status.finetuning_stats.approved_pairs }}</div>
+                <div class="text-xs text-success mt-1"><i class="fa-solid fa-check-double"></i> Padrão-Ouro Humano</div>
+            </div>
+            <div class="card-glass p-3">
+                <div class="text-xs text-muted">Indexados no RAG (ChromaDB)</div>
+                <div class="font-bold text-2xl text-info mt-1" id="stat-rag">{{ tf_status.finetuning_stats.rag_synced_pairs }}</div>
+                <div class="text-xs text-info mt-1"><i class="fa-solid fa-database"></i> Retroalimentação Ativa</div>
+            </div>
+            <div class="card-glass p-3">
+                <div class="text-xs text-muted">Aguardando Curadoria</div>
+                <div class="font-bold text-2xl text-warning mt-1" id="stat-pending">{{ tf_status.finetuning_stats.pending_pairs }}</div>
+                <div class="text-xs text-warning mt-1"><i class="fa-solid fa-clock"></i> Pendentes de Validação</div>
+            </div>
+        </div>
+
+        <!-- Painel de Filtros e Ações de Curadoria -->
+        <div class="card-glass p-4 mb-4">
+            <div class="d-flex flex-wrap align-center justify-between gap-3 mb-3">
+                <div class="d-flex align-center gap-2" id="finetuning-filter-tabs">
+                    <span class="text-sm font-semibold text-muted">Filtrar por Status:</span>
+                    <button class="btn-tab active" onclick="loadFineTuningPairs('all', this)">Todos</button>
+                    <button class="btn-tab" onclick="loadFineTuningPairs('pending', this)">Pendentes</button>
+                    <button class="btn-tab" onclick="loadFineTuningPairs('approved', this)">Aprovados</button>
+                    <button class="btn-tab" onclick="loadFineTuningPairs('rejected', this)">Rejeitados</button>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <button type="button" class="btn-primary" onclick="syncApprovedToRAG()" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; border-radius: 8px; font-size: 0.85rem; padding: 8px 14px;">
+                        <i class="fa-solid fa-bolt text-white"></i> Sincronizar Aprovados no RAG Agora
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabela / Lista Dinâmica de Pares -->
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="table-glass w-100" style="font-size: 0.88rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left;">
+                            <th class="py-2 px-3 text-muted">Lead / Contato</th>
+                            <th class="py-2 px-3 text-muted" style="width: 32%;">Pergunta / Áudio / Imagem do Lead</th>
+                            <th class="py-2 px-3 text-muted" style="width: 36%;">Resposta Humana (Padrão-Ouro)</th>
+                            <th class="py-2 px-3 text-muted">Intenção & TF</th>
+                            <th class="py-2 px-3 text-muted text-center">Status</th>
+                            <th class="py-2 px-3 text-muted text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pairs-table-body">
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Carregando pares de conversas...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- Cards de Métricas dos Modelos -->
-    <div class="grid grid-3 gap-4 mb-4">
-        <!-- Model 1 -->
-        <div class="card-glass p-4">
-            <div class="d-flex align-center justify-between mb-3">
-                <div class="font-semibold text-main d-flex align-center gap-2">
-                    <i class="fa-solid fa-bullseye text-warning"></i> Lead Scoring Neural
+    <!-- SEÇÃO 2: REDES NEURAIS KERAS & SIMULAÇÃO -->
+    <div id="section-models" class="main-section d-none">
+        <!-- Cards de Métricas dos Modelos -->
+        <div class="grid grid-3 gap-4 mb-4">
+            <!-- Model 1 -->
+            <div class="card-glass p-4">
+                <div class="d-flex align-center justify-between mb-3">
+                    <div class="font-semibold text-main d-flex align-center gap-2">
+                        <i class="fa-solid fa-bullseye text-warning"></i> Lead Scoring Neural
+                    </div>
+                    <span class="badge bg-success-soft text-success">Ativo</span>
                 </div>
-                <span class="badge bg-success-soft text-success">Ativo</span>
+                <div class="d-flex align-baseline gap-2 mb-2">
+                    <div class="font-bold text-2xl text-main">{{ tf_status.metrics.lead_score_acc }}%</div>
+                    <div class="text-xs text-muted">Acurácia (Validação)</div>
+                </div>
+                <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill" style="width: {{ tf_status.metrics.lead_score_acc }}%; height: 100%; background: linear-gradient(90deg, #ff7300, #10b981);"></div>
+                </div>
+                <div class="text-xs text-muted d-flex justify-between">
+                    <span>Loss: <strong>{{ tf_status.metrics.lead_score_loss }}</strong></span>
+                    <span>Densidade: Keras 3-Layers</span>
+                </div>
             </div>
-            <div class="d-flex align-baseline gap-2 mb-2">
-                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.lead_score_acc }}%</div>
-                <div class="text-xs text-muted">Acurácia (Validação)</div>
+
+            <!-- Model 2 -->
+            <div class="card-glass p-4">
+                <div class="d-flex align-center justify-between mb-3">
+                    <div class="font-semibold text-main d-flex align-center gap-2">
+                        <i class="fa-solid fa-user-slash text-danger"></i> Churn Risk Predictor
+                    </div>
+                    <span class="badge bg-success-soft text-success">Ativo</span>
+                </div>
+                <div class="d-flex align-baseline gap-2 mb-2">
+                    <div class="font-bold text-2xl text-main">{{ tf_status.metrics.churn_acc }}%</div>
+                    <div class="text-xs text-muted">Acurácia (Validação)</div>
+                </div>
+                <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill" style="width: {{ tf_status.metrics.churn_acc }}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981);"></div>
+                </div>
+                <div class="text-xs text-muted d-flex justify-between">
+                    <span>Loss: <strong>{{ tf_status.metrics.churn_loss }}</strong></span>
+                    <span>Função: Binary Cross-Entropy</span>
+                </div>
             </div>
-            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
-                <div class="progress-fill" style="width: {{ tf_status.metrics.lead_score_acc }}%; height: 100%; background: linear-gradient(90deg, #ff7300, #10b981);"></div>
-            </div>
-            <div class="text-xs text-muted d-flex justify-between">
-                <span>Loss: <strong>{{ tf_status.metrics.lead_score_loss }}</strong></span>
-                <span>Densidade: Keras 3-Layers</span>
+
+            <!-- Model 3 -->
+            <div class="card-glass p-4">
+                <div class="d-flex align-center justify-between mb-3">
+                    <div class="font-semibold text-main d-flex align-center gap-2">
+                        <i class="fa-solid fa-comments text-info"></i> Classificador de Sentimento & Intenção
+                    </div>
+                    <span class="badge bg-success-soft text-success">Ativo</span>
+                </div>
+                <div class="d-flex align-baseline gap-2 mb-2">
+                    <div class="font-bold text-2xl text-main">{{ tf_status.metrics.sentiment_acc }}%</div>
+                    <div class="text-xs text-muted">Acurácia (Validação)</div>
+                </div>
+                <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill" style="width: {{ tf_status.metrics.sentiment_acc }}%; height: 100%; background: linear-gradient(90deg, #a855f7, #3b82f6);"></div>
+                </div>
+                <div class="text-xs text-muted d-flex justify-between">
+                    <span>Loss: <strong>{{ tf_status.metrics.sentiment_loss }}</strong></span>
+                    <span>Arquitetura: Embedding + Dense</span>
+                </div>
             </div>
         </div>
 
-        <!-- Model 2 -->
-        <div class="card-glass p-4">
-            <div class="d-flex align-center justify-between mb-3">
-                <div class="font-semibold text-main d-flex align-center gap-2">
-                    <i class="fa-solid fa-user-slash text-danger"></i> Churn Risk Predictor
+        <!-- Abas de Ferramentas de Simulação e Treinamento -->
+        <div class="grid grid-3-1 gap-4">
+            <!-- Coluna Esquerda: Benchmarks de Inferência Neurais -->
+            <div class="card-glass p-4">
+                <h3 class="font-bold text-main text-lg mb-3 d-flex align-center gap-2">
+                    <i class="fa-solid fa-flask text-warning"></i> Bancada de Teste de Inferência Neural
+                </h3>
+                
+                <div class="tabs-nav mb-4 border-b border-glass pb-2 d-flex gap-2" id="sim-filter-tabs">
+                    <button type="button" class="btn-tab active" id="tab-btn-lead" onclick="switchSimTab('lead')">
+                        <i class="fa-solid fa-user-check"></i> Lead Scoring
+                    </button>
+                    <button type="button" class="btn-tab" id="tab-btn-churn" onclick="switchSimTab('churn')">
+                        <i class="fa-solid fa-shield-cat"></i> Risco de Churn
+                    </button>
+                    <button type="button" class="btn-tab" id="tab-btn-text" onclick="switchSimTab('text')">
+                        <i class="fa-solid fa-message"></i> Sentimento & Intenção
+                    </button>
                 </div>
-                <span class="badge bg-success-soft text-success">Ativo</span>
-            </div>
-            <div class="d-flex align-baseline gap-2 mb-2">
-                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.churn_acc }}%</div>
-                <div class="text-xs text-muted">Acurácia (Validação)</div>
-            </div>
-            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
-                <div class="progress-fill" style="width: {{ tf_status.metrics.churn_acc }}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981);"></div>
-            </div>
-            <div class="text-xs text-muted d-flex justify-between">
-                <span>Loss: <strong>{{ tf_status.metrics.churn_loss }}</strong></span>
-                <span>Função: Binary Cross-Entropy</span>
-            </div>
-        </div>
 
-        <!-- Model 3 -->
-        <div class="card-glass p-4">
-            <div class="d-flex align-center justify-between mb-3">
-                <div class="font-semibold text-main d-flex align-center gap-2">
-                    <i class="fa-solid fa-comments text-info"></i> Classificador de Sentimento
+                <!-- Tab 1: Lead Score -->
+                <div id="sim-tab-lead" class="sim-tab-content">
+                    <form id="form-sim-lead" onsubmit="runSimLead(event)">
+                        <div class="grid grid-2 gap-3 mb-3">
+                            <div>
+                                <label class="form-label text-xs">Frequência de Compras</label>
+                                <input type="number" id="lead_freq" class="input-glass" value="4" min="0" max="100">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">LTV Total (R$)</label>
+                                <input type="number" id="lead_ltv" class="input-glass" value="2500" min="0">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">Nota no Google (0 a 5)</label>
+                                <input type="number" step="0.1" id="lead_rating" class="input-glass" value="4.8" min="0" max="5">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">Dias sem Contato</label>
+                                <input type="number" id="lead_days" class="input-glass" value="12" min="0">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary w-100 py-2">
+                            <i class="fa-solid fa-play"></i> Calcular Score Neural
+                        </button>
+                    </form>
+
+                    <div id="res-lead" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-center justify-between mb-2">
+                            <span class="text-sm font-semibold text-muted">Resultado da Inferência:</span>
+                            <span id="res-lead-badge" class="badge"></span>
+                        </div>
+                        <div class="d-flex align-baseline gap-2 mb-2">
+                            <span class="font-bold text-3xl text-main" id="res-lead-score">0</span>
+                            <span class="text-xs text-muted">/ 100 de Score de Qualificação</span>
+                        </div>
+                        <p class="text-xs text-muted m-0 mt-2" id="res-lead-rec"></p>
+                    </div>
                 </div>
-                <span class="badge bg-success-soft text-success">Ativo</span>
+
+                <!-- Tab 2: Churn Risk -->
+                <div id="sim-tab-churn" class="sim-tab-content d-none">
+                    <form id="form-sim-churn" onsubmit="runSimChurn(event)">
+                        <div class="grid grid-2 gap-3 mb-3">
+                            <div>
+                                <label class="form-label text-xs">Dias de Inatividade</label>
+                                <input type="number" id="churn_days" class="input-glass" value="65" min="0">
+                            </div>
+                            <div>
+                                <label class="form-label text-xs">Histórico de Compras</label>
+                                <input type="number" id="churn_freq" class="input-glass" value="1" min="0">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary w-100 py-2" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                            <i class="fa-solid fa-play"></i> Avaliar Risco de Churn
+                        </button>
+                    </form>
+
+                    <div id="res-churn" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="d-flex align-center justify-between mb-2">
+                            <span class="text-sm font-semibold text-muted">Probabilidade de Churn:</span>
+                            <span id="res-churn-badge" class="badge"></span>
+                        </div>
+                        <div class="d-flex align-baseline gap-2 mb-2">
+                            <span class="font-bold text-3xl text-danger" id="res-churn-pct">0%</span>
+                        </div>
+                        <p class="text-xs text-muted m-0 mt-2" id="res-churn-action"></p>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Sentiment & Intent -->
+                <div id="sim-tab-text" class="sim-tab-content d-none">
+                    <form id="form-sim-text" onsubmit="runSimText(event)">
+                        <div class="mb-3">
+                            <label class="form-label text-xs">Mensagem do Cliente (WhatsApp)</label>
+                            <textarea id="text_msg" rows="3" class="input-glass" placeholder="Ex: Olá, gostaria de saber os preços e se aceitam Pix..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary w-100 py-2">
+                            <i class="fa-solid fa-brain"></i> Classificar Mensagem com TensorFlow
+                        </button>
+                    </form>
+
+                    <div id="res-text" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                        <div class="grid grid-3 gap-2 text-center">
+                            <div>
+                                <div class="text-xs text-muted">Sentimento</div>
+                                <div class="font-bold text-main mt-1" id="res-text-sent">-</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted">Intenção Prevista</div>
+                                <div class="font-bold text-warning mt-1" id="res-text-intent">-</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted">Confiança Neural</div>
+                                <div class="font-bold text-success mt-1" id="res-text-conf">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="d-flex align-baseline gap-2 mb-2">
-                <div class="font-bold text-2xl text-main">{{ tf_status.metrics.sentiment_acc }}%</div>
-                <div class="text-xs text-muted">Acurácia (Validação)</div>
-            </div>
-            <div class="progress-bar-bg mb-2" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
-                <div class="progress-fill" style="width: {{ tf_status.metrics.sentiment_acc }}%; height: 100%; background: linear-gradient(90deg, #a855f7, #3b82f6);"></div>
-            </div>
-            <div class="text-xs text-muted d-flex justify-between">
-                <span>Loss: <strong>{{ tf_status.metrics.sentiment_loss }}</strong></span>
-                <span>Arquitetura: Embedding + Dense</span>
+
+            <!-- Coluna Direita: Console de Treinamento ao Vivo -->
+            <div class="card-glass p-4 d-flex flex-column">
+                <div class="d-flex align-center justify-between mb-3">
+                    <h3 class="font-bold text-main text-lg m-0 d-flex align-center gap-2">
+                        <i class="fa-solid fa-terminal text-success"></i> Terminal Keras / TF
+                    </h3>
+                    <span id="train-status-badge" class="badge bg-secondary-soft text-muted">Aguardando</span>
+                </div>
+
+                <div id="terminal-log" class="p-3 rounded-lg flex-grow-1 font-mono text-xs" style="background: #090d16; border: 1px solid rgba(255,255,255,0.08); color: #10b981; min-height: 250px; max-height: 380px; overflow-y: auto;">
+                    <div>[TensorFlowEngine] Motor inicializado (versão: {{ tf_status.version }}).</div>
+                    <div>[Dispositivo]: {{ tf_status.device }}</div>
+                    <div>[Modelos carregados]: 4 (Lead Scoring, Churn, Sentimento e Retroalimentação RAG).</div>
+                    <div class="text-muted mt-2">Clique em 'Treinar Modelos' para iniciar nova época de calibração neural.</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Abas de Ferramentas de Simulação e Treinamento -->
-    <div class="grid grid-3-1 gap-4">
-        <!-- Coluna Esquerda: Benchmarks de Inferência Neurais -->
-        <div class="card-glass p-4">
-            <h3 class="font-bold text-main text-lg mb-3 d-flex align-center gap-2">
-                <i class="fa-solid fa-flask text-warning"></i> Bancada de Teste de Inferência Neural
-            </h3>
-            
-            <div class="tabs-nav mb-4 border-b border-glass pb-2 d-flex gap-2">
-                <button type="button" class="btn-tab active" id="tab-btn-lead" onclick="switchSimTab('lead')">
-                    <i class="fa-solid fa-user-check"></i> Lead Scoring
-                </button>
-                <button type="button" class="btn-tab" id="tab-btn-churn" onclick="switchSimTab('churn')">
-                    <i class="fa-solid fa-shield-cat"></i> Risco de Churn
-                </button>
-                <button type="button" class="btn-tab" id="tab-btn-text" onclick="switchSimTab('text')">
-                    <i class="fa-solid fa-message"></i> Sentimento & Intenção
-                </button>
-            </div>
-
-            <!-- Tab 1: Lead Score -->
-            <div id="sim-tab-lead" class="sim-tab-content">
-                <form id="form-sim-lead" onsubmit="runSimLead(event)">
-                    <div class="grid grid-2 gap-3 mb-3">
-                        <div>
-                            <label class="form-label text-xs">Frequência de Compras</label>
-                            <input type="number" id="lead_freq" class="input-glass" value="4" min="0" max="100">
-                        </div>
-                        <div>
-                            <label class="form-label text-xs">LTV Total (R$)</label>
-                            <input type="number" id="lead_ltv" class="input-glass" value="2500" min="0">
-                        </div>
-                        <div>
-                            <label class="form-label text-xs">Nota no Google (0 a 5)</label>
-                            <input type="number" step="0.1" id="lead_rating" class="input-glass" value="4.8" min="0" max="5">
-                        </div>
-                        <div>
-                            <label class="form-label text-xs">Dias sem Contato</label>
-                            <input type="number" id="lead_days" class="input-glass" value="12" min="0">
-                        </div>
+    <!-- SEÇÃO 3: PIPELINE MULTIMODAL (ÁUDIO, VISÃO E VÍDEOS) -->
+    <div id="section-multimodal" class="main-section d-none">
+        <div class="grid grid-3 gap-4 mb-4">
+            <div class="card-glass p-4">
+                <div class="d-flex align-center gap-3 mb-3">
+                    <div class="p-3 rounded-lg" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 1.5rem;">
+                        <i class="fa-solid fa-microphone-lines"></i>
                     </div>
-                    <button type="submit" class="btn-primary w-100 py-2">
-                        <i class="fa-solid fa-play"></i> Calcular Score Neural
-                    </button>
-                </form>
-
-                <div id="res-lead" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
-                    <div class="d-flex align-center justify-between mb-2">
-                        <span class="text-sm font-semibold text-muted">Resultado da Inferência:</span>
-                        <span id="res-lead-badge" class="badge"></span>
+                    <div>
+                        <h4 class="m-0 font-bold text-main">Áudio STT (Speech-to-Text)</h4>
+                        <div class="text-xs text-success"><i class="fa-solid fa-circle-check"></i> Ativo & Integrado</div>
                     </div>
-                    <div class="d-flex align-baseline gap-2 mb-2">
-                        <span class="font-bold text-3xl text-main" id="res-lead-score">0</span>
-                        <span class="text-xs text-muted">/ 100 de Score de Qualificação</span>
-                    </div>
-                    <p class="text-xs text-muted m-0 mt-2" id="res-lead-rec"></p>
+                </div>
+                <p class="text-xs text-muted mb-3">
+                    Converte automaticamente mensagens de voz e áudio (.ogg, .mp3, opus) enviadas pelo cliente em texto coeso antes do buffer de debounce.
+                </p>
+                <div class="p-2 rounded text-xs text-muted" style="background: rgba(255,255,255,0.03);">
+                    <strong>Engine Ativa:</strong> Google Gemini 2.0 Flash Audio / Whisper Fallback
                 </div>
             </div>
 
-            <!-- Tab 2: Churn Risk -->
-            <div id="sim-tab-churn" class="sim-tab-content d-none">
-                <form id="form-sim-churn" onsubmit="runSimChurn(event)">
-                    <div class="grid grid-2 gap-3 mb-3">
-                        <div>
-                            <label class="form-label text-xs">Dias de Inatividade</label>
-                            <input type="number" id="churn_days" class="input-glass" value="65" min="0">
-                        </div>
-                        <div>
-                            <label class="form-label text-xs">Histórico de Compras</label>
-                            <input type="number" id="churn_freq" class="input-glass" value="1" min="0">
-                        </div>
+            <div class="card-glass p-4">
+                <div class="d-flex align-center gap-3 mb-3">
+                    <div class="p-3 rounded-lg" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 1.5rem;">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
                     </div>
-                    <button type="submit" class="btn-primary w-100 py-2" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
-                        <i class="fa-solid fa-play"></i> Avaliar Risco de Churn
-                    </button>
-                </form>
-
-                <div id="res-churn" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
-                    <div class="d-flex align-center justify-between mb-2">
-                        <span class="text-sm font-semibold text-muted">Probabilidade de Cancelamento:</span>
-                        <span id="res-churn-badge" class="badge"></span>
+                    <div>
+                        <h4 class="m-0 font-bold text-main">Visão Computacional & Pix</h4>
+                        <div class="text-xs text-success"><i class="fa-solid fa-circle-check"></i> Ativo & Integrado</div>
                     </div>
-                    <div class="d-flex align-baseline gap-2 mb-2">
-                        <span class="font-bold text-3xl text-main" id="res-churn-pct">0%</span>
-                    </div>
-                    <p class="text-xs text-muted m-0 mt-2" id="res-churn-action"></p>
+                </div>
+                <p class="text-xs text-muted mb-3">
+                    Analisa fotos e comprovantes bancários (Pix, TED, boletos). Extrai valores (R$), favorecido, data/hora e autenticação para o bot e CRM.
+                </p>
+                <div class="p-2 rounded text-xs text-muted" style="background: rgba(255,255,255,0.03);">
+                    <strong>Engine Ativa:</strong> Gemini 2.0 Flash Vision (OCR + Compreensão)
                 </div>
             </div>
 
-            <!-- Tab 3: Text Classifier -->
-            <div id="sim-tab-text" class="sim-tab-content d-none">
-                <form id="form-sim-text" onsubmit="runSimText(event)">
-                    <div class="mb-3">
-                        <label class="form-label text-xs">Mensagem do Cliente no WhatsApp</label>
-                        <textarea id="text_msg" class="input-glass w-100" rows="3" placeholder="Ex: Olá! Gostaria de saber qual é o valor do plano corporativo?">Gostaria de saber qual é o preço do plano de CRM para 5 usuários?</textarea>
+            <div class="card-glass p-4">
+                <div class="d-flex align-center gap-3 mb-3">
+                    <div class="p-3 rounded-lg" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 1.5rem;">
+                        <i class="fa-solid fa-video"></i>
                     </div>
-                    <button type="submit" class="btn-primary w-100 py-2" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%);">
-                        <i class="fa-solid fa-robot"></i> Classificar Sentimento & Intenção
-                    </button>
-                </form>
-
-                <div id="res-text" class="mt-4 p-3 rounded-lg d-none" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
-                    <div class="grid grid-2 gap-3 mb-2">
-                        <div>
-                            <span class="text-xs text-muted block">Sentimento Detectado</span>
-                            <span class="font-bold text-main text-base" id="res-text-sent"></span>
-                        </div>
-                        <div>
-                            <span class="text-xs text-muted block">Intenção Identificada</span>
-                            <span class="font-bold text-main text-base" id="res-text-intent"></span>
-                        </div>
+                    <div>
+                        <h4 class="m-0 font-bold text-main">Vídeos e Anexos</h4>
+                        <div class="text-xs text-success"><i class="fa-solid fa-circle-check"></i> Ativo & Integrado</div>
                     </div>
-                    <div class="text-xs text-muted mt-2">Confiança do Modelo: <strong id="res-text-conf"></strong></div>
+                </div>
+                <p class="text-xs text-muted mb-3">
+                    Identifica vídeos e documentos (.pdf), preservando legendas e acionando atendimento humano especializado quando necessário.
+                </p>
+                <div class="p-2 rounded text-xs text-muted" style="background: rgba(255,255,255,0.03);">
+                    <strong>Engine Ativa:</strong> WAHA Gateway + Extrator de Mídias
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Coluna Direita: Console de Treinamento em Tempo Real -->
-        <div class="card-glass p-4">
-            <h4 class="font-bold text-main text-base mb-3 d-flex align-center justify-between">
-                <span><i class="fa-solid fa-terminal text-success"></i> Console de Treino Keras</span>
-                <span id="train-status-badge" class="badge bg-secondary-soft text-muted">Standby</span>
-            </h4>
+    <!-- SEÇÃO 4: MAPA MENTAL INTERATIVO DO FLUXO TENSORFLOW & RAG -->
+    <div id="section-mindmap" class="main-section d-none">
+        <div class="card-glass p-4 mb-4">
+            <div class="d-flex flex-wrap align-center justify-between gap-3 mb-3">
+                <div>
+                    <h3 class="font-bold text-main text-lg m-0 d-flex align-center gap-2">
+                        <i class="fa-solid fa-diagram-project text-info"></i> Mapa Mental do Fluxo Neural & Retroalimentação RAG
+                    </h3>
+                    <p class="text-xs text-muted m-0 mt-1">
+                        Visualização arquitetural interativa: captura de vozes (Lead ↔ Humano), processamento multimodal, classificação Keras e enriquecimento mútuo do RAG.
+                    </p>
+                </div>
+                <div class="d-flex align-center gap-2" id="mindmap-filter-tabs">
+                    <span class="text-xs text-muted">Foco do Diagrama:</span>
+                    <button type="button" class="btn-tab active" onclick="filterMindmap('all', this)">Visão Global</button>
+                    <button type="button" class="btn-tab" onclick="filterMindmap('multimodal', this)">Multimodal</button>
+                    <button type="button" class="btn-tab" onclick="filterMindmap('learning', this)">Aprendizado Humano</button>
+                    <button type="button" class="btn-tab" onclick="filterMindmap('rag', this)">Loop RAG</button>
+                </div>
+            </div>
 
-            <div id="terminal-log" style="background: #090d16; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 0.78rem; color: #a7f3d0; line-height: 1.5;">
-                <div class="text-muted">[TensorFlowEngine] Sistema pronto. Aguardando disparo de treinamento de épocas...</div>
+            <!-- Canvas Container do Mapa Mental -->
+            <div class="mindmap-container p-3 rounded-xl position-relative" style="background: radial-gradient(circle at 50% 50%, #111827 0%, #090d16 100%); border: 1px solid rgba(255, 115, 0, 0.25); min-height: 700px; overflow: hidden; border-radius: 16px;">
+                <!-- Grid de Fundo Sutil -->
+                <div style="position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; opacity: 0.6;"></div>
+
+                <div class="grid grid-4-1 gap-3 position-relative" style="z-index: 2;">
+                    <!-- Área do Gráfico Mental -->
+                    <div style="position: relative; height: 660px;" id="mindmap-canvas-wrapper">
+                        <!-- SVG para Conexões Neurais Dinâmicas -->
+                        <svg id="mindmap-svg" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
+                            <defs>
+                                <linearGradient id="grad-tf-rag" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#ff7300" />
+                                    <stop offset="100%" stop-color="#3b82f6" />
+                                </linearGradient>
+                                <linearGradient id="grad-human-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#10b981" />
+                                    <stop offset="100%" stop-color="#ff7300" />
+                                </linearGradient>
+                                <linearGradient id="grad-multi" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#a855f7" />
+                                    <stop offset="100%" stop-color="#ff7300" />
+                                </linearGradient>
+                            </defs>
+
+                            <!-- Conexões Sinápticas (Curvas Bezier) -->
+                            <!-- WAHA -> Multimodal -->
+                            <path id="wire-waha-multi" d="M 170 110 C 230 110, 230 75, 300 75" stroke="#a855f7" stroke-width="2.5" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- Multimodal -> Buffer Debounce -->
+                            <path id="wire-multi-debounce" d="M 470 75 C 530 75, 530 110, 580 110" stroke="#a855f7" stroke-width="2.5" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- Buffer Debounce -> TF Core -->
+                            <path id="wire-debounce-core" d="M 660 150 C 660 250, 540 280, 480 320" stroke="url(#grad-tf-rag)" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- TF Core -> Classificador Intenção -->
+                            <path id="wire-core-intent" d="M 480 340 C 560 340, 600 320, 660 320" stroke="#ff7300" stroke-width="2.5" fill="none" />
+                            <!-- Classificador Intenção -> RAG ChromaDB -->
+                            <path id="wire-intent-rag" d="M 720 360 C 720 440, 680 480, 650 510" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- RAG ChromaDB -> TF Core (Retroalimentação) -->
+                            <path id="wire-rag-core" d="M 520 540 C 440 540, 400 440, 400 380" stroke="url(#grad-tf-rag)" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- WAHA Operador Humano (fromMe) -> DialogueCollector -->
+                            <path id="wire-waha-human" d="M 120 150 C 120 250, 110 280, 130 330" stroke="#10b981" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- DialogueCollector -> FineTuningPair -->
+                            <path id="wire-human-pair" d="M 170 370 C 190 440, 190 460, 200 500" stroke="url(#grad-human-gold)" stroke-width="2.5" fill="none" />
+                            <!-- FineTuningPair Aprovado -> RAG ChromaDB (Retroalimentação Canônica) -->
+                            <path id="wire-pair-rag" d="M 280 540 C 370 570, 450 570, 520 540" stroke="#10b981" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                            <!-- TF Core -> Fallback Humano (2 Falhas) -->
+                            <path id="wire-core-takeover" d="M 360 350 C 290 350, 270 340, 230 340" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,4" fill="none" />
+                            <!-- TF Core -> Resposta WhatsApp -->
+                            <path id="wire-core-reply" d="M 400 380 C 400 460, 360 520, 360 600" stroke="#10b981" stroke-width="3" fill="none" stroke-dasharray="6,6" class="neural-pulse-path" />
+                        </svg>
+
+                        <!-- NÓ 1: WhatsApp / WAHA Gateway (Topo Esquerda) -->
+                        <div class="mind-node node-group-multimodal" id="node-waha" style="top: 80px; left: 30px;" onclick="inspectNode('waha')">
+                            <div class="node-icon bg-success-soft text-success"><i class="fa-brands fa-whatsapp"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">WhatsApp Gateway (WAHA)</div>
+                                <div class="node-sub">Webhook Assíncrono (&lt;50ms)</div>
+                            </div>
+                            <span class="badge bg-success-soft text-success text-xxs">HTTP 200</span>
+                        </div>
+
+                        <!-- NÓ 2: Processador Multimodal (Topo Centro) -->
+                        <div class="mind-node node-group-multimodal" id="node-multimodal" style="top: 40px; left: 270px;" onclick="inspectNode('multimodal')">
+                            <div class="node-icon" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;"><i class="fa-solid fa-microphone-lines"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Processador Multimodal</div>
+                                <div class="node-sub">STT Whisper / Visão Pix Gemini</div>
+                            </div>
+                            <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 0.65rem;">Áudio &amp; Foto</span>
+                        </div>
+
+                        <!-- NÓ 3: Buffer Temporal Debounce (Topo Direita) -->
+                        <div class="mind-node node-group-all" id="node-debounce" style="top: 80px; left: 540px;" onclick="inspectNode('debounce')">
+                            <div class="node-icon bg-warning-soft text-warning"><i class="fa-solid fa-hourglass-half"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Buffer de Debounce (Redis)</div>
+                                <div class="node-sub">Agrupa mensagens (3 a 5 seg)</div>
+                            </div>
+                            <span class="badge bg-warning-soft text-warning text-xxs">4s Delay</span>
+                        </div>
+
+                        <!-- NÓ CENTRAL: Núcleo Neural TensorFlow & Memória (Centro) -->
+                        <div class="mind-node node-center" id="node-tfcore" style="top: 290px; left: 340px;" onclick="inspectNode('tfcore')">
+                            <div class="pulse-ring"></div>
+                            <div class="node-icon" style="background: linear-gradient(135deg, #ff7300, #e65100); color: #fff; width: 48px; height: 48px; font-size: 1.4rem;">
+                                <i class="fa-solid fa-brain"></i>
+                            </div>
+                            <div class="node-info">
+                                <div class="node-title font-bold text-warning" style="font-size: 1rem;">TensorFlow 2.21 / Keras</div>
+                                <div class="node-sub text-muted">Cérebro Neural &amp; State Machine</div>
+                            </div>
+                            <span class="badge bg-warning-soft text-warning" style="font-size: 0.7rem;">HUB CENTRAL</span>
+                        </div>
+
+                        <!-- NÓ 4: Classificador Neural de Intenção & Sentimento (Meio Direita) -->
+                        <div class="mind-node node-group-rag" id="node-intent" style="top: 280px; left: 630px;" onclick="inspectNode('intent')">
+                            <div class="node-icon bg-info-soft text-info"><i class="fa-solid fa-tags"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Classificador de Intenção</div>
+                                <div class="node-sub">Embedding Keras + Humor</div>
+                            </div>
+                            <span class="badge bg-info-soft text-info text-xxs">8 Classes</span>
+                        </div>
+
+                        <!-- NÓ 5: RAG Semântico ChromaDB (Base Direita) -->
+                        <div class="mind-node node-group-rag" id="node-rag" style="top: 480px; left: 520px;" onclick="inspectNode('rag')">
+                            <div class="node-icon" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;"><i class="fa-solid fa-database"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">RAG Vector (ChromaDB)</div>
+                                <div class="node-sub">Busca Híbrida + FAQs Retroativas</div>
+                            </div>
+                            <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-size: 0.65rem;">Top-K Rerank</span>
+                        </div>
+
+                        <!-- NÓ 6: Captura do Atendente Humano (Meio Esquerda) -->
+                        <div class="mind-node node-group-learning" id="node-human" style="top: 310px; left: 50px;" onclick="inspectNode('human')">
+                            <div class="node-icon bg-success-soft text-success"><i class="fa-solid fa-user-tie"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Captura do Humano (fromMe)</div>
+                                <div class="node-sub">Separação de Vozes &amp; Padrão-Ouro</div>
+                            </div>
+                            <span class="badge bg-success-soft text-success text-xxs">DialogueCollector</span>
+                        </div>
+
+                        <!-- NÓ 7: Dataset Fine-Tuning & Curadoria (Base Esquerda) -->
+                        <div class="mind-node node-group-learning" id="node-finetune" style="top: 480px; left: 140px;" onclick="inspectNode('finetune')">
+                            <div class="node-icon" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;"><i class="fa-solid fa-graduation-cap"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Curadoria &amp; Fine-Tuning</div>
+                                <div class="node-sub">Pares Validados &amp; JSONL Export</div>
+                            </div>
+                            <span class="badge bg-warning-soft text-warning text-xxs">{{ tf_status.finetuning_stats.approved_pairs }} Aprovados</span>
+                        </div>
+
+                        <!-- NÓ 8: Resposta Final WhatsApp (Base Centro) -->
+                        <div class="mind-node node-group-all" id="node-reply" style="top: 570px; left: 320px;" onclick="inspectNode('reply')">
+                            <div class="node-icon bg-success-soft text-success"><i class="fa-solid fa-paper-plane"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Resposta Concisa &amp; Direcionada</div>
+                                <div class="node-sub">Ollama / Gemini + Envio WAHA</div>
+                            </div>
+                            <span class="badge bg-success-soft text-success text-xxs">Conclusão</span>
+                        </div>
+
+                        <!-- NÓ 9: Transbordo / Fallback Humano (Badge Flutuante) -->
+                        <div class="mind-node node-group-all" id="node-takeover" style="top: 240px; left: 180px;" onclick="inspectNode('takeover')">
+                            <div class="node-icon bg-danger-soft text-danger"><i class="fa-solid fa-headset"></i></div>
+                            <div class="node-info">
+                                <div class="node-title">Fallback Humano Imediato</div>
+                                <div class="node-sub">Pausa em 2 Falhas / Pedido</div>
+                            </div>
+                            <span class="badge bg-danger-soft text-danger text-xxs">Takeover</span>
+                        </div>
+                    </div>
+
+                    <!-- Inspetor Técnico Lateral -->
+                    <div class="card-glass p-3 d-flex flex-column justify-between" style="background: rgba(15, 23, 42, 0.85); border-radius: 12px; height: 660px; overflow-y: auto;">
+                        <div>
+                            <div class="d-flex align-center gap-2 mb-2 pb-2 border-b border-glass">
+                                <div class="icon-avatar text-warning" style="width: 32px; height: 32px; font-size: 1rem; background: rgba(255,115,0,0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i id="inspect-icon" class="fa-solid fa-brain"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-main m-0 text-sm" id="inspect-title">Núcleo TensorFlow &amp; Memória</h4>
+                                    <div class="text-xxs text-muted" id="inspect-pilar">Pilar 2: Assertividade &amp; Aprendizado</div>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-muted mb-3" id="inspect-desc">
+                                O cérebro do sistema: centraliza o estado conversacional, orquestra a retroalimentação com o RAG no ChromaDB, classifica intenções e sentimentos via Keras e gerencia a transição segura para o atendimento humano.
+                            </p>
+
+                            <div class="space-y-2 mb-3">
+                                <div class="p-2 rounded text-xs" style="background: rgba(255,255,255,0.03);">
+                                    <div class="text-muted text-xxs">Tecnologia &amp; Biblioteca:</div>
+                                    <div class="font-semibold text-main mt-0.5" id="inspect-tech">TensorFlow 2.21 + Keras 3 + Redis</div>
+                                </div>
+                                <div class="p-2 rounded text-xs" style="background: rgba(255,255,255,0.03);">
+                                    <div class="text-muted text-xxs">Métrica / Latência Típica:</div>
+                                    <div class="font-semibold text-warning mt-0.5" id="inspect-latency">&lt; 15ms de inferência neural</div>
+                                </div>
+                                <div class="p-2 rounded text-xs" style="background: rgba(255,255,255,0.03);">
+                                    <div class="text-muted text-xxs">Papel no Aprendizado:</div>
+                                    <div class="font-semibold text-success mt-0.5" id="inspect-role">Curadoria de Diálogos &amp; Formação do Padrão-Ouro</div>
+                                </div>
+                            </div>
+
+                            <div class="p-2.5 rounded text-xs" style="background: rgba(255, 115, 0, 0.08); border: 1px solid rgba(255, 115, 0, 0.2);">
+                                <div class="font-bold text-warning mb-1"><i class="fa-solid fa-lightbulb"></i> Como o Aprendizado Acontece:</div>
+                                <div class="text-muted text-xxs" id="inspect-insight">
+                                    Ao responder um cliente no WhatsApp, sua resposta humana é capturada pelo DialogueCollector, gerando um par Lead ↔ Atendente. Esse par alimenta o classificador do TensorFlow e é vetorizado no ChromaDB como nova FAQ oficial.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t border-glass text-center">
+                            <button type="button" class="btn-primary w-100 py-1.5 text-xs" onclick="triggerTraining()" style="background: linear-gradient(135deg, #ff7300, #e65100);">
+                                <i class="fa-solid fa-rotate"></i> Retreinar com Dados Recentes
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-.btn-tab {
-    background: transparent;
-    border: none;
-    color: var(--text-muted, #94a3b8);
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 500;
+/* Estilos do Mapa Mental Neural */
+.mind-node {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3;
+    max-width: 250px;
 }
-.btn-tab:hover {
-    color: var(--text-main, #f8fafc);
-    background: rgba(255, 255, 255, 0.05);
+
+.mind-node:hover {
+    transform: translateY(-4px) scale(1.03);
+    border-color: #ff7300;
+    box-shadow: 0 12px 30px rgba(255, 115, 0, 0.35);
+    background: rgba(30, 41, 59, 0.95);
 }
-.btn-tab.active {
-    color: #ff7300;
-    background: rgba(255, 115, 0, 0.12);
+
+.mind-node.node-center {
+    padding: 14px 18px;
+    border: 2px solid rgba(255, 115, 0, 0.6);
+    background: rgba(20, 24, 38, 0.95);
+    box-shadow: 0 0 35px rgba(255, 115, 0, 0.4);
+    z-index: 4;
+}
+
+.node-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.node-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.node-title {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #f8fafc;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.node-sub {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.text-xxs {
+    font-size: 0.65rem;
+}
+
+/* Animação de Pulso nas Linhas de Sinapse */
+@keyframes pulseWire {
+    0% {
+        stroke-dashoffset: 0;
+    }
+    100% {
+        stroke-dashoffset: -36;
+    }
+}
+
+.neural-pulse-path {
+    animation: pulseWire 2.5s linear infinite;
+}
+
+/* Anel de Pulso do Nó Central */
+.pulse-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 115, 0, 0.4);
+    animation: pulseRing 3s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes pulseRing {
+    0% { transform: scale(0.98); opacity: 0.8; }
+    50% { transform: scale(1.05); opacity: 0.2; }
+    100% { transform: scale(0.98); opacity: 0.8; }
+}
+
+/* ── Botões de Abas Mestras e Filtros no Painel TensorFlow ── */
+.main-nav-tabs .btn-tab {
+    padding: 0.65rem 1.25rem;
+    font-size: 0.88rem;
     font-weight: 600;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: auto !important;
+}
+
+.main-nav-tabs .btn-tab:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f8fafc;
+    border-color: rgba(255, 115, 0, 0.3);
+    transform: translateY(-1px);
+}
+
+.main-nav-tabs .btn-tab.active {
+    background: linear-gradient(135deg, rgba(255, 115, 0, 0.22) 0%, rgba(230, 81, 0, 0.12) 100%) !important;
+    border-color: #ff7300 !important;
+    color: #ff9d42 !important;
+    box-shadow: 0 4px 18px rgba(255, 115, 0, 0.25);
+}
+
+/* Filtros de Status e Simulação */
+#finetuning-filter-tabs .btn-tab,
+#sim-filter-tabs .btn-tab,
+#mindmap-filter-tabs .btn-tab {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.78rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: auto !important;
+}
+
+#finetuning-filter-tabs .btn-tab:hover,
+#sim-filter-tabs .btn-tab:hover,
+#mindmap-filter-tabs .btn-tab:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+}
+
+#finetuning-filter-tabs .btn-tab.active,
+#sim-filter-tabs .btn-tab.active,
+#mindmap-filter-tabs .btn-tab.active {
+    background: rgba(255, 115, 0, 0.2) !important;
+    border-color: #ff7300 !important;
+    color: #ff9d42 !important;
+}
+
+/* Botões de Ação na Tabela de Pares */
+.table-glass .btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.table-glass .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.08);
 }
 </style>
 
+
+<!-- Modal de Edição de Par de Fine-Tuning -->
+<div id="modal-edit-pair" class="modal-backdrop d-none" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+    <div class="card-glass p-4" style="width: 650px; max-width: 95vw; background: #0f172a; border: 1px solid rgba(255, 115, 0, 0.4); border-radius: 14px;">
+        <div class="d-flex align-center justify-between mb-3 border-b border-glass pb-2">
+            <h4 class="font-bold text-main m-0 d-flex align-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-warning"></i> Editar Par de Diálogo (Padrão-Ouro)
+            </h4>
+            <button type="button" class="btn-icon" onclick="closeEditModal()" style="background: transparent; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <input type="hidden" id="edit-pair-id">
+
+        <div class="mb-3">
+            <label class="form-label text-xs text-muted font-semibold">Pergunta / Entrada do Lead (Prompt)</label>
+            <textarea id="edit-lead-prompt" rows="3" class="input-glass w-100"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label text-xs text-muted font-semibold">Resposta Ideal do Atendente (Completion - Padrão-Ouro)</label>
+            <textarea id="edit-human-response" rows="4" class="input-glass w-100"></textarea>
+            <div class="text-xs text-muted mt-1">Essa resposta será usada no Fine-Tuning e como exemplo canônico no RAG.</div>
+        </div>
+
+        <div class="grid grid-2 gap-3 mb-4">
+            <div>
+                <label class="form-label text-xs text-muted">Avaliação de Qualidade</label>
+                <select id="edit-quality" class="input-glass">
+                    <option value="5">⭐⭐⭐⭐⭐ 5 Estrelas (Excelente)</option>
+                    <option value="4">⭐⭐⭐⭐ 4 Estrelas (Bom)</option>
+                    <option value="3">⭐⭐⭐ 3 Estrelas (Regular)</option>
+                    <option value="2">⭐⭐ 2 Estrelas (Razoável)</option>
+                    <option value="1">⭐ 1 Estrela (Fraco)</option>
+                </select>
+            </div>
+            <div class="d-flex align-end">
+                <label class="d-flex align-center gap-2 text-xs text-muted cursor-pointer">
+                    <input type="checkbox" id="edit-sync-rag" checked> Sincronizar com RAG ao salvar
+                </label>
+            </div>
+        </div>
+
+        <div class="d-flex justify-end gap-2">
+            <button type="button" class="btn-secondary px-3 py-2 text-sm btn-auto" onclick="closeEditModal()">Cancelar</button>
+            <button type="button" class="btn-primary px-4 py-2 text-sm btn-auto" onclick="saveEditedPair()" style="background: linear-gradient(135deg, #ff7300, #e65100);">
+                <i class="fa-solid fa-save"></i> Salvar e Aprovar
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+// Navegação Principal de Abas
+function switchMainTab(tab) {
+    document.querySelectorAll('.main-section').forEach(el => el.classList.add('d-none'));
+    document.querySelectorAll('.main-nav-tabs .btn-tab').forEach(el => el.classList.remove('active'));
+
+    document.getElementById(`section-${tab}`).classList.remove('d-none');
+    document.getElementById(`main-tab-${tab}`).classList.add('active');
+
+    if (tab === 'finetuning') {
+        loadFineTuningPairs('all');
+    }
+}
+
+// Navegação de Abas de Simulação
 function switchSimTab(tab) {
     document.querySelectorAll('.sim-tab-content').forEach(el => el.classList.add('d-none'));
-    document.querySelectorAll('.btn-tab').forEach(el => el.classList.remove('active'));
-    
+    document.querySelectorAll('#sim-filter-tabs .btn-tab').forEach(el => el.classList.remove('active'));
+
     document.getElementById(`sim-tab-${tab}`).classList.remove('d-none');
     document.getElementById(`tab-btn-${tab}`).classList.add('active');
 }
 
+// Carregamento de Pares de Diálogo
+let currentPairsData = [];
+function loadFineTuningPairs(status = 'all', btn = null) {
+    if (btn) {
+        document.querySelectorAll('#finetuning-filter-tabs .btn-tab').forEach(el => el.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    const tbody = document.getElementById('pairs-table-body');
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Carregando pares de conversas...</td></tr>`;
+
+    fetch(`{{ url_for('admin.tf_finetuning_list') }}?status=${status}`)
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok && res.pairs) {
+            currentPairsData = res.pairs;
+            renderPairsTable(res.pairs);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">Nenhum diálogo encontrado.</td></tr>`;
+        }
+    })
+    .catch(err => {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Erro ao carregar pares: ${err}</td></tr>`;
+    });
+}
+
+function renderPairsTable(pairs) {
+    const tbody = document.getElementById('pairs-table-body');
+    if (!pairs.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">Nenhum diálogo disponível no momento. As conversas enviadas no Waha aparecerão aqui automaticamente.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = pairs.map(p => {
+        const statusBadge = p.status === 'approved' 
+            ? `<span class="badge bg-success-soft text-success"><i class="fa-solid fa-check"></i> Aprovado</span>`
+            : p.status === 'rejected'
+            ? `<span class="badge bg-danger-soft text-danger"><i class="fa-solid fa-times"></i> Rejeitado</span>`
+            : `<span class="badge bg-warning-soft text-warning"><i class="fa-solid fa-clock"></i> Pendente</span>`;
+
+        const ragBadge = p.is_in_rag
+            ? `<div class="text-xs text-info mt-1"><i class="fa-solid fa-database"></i> No RAG</div>`
+            : '';
+
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td class="py-3 px-3">
+                    <div class="font-bold text-main">${p.client_name || p.chat_id}</div>
+                    <div class="text-xs text-muted">${p.created_at}</div>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="p-2 rounded text-xs" style="background: rgba(255,255,255,0.03); max-height: 90px; overflow-y: auto;">
+                        ${p.lead_prompt}
+                    </div>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="p-2 rounded text-xs" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); max-height: 90px; overflow-y: auto;">
+                        ${p.human_response || '<span class="text-muted italic">Aguardando resposta do atendente humano...</span>'}
+                    </div>
+                </td>
+                <td class="py-3 px-3">
+                    <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-size: 0.7rem;">${p.intent_detected || 'Geral'}</span>
+                    <div class="text-xs text-muted mt-1">${p.sentiment_detected || 'Neutro'}</div>
+                </td>
+                <td class="py-3 px-3 text-center">
+                    ${statusBadge}
+                    ${ragBadge}
+                </td>
+                <td class="py-3 px-3 text-right">
+                    <div class="d-flex align-center justify-end gap-1">
+                        <button type="button" class="btn-icon text-success" title="Aprovar e Enriquecer RAG" onclick="approvePair(${p.id}, true)">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </button>
+                        <button type="button" class="btn-icon text-warning" title="Editar Prompt ou Resposta" onclick="openEditModal(${p.id})">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button type="button" class="btn-icon text-danger" title="Rejeitar Par" onclick="rejectPair(${p.id})">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Ações nos Pares
+function approvePair(pairId, syncRag = true) {
+    fetch(`/admin/tensorflow/finetuning/${pairId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sync_rag: syncRag })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            loadFineTuningPairs();
+        }
+    });
+}
+
+function rejectPair(pairId) {
+    fetch(`/admin/tensorflow/finetuning/${pairId}/reject`, { method: "POST" })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            loadFineTuningPairs();
+        }
+    });
+}
+
+function syncApprovedToRAG() {
+    fetch(`{{ url_for('admin.tf_finetuning_sync_rag') }}`, { method: "POST" })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            alert(`Sucesso! ${res.synced_count} novos conhecimentos foram indexados no ChromaDB.`);
+            loadFineTuningPairs();
+        }
+    });
+}
+
+function openEditModal(pairId) {
+    const pair = currentPairsData.find(p => p.id === pairId);
+    if (!pair) return;
+
+    document.getElementById('edit-pair-id').value = pair.id;
+    document.getElementById('edit-lead-prompt').value = pair.lead_prompt;
+    document.getElementById('edit-human-response').value = pair.human_response || '';
+    document.getElementById('edit-quality').value = pair.quality_score || 5;
+
+    document.getElementById('modal-edit-pair').classList.remove('d-none');
+}
+
+function closeEditModal() {
+    document.getElementById('modal-edit-pair').classList.add('d-none');
+}
+
+function saveEditedPair() {
+    const pairId = document.getElementById('edit-pair-id').value;
+    const prompt = document.getElementById('edit-lead-prompt').value;
+    const response = document.getElementById('edit-human-response').value;
+    const quality = document.getElementById('edit-quality').value;
+    const syncRag = document.getElementById('edit-sync-rag').checked;
+
+    fetch(`/admin/tensorflow/finetuning/${pairId}/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            lead_prompt: prompt,
+            human_response: response,
+            quality_score: quality
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) {
+            approvePair(pairId, syncRag);
+            closeEditModal();
+        }
+    });
+}
+
+// Funções de Simulação dos Modelos
 function runSimLead(e) {
     e.preventDefault();
     const data = {
@@ -344,13 +1118,14 @@ function runSimText(e) {
 }
 
 function triggerTraining() {
+    switchMainTab('models');
     const logDiv = document.getElementById('terminal-log');
     const statusBadge = document.getElementById('train-status-badge');
     
     statusBadge.innerText = "Treinando...";
     statusBadge.className = "badge bg-warning-soft text-warning";
 
-    logDiv.innerHTML = `<div class="text-warning">[TensorFlowEngine] Iniciando pipeline de treino Keras Sequential...</div>`;
+    logDiv.innerHTML = `<div class="text-warning">[TensorFlowEngine] Iniciando pipeline de treino Keras Sequential com dados do banco...</div>`;
 
     fetch("{{ url_for('admin.tf_train_api') }}", { method: "POST" })
     .then(r => r.json())
@@ -369,9 +1144,175 @@ function triggerTraining() {
 
             statusBadge.innerText = "Concluído";
             statusBadge.className = "badge bg-success-soft text-success";
-            setTimeout(() => window.location.reload(), 2000);
         }
     });
 }
+
+// Detalhes Técnicos e Educativos para o Inspetor do Mapa Mental
+const nodeDetails = {
+    'tfcore': {
+        icon: 'fa-solid fa-brain',
+        title: 'Núcleo Neural TensorFlow 2.21 & Memória',
+        pilar: 'Pilar 2: Assertividade & Feedback Loop',
+        desc: 'O hub cognitivo: centraliza o estado conversacional no Redis, orquestra a retroalimentação com o RAG (ChromaDB), aciona modelos neurais Keras e coordena o fluxo de respostas e transbordo.',
+        tech: 'TensorFlow 2.21 CPU + Keras 3 + Redis State Machine',
+        latency: '< 15ms de inferência neural',
+        role: 'Orquestração Central e Inteligência de Conversação',
+        insight: 'Ao receber uma mensagem ou transcrição, o núcleo TensorFlow extrai intenções, prevê humor/sentimento e formula diretrizes táticas que orientam as buscas semânticas no RAG.'
+    },
+    'waha': {
+        icon: 'fa-brands fa-whatsapp',
+        title: 'WhatsApp Gateway (WAHA)',
+        pilar: 'Pilar 1: Eficiência & Fila Assíncrona',
+        desc: 'Porta de entrada e saída com o WhatsApp. Recebe webhooks em tempo real e entrega respostas ao cliente.',
+        tech: 'WAHA HTTP API + FastAPI/Flask Webhook',
+        latency: '< 50ms para devolução de HTTP 200',
+        role: 'Recepção e Envio de Mensagens e Mídias',
+        insight: 'Separa automaticamente as mensagens enviadas pelo cliente daquelas enviadas pelo operador humano (fromMe: True), enviando cada uma para sua respectiva esteira de processamento.'
+    },
+    'multimodal': {
+        icon: 'fa-solid fa-microphone-lines',
+        title: 'Processador Multimodal (Áudio STT & Visão)',
+        pilar: 'Pilar 3: Versatilidade & Multimodalidade',
+        desc: 'Baixa e processa áudios de voz e imagens de comprovantes Pix/TED enviados pelo cliente antes de enviar ao bot.',
+        tech: 'Google Gemini 2.0 Flash Audio / Whisper STT + Vision',
+        latency: '400ms a 1.2s para transcrição e análise',
+        role: 'Transformação de Mídia em Texto Estruturado',
+        insight: 'Áudios são convertidos em texto e imagens de comprovantes são analisadas com extração de valor (R$), banco e data, injetando o contexto no diálogo.'
+    },
+    'debounce': {
+        icon: 'fa-solid fa-hourglass-half',
+        title: 'Buffer de Debounce Temporal',
+        pilar: 'Pilar 1: Eficiência & Experiência Fluida',
+        desc: 'Agrupa mensagens consecutivas enviadas pelo cliente em uma janela de 3 a 5 segundos de silêncio.',
+        tech: 'Redis Queues (RQ) + Locks Atômicos',
+        latency: 'Janela calibrada em 4 segundos',
+        role: 'Agrupamento Semântico de Mensagens Picadas',
+        insight: 'Evita respostas fragmentadas ("Oi", "tudo bem?", "quanto custa?"), unificando tudo em uma única entrada coesa para a rede neural.'
+    },
+    'intent': {
+        icon: 'fa-solid fa-tags',
+        title: 'Classificador de Intenção & Sentimento',
+        pilar: 'Pilar 2: Assertividade & Entidades',
+        desc: 'Rede neural Keras com camadas de Embedding e Dense treinada com os diálogos curados da sua empresa.',
+        tech: 'Keras Embedding + GlobalAveragePooling + Softmax',
+        latency: '< 10ms por mensagem',
+        role: 'Identificação de Dúvida, Preço, Compra ou Reclamação',
+        insight: 'Detecta a urgência e o tom do cliente, ativando alertas imediatos se houver solicitação de atendimento humano ou insatisfação.'
+    },
+    'rag': {
+        icon: 'fa-solid fa-database',
+        title: 'RAG Vetorial (ChromaDB)',
+        pilar: 'Pilar 2: Assertividade sem Alucinação',
+        desc: 'Base de conhecimento empresarial com busca híbrida (Embeddings densos + BM25 léxico) e reclassificação de relevância.',
+        tech: 'ChromaDB Persistent Client + Cosine Similarity',
+        latency: '25ms a 60ms por busca',
+        role: 'Recuperação de Regras de Negócio e FAQs Oficiais',
+        insight: 'Retroalimentação mútua: todas as respostas humanas aprovadas no Fine-Tuning são convertidas em novos documentos vetoriais automaticamente.'
+    },
+    'human': {
+        icon: 'fa-solid fa-user-tie',
+        title: 'Captura do Atendente Humano (fromMe)',
+        pilar: 'Pilar 3: Aprendizado Contínuo',
+        desc: 'Detecta quando você ou sua equipe responde a um cliente no WhatsApp e captura a resposta como padrão-ouro.',
+        tech: 'DialogueCollector + PostgreSQL MessageLog',
+        latency: 'Imediato (em segundo plano)',
+        role: 'Geração Contínua do Dataset de Treinamento',
+        insight: 'Suas respostas reais ensinam o modelo como se comportar, criando pares de perguntas reais e respostas perfeitas para fine-tuning.'
+    },
+    'finetune': {
+        icon: 'fa-solid fa-graduation-cap',
+        title: 'Curadoria & Fine-Tuning de LLMs',
+        pilar: 'Pilar 3: Versatilidade & Especialização',
+        desc: 'Módulo de validação humana e exportação de datasets em formato JSONL (ChatML / OpenAI / LLaMA).',
+        tech: 'FineTuningPair Dataset + Exportador JSONL',
+        latency: 'Curadoria em 1 clique',
+        role: 'Treinamento de Redes Neurais e Ajuste Fino',
+        insight: 'Permite editar, validar com estrelas e exportar centenas de turnos de diálogo prontos para treinar seu próprio modelo especializado.'
+    },
+    'reply': {
+        icon: 'fa-solid fa-paper-plane',
+        title: 'Resposta Concisa & Direcionada',
+        pilar: 'Pilar 2: Assertividade no WhatsApp',
+        desc: 'Sintetiza a resposta final combinando o RAG, a orientação do TensorFlow e o histórico multi-turno.',
+        tech: 'Ollama (Llama 3.2 / Qwen) / Gemini 2.0 Flash',
+        latency: '500ms a 1.5s',
+        role: 'Atendimento Fluido, Curto e Humanizado',
+        insight: 'Gera respostas de no máximo 1 a 3 parágrafos curtos, otimizadas para leitura rápida na tela do celular do cliente.'
+    },
+    'takeover': {
+        icon: 'fa-solid fa-headset',
+        title: 'Fallback Humano Imediato (Takeover)',
+        pilar: 'Pilar 1: Eficiência & Segurança',
+        desc: 'Pausa o bot automaticamente se o usuário pedir humano ou se houver 2 falhas consecutivas de interpretação.',
+        tech: 'Redis Mutex Lock + Live Tracker Alert',
+        latency: 'Pausa instantânea (TTL 24h)',
+        role: 'Garantia de Não Alucinação e Proteção do Lead',
+        insight: 'Evita loops frustrantes com o cliente. O bot avisa educadamente que a equipe humana assumirá e aguarda a intervenção do operador.'
+    }
+};
+
+function inspectNode(nodeId) {
+    const data = nodeDetails[nodeId] || nodeDetails['tfcore'];
+    document.getElementById('inspect-icon').className = data.icon;
+    document.getElementById('inspect-title').innerText = data.title;
+    document.getElementById('inspect-pilar').innerText = data.pilar;
+    document.getElementById('inspect-desc').innerText = data.desc;
+    document.getElementById('inspect-tech').innerText = data.tech;
+    document.getElementById('inspect-latency').innerText = data.latency;
+    document.getElementById('inspect-role').innerText = data.role;
+    document.getElementById('inspect-insight').innerText = data.insight;
+
+    // Destaca o nó selecionado
+    document.querySelectorAll('.mind-node').forEach(n => {
+        n.style.borderColor = 'rgba(255,255,255,0.12)';
+        n.style.transform = 'none';
+    });
+    const selected = document.getElementById(`node-${nodeId}`);
+    if (selected) {
+        selected.style.borderColor = '#ff7300';
+        selected.style.transform = 'translateY(-4px) scale(1.05)';
+    }
+}
+
+function filterMindmap(category, btn) {
+    document.querySelectorAll('#mindmap-filter-tabs .btn-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const allNodes = document.querySelectorAll('.mind-node');
+    const allWires = document.querySelectorAll('#mindmap-svg path');
+
+    if (category === 'all') {
+        allNodes.forEach(n => n.style.opacity = '1');
+        allWires.forEach(w => w.style.opacity = '1');
+        return;
+    }
+
+    allNodes.forEach(n => {
+        if (n.classList.contains(`node-group-${category}`) || n.id === 'node-tfcore') {
+            n.style.opacity = '1';
+        } else {
+            n.style.opacity = '0.25';
+        }
+    });
+
+    // Filtra sinapses
+    allWires.forEach(w => {
+        if (category === 'multimodal' && (w.id.includes('multi') || w.id.includes('waha'))) {
+            w.style.opacity = '1';
+        } else if (category === 'learning' && (w.id.includes('human') || w.id.includes('pair'))) {
+            w.style.opacity = '1';
+        } else if (category === 'rag' && (w.id.includes('rag') || w.id.includes('intent'))) {
+            w.style.opacity = '1';
+        } else {
+            w.style.opacity = '0.15';
+        }
+    });
+}
+
+// Inicialização automática
+document.addEventListener('DOMContentLoaded', () => {
+    loadFineTuningPairs('all');
+});
 </script>
 {% endblock %}

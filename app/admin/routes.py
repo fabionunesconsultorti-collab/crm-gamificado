@@ -1506,6 +1506,127 @@ def tf_train_api():
     return jsonify(res)
 
 
+# ── Fine-Tuning, Curadoria de Conversas & Retroalimentação RAG ─────────────────
+@bp.route('/tensorflow/finetuning/list', methods=['GET'])
+@login_required
+@admin_required
+def tf_finetuning_list():
+    """Lista pares de diálogo capturados do Waha para curadoria e validação humana."""
+    from app.models import FineTuningPair
+    status_filter = request.args.get('status', 'all')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 25))
+
+    query = FineTuningPair.query
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+
+    total = query.count()
+    pairs = query.order_by(FineTuningPair.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
+
+    return jsonify({
+        'ok': True,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pairs': [p.to_dict() for p in pairs]
+    })
+
+
+@bp.route('/tensorflow/finetuning/<int:pair_id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def tf_finetuning_approve(pair_id):
+    """Aprova um par de diálogo para fine-tuning e opcionalmente adiciona ao RAG."""
+    from app.models import FineTuningPair
+    from app.utils.tf_engine import TensorFlowEngine
+    pair = FineTuningPair.query.get_or_404(pair_id)
+    data = request.get_json(silent=True) or request.form
+
+    pair.status = 'approved'
+    if data.get('human_response'):
+        pair.human_response = str(data.get('human_response')).strip()
+    if data.get('quality_score'):
+        pair.quality_score = int(data.get('quality_score'))
+
+    db.session.commit()
+
+    rag_synced = False
+    if str(data.get('sync_rag', 'false')).lower() in ['true', '1', 'yes']:
+        TensorFlowEngine.formulate_rag_insights_and_enrich()
+        rag_synced = True
+
+    return jsonify({'ok': True, 'pair': pair.to_dict(), 'rag_synced': rag_synced})
+
+
+@bp.route('/tensorflow/finetuning/<int:pair_id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def tf_finetuning_reject(pair_id):
+    """Rejeita um par de diálogo."""
+    from app.models import FineTuningPair
+    pair = FineTuningPair.query.get_or_404(pair_id)
+    pair.status = 'rejected'
+    db.session.commit()
+    return jsonify({'ok': True, 'pair': pair.to_dict()})
+
+
+@bp.route('/tensorflow/finetuning/<int:pair_id>/update', methods=['POST'])
+@login_required
+@admin_required
+def tf_finetuning_update(pair_id):
+    """Atualiza pergunta e resposta ideal para aperfeiçoar o par de treinamento."""
+    from app.models import FineTuningPair
+    pair = FineTuningPair.query.get_or_404(pair_id)
+    data = request.get_json(silent=True) or request.form
+
+    if 'lead_prompt' in data:
+        pair.lead_prompt = str(data['lead_prompt']).strip()
+    if 'human_response' in data:
+        pair.human_response = str(data['human_response']).strip()
+    if 'quality_score' in data:
+        pair.quality_score = int(data['quality_score'])
+
+    db.session.commit()
+    return jsonify({'ok': True, 'pair': pair.to_dict()})
+
+
+@bp.route('/tensorflow/finetuning/sync_rag', methods=['POST'])
+@login_required
+@admin_required
+def tf_finetuning_sync_rag():
+    """Retroalimentação: Sincroniza todos os pares aprovados com o ChromaDB / RAG."""
+    from app.utils.tf_engine import TensorFlowEngine
+    res = TensorFlowEngine.formulate_rag_insights_and_enrich()
+    return jsonify(res)
+
+
+@bp.route('/tensorflow/finetuning/export', methods=['GET'])
+@login_required
+@admin_required
+def tf_finetuning_export():
+    """Exporta o dataset completo de conversas aprovadas em JSONL pronto para Fine-Tuning."""
+    from app.utils.tf_engine import TensorFlowEngine
+    from flask import Response
+    dataset_content = TensorFlowEngine.export_finetuning_dataset()
+    return Response(
+        dataset_content,
+        mimetype='application/x-jsonlines',
+        headers={'Content-Disposition': 'attachment;filename=finetuning_dataset.jsonl'}
+    )
+
+
+@bp.route('/tensorflow/resume_bot/<chat_id>', methods=['POST'])
+@login_required
+@admin_required
+def tf_resume_bot(chat_id):
+    """Remove a trava de transbordo humano e devolve o atendimento para o bot inteligente."""
+    from app.utils.dialogue_collector import DialogueCollector
+    DialogueCollector.deactivate_human_takeover(chat_id)
+    return jsonify({'ok': True, 'message': f'Bot reativado com sucesso para {chat_id}'})
+
+
+
 # ── Painel de Gerenciamento de Plugins ──────────────────────────────────────────
 @bp.route('/plugins', methods=['GET'])
 @login_required
@@ -1559,6 +1680,14 @@ def api_toggle_module():
 
     Setting.set_val(setting_key, 'true' if enable else 'false')
     db.session.commit()
+
+    if not enable and ('waha' in setting_key or 'bulk' in setting_key):
+        try:
+            from app.tasks.bulk_engine import freeze_engine_gracefully
+            freeze_engine_gracefully("Módulo desativado com segurança pelo operador no Painel de Módulos")
+        except Exception as e:
+            pass
+
     return jsonify({'success': True, 'message': 'Status do módulo atualizado com sucesso!', 'enabled': enable})
 
 

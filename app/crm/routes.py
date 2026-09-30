@@ -7,7 +7,12 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_, and_
 
 import urllib.parse
-from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance, ScrapingJob
+from app.models import Client, SystemLog, Setting, User, Store, MessageTemplate, MessageLog, WahaInstance, ScrapingJob, BulkCampaign, BulkCampaignRecipient
+from app.tasks.bulk_engine import (
+    start_campaign_engine, pause_campaign_engine, cancel_campaign_engine,
+    get_campaign_telemetry, is_master_switch_enabled, set_master_switch,
+    resolve_spintax, resolve_message_variables
+)
 from app.utils.messaging import WhatsAppEngine
 from app.utils.waha import WahaAPI
 from app.utils.ai_handler import AIHandler
@@ -540,42 +545,356 @@ def import_batch():
         
     return jsonify({'ok': True, 'count': count})
 
-# ── Bulk Message Engine ────────────────────────────────────────────────────────
+def build_client_filter_query(filters: dict):
+    """Constrói consulta refinada de leads com base em critérios multi-dimensionais."""
+    query = Client.query.filter(Client.phone.isnot(None), Client.phone != '')
+    if not filters:
+        return query
+
+    # 1. Filtro de Status
+    statuses = filters.get('statuses')
+    if statuses and isinstance(statuses, list) and len(statuses) > 0 and 'all' not in statuses:
+        query = query.filter(Client.status.in_(statuses))
+    elif isinstance(statuses, str) and statuses and statuses != 'all':
+        query = query.filter(Client.status == statuses)
+
+    # 2. Filtro de Segmento / Categoria (Multi-seleção com fallback retrocompatível)
+    segments = filters.get('segments') if filters.get('segments') is not None else filters.get('segment')
+    if segments:
+        if isinstance(segments, str):
+            if ',' in segments:
+                segments = [s.strip() for s in segments.split(',') if s.strip()]
+            elif segments != 'all':
+                segments = [segments]
+            else:
+                segments = []
+        if isinstance(segments, list) and len(segments) > 0 and 'all' not in segments:
+            query = query.filter(or_(Client.segment.in_(segments), Client.category.in_(segments)))
+
+    # 3. Filtro de Origem do Lead
+    sources = filters.get('sources')
+    if sources and isinstance(sources, list) and len(sources) > 0 and 'all' not in sources:
+        query = query.filter(Client.lead_source.in_(sources))
+    elif isinstance(sources, str) and sources and sources != 'all':
+        query = query.filter(Client.lead_source == sources)
+
+    # 4. Filtro de Vendedor / Responsável
+    assigned_to = filters.get('assigned_to')
+    if assigned_to and assigned_to != 'all':
+        if assigned_to == 'unassigned':
+            query = query.filter(Client.assigned_to.is_(None))
+        else:
+            try:
+                query = query.filter(Client.assigned_to == int(assigned_to))
+            except (ValueError, TypeError):
+                pass
+
+    # 5. Filtro de DDDs
+    ddds = filters.get('ddds')
+    if ddds and isinstance(ddds, list) and len(ddds) > 0:
+        clean_ddds = [str(d).strip() for d in ddds if str(d).strip().isdigit()]
+        if clean_ddds:
+            ddd_conditions = [Client.phone.ilike(f'%{d}%') for d in clean_ddds]
+            query = query.filter(or_(*ddd_conditions))
+
+    # 6. Filtro Anti-Fadiga (descarta contatados recentemente)
+    anti_fatigue_days = filters.get('anti_fatigue_days')
+    if anti_fatigue_days:
+        try:
+            days = int(anti_fatigue_days)
+            if days > 0:
+                cutoff = datetime.utcnow() - timedelta(days=days)
+                recent_ids = db.session.query(MessageLog.client_id).filter(
+                    MessageLog.timestamp >= cutoff,
+                    MessageLog.client_id.isnot(None)
+                ).scalar_subquery()
+                query = query.filter(Client.id.not_in(recent_ids))
+        except (ValueError, TypeError):
+            pass
+
+    # 7. Conformidade LGPD (apenas com Opt-in)
+    if filters.get('opt_in_only'):
+        query = query.filter(Client.opt_in.is_(True))
+
+    return query
+
+
+# ── Bulk Message Engine (Painel & Controle Desacoplado) ───────────────────────
 @bp.route('/bulk-message', methods=['GET'])
 @login_required
-@requires_module('waha')
+@requires_module('waha_bulk')
 def bulk_message():
-    templates = MessageTemplate.query.all()
-    # Listamos todos os clientes ativos com número de telefone para o usuário filtrar
-    clients_raw = Client.query.filter(Client.phone.isnot(None), Client.phone != '').all()
-    
-    clients = []
-    for c in clients_raw:
-        clients.append({
-            'id': c.id,
-            'name': c.name or '',
-            'phone': ''.join(filter(str.isdigit, str(c.phone))),
-            'status': c.status or ''
-        })
-        
+    templates = MessageTemplate.query.order_by(MessageTemplate.name.asc()).all()
     templates_data = [{'id': t.id, 'name': t.name, 'text': t.text_content} for t in templates]
     
-    # WAHA Instances
+    # Instâncias WAHA
     waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
     waha_instances_stats = {inst.id: inst.get_anti_ban_stats() for inst in waha_instances}
     
-    # Busca logs para a aba de histórico
-    logs = MessageLog.query.order_by(MessageLog.timestamp.desc()).limit(200).all()
+    # Extração de Metadados Únicos para os Filtros Avançados
+    segments_raw = db.session.query(Client.segment).filter(Client.segment.isnot(None), Client.segment != '').distinct().all()
+    categories_raw = db.session.query(Client.category).filter(Client.category.isnot(None), Client.category != '').distinct().all()
+    all_segments = sorted(list(set([s[0].strip() for s in segments_raw if s[0]] + [c[0].strip() for c in categories_raw if c[0]])))
+
+    sources_raw = db.session.query(Client.lead_source).filter(Client.lead_source.isnot(None), Client.lead_source != '').distinct().all()
+    all_sources = sorted(list(set([s[0].strip() for s in sources_raw if s[0]])))
+
+    assigned_users = User.query.filter_by(is_active=True).order_by(User.username.asc()).all()
+
+    # Campanhas Recentes e Campanha Ativa
+    recent_campaigns = BulkCampaign.query.order_by(BulkCampaign.id.desc()).limit(15).all()
+    active_campaign = BulkCampaign.query.filter(BulkCampaign.status.in_(['running', 'paused'])).order_by(BulkCampaign.id.desc()).first()
+
+    # Total geral de clientes com telefone cadastrado
+    total_clients_with_phone = Client.query.filter(Client.phone.isnot(None), Client.phone != '').count()
+
+    # Histórico de envios de mensagens
+    logs = MessageLog.query.order_by(MessageLog.timestamp.desc()).limit(100).all()
     active_tab = request.args.get('tab', 'disparo')
-    
+
     return render_template('crm/bulk_message.html', 
-                           title='Disparo em Lote', 
+                           title='Disparo em Lote Inteligente (WAHA)', 
                            templates=templates_data,
-                           clients_json=clients,
                            waha_instances=waha_instances,
                            waha_instances_stats=waha_instances_stats,
+                           segments=all_segments,
+                           lead_sources=all_sources,
+                           assigned_users=assigned_users,
+                           total_clients_count=total_clients_with_phone,
+                           recent_campaigns=[c.to_dict() for c in recent_campaigns],
+                           active_campaign=active_campaign.to_dict() if active_campaign else None,
+                           master_switch_enabled=is_master_switch_enabled(),
                            logs=logs,
                            active_tab=active_tab)
+
+
+# ── APIs do Motor Desacoplado e Filtragem ─────────────────────────────────────
+
+@bp.route('/api/bulk/estimate', methods=['POST'])
+@login_required
+def api_bulk_estimate():
+    """Calcula quantidade e retorna amostra de leads com base no filtro multi-critério."""
+    data = request.get_json(force=True) or {}
+    query = build_client_filter_query(data)
+    count = query.count()
+    
+    # Amostra de 5 contatos para conferência visual
+    sample_leads = query.limit(5).all()
+    sample_data = [{'name': c.name, 'phone': c.phone, 'status': c.status, 'segment': c.display_segment} for c in sample_leads]
+
+    return jsonify({
+        'ok': True,
+        'count': count,
+        'sample': sample_data
+    })
+
+
+@bp.route('/api/bulk/campaigns', methods=['POST'])
+@login_required
+def api_bulk_create_campaign():
+    """Cria uma nova campanha e compila sua fila no banco de dados com desduplicação."""
+    data = request.get_json(force=True) or {}
+    
+    name = (data.get('name') or f"Campanha {datetime.now().strftime('%d/%m %H:%M')}").strip()
+    message_text = (data.get('message_text') or '').strip()
+    if not message_text:
+        return jsonify({'ok': False, 'error': 'O texto da mensagem é obrigatório'}), 400
+
+    waha_instance_id = data.get('waha_instance_id')
+    template_id = data.get('template_id')
+    min_delay = int(data.get('min_delay', 6))
+    max_delay = int(data.get('max_delay', 16))
+    use_ai = bool(data.get('use_ai', False))
+    use_spintax = bool(data.get('use_spintax', True))
+    batch_pause_every = int(data.get('batch_pause_every', 25))
+    batch_pause_duration = int(data.get('batch_pause_duration', 60))
+
+    # Criação do Registro da Campanha
+    campaign = BulkCampaign(
+        name=name,
+        status='draft',
+        message_text=message_text,
+        waha_instance_id=int(waha_instance_id) if waha_instance_id else None,
+        created_by_id=current_user.id,
+        template_id=int(template_id) if template_id else None,
+        min_delay=min_delay,
+        max_delay=max_delay,
+        batch_pause_every=batch_pause_every,
+        batch_pause_duration=batch_pause_duration,
+        use_ai=use_ai,
+        use_spintax=use_spintax
+    )
+    db.session.add(campaign)
+    db.session.flush() # obtém campaign.id
+
+    recipients_to_insert = []
+    seen_phones = set()
+
+    # 1. Coleta Destinatários do Filtro CRM
+    filters = data.get('filters')
+    if filters and (filters.get('apply_crm') or filters.get('statuses') or filters.get('segments')):
+        crm_query = build_client_filter_query(filters)
+        clients = crm_query.all()
+        for c in clients:
+            clean = ''.join(filter(str.isdigit, str(c.phone or '')))
+            if len(clean) >= 10 and clean not in seen_phones:
+                seen_phones.add(clean)
+                recipients_to_insert.append(BulkCampaignRecipient(
+                    campaign_id=campaign.id,
+                    client_id=c.id,
+                    name=c.name or 'Cliente',
+                    phone=clean,
+                    source='crm',
+                    status='pending'
+                ))
+
+    # 2. Coleta Destinatários da Lista Manual
+    manual_list = data.get('manual_list', '').strip()
+    if manual_list:
+        for line in manual_list.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(',')
+            m_name = parts[0].strip() if len(parts) >= 2 else 'Contato'
+            raw_phone = parts[1].strip() if len(parts) >= 2 else parts[0].strip()
+            clean = ''.join(filter(str.isdigit, raw_phone))
+            if len(clean) >= 10 and clean not in seen_phones:
+                seen_phones.add(clean)
+                recipients_to_insert.append(BulkCampaignRecipient(
+                    campaign_id=campaign.id,
+                    client_id=None,
+                    name=m_name,
+                    phone=clean,
+                    source='manual',
+                    status='pending'
+                ))
+
+    # 3. Coleta Destinatários de Planilha Importada
+    imported_clients = data.get('imported_clients', [])
+    if imported_clients and isinstance(imported_clients, list):
+        for item in imported_clients:
+            i_name = (item.get('name') or 'Contato').strip()
+            raw_phone = str(item.get('phone') or '')
+            clean = ''.join(filter(str.isdigit, raw_phone))
+            if len(clean) >= 10 and clean not in seen_phones:
+                seen_phones.add(clean)
+                recipients_to_insert.append(BulkCampaignRecipient(
+                    campaign_id=campaign.id,
+                    client_id=None,
+                    name=i_name,
+                    phone=clean,
+                    source='file',
+                    status='pending'
+                ))
+
+    if not recipients_to_insert:
+        db.session.rollback()
+        return jsonify({'ok': False, 'error': 'Nenhum contato válido encontrado para inclusão na fila.'}), 400
+
+    campaign.total_count = len(recipients_to_insert)
+    db.session.bulk_save_objects(recipients_to_insert)
+    db.session.commit()
+
+    return jsonify({
+        'ok': True,
+        'message': f'Fila compilada com sucesso com {campaign.total_count} contatos únicos!',
+        'campaign': campaign.to_dict()
+    })
+
+
+@bp.route('/api/bulk/campaigns/<int:id>/start', methods=['POST'])
+@login_required
+def api_bulk_campaign_start(id):
+    """Inicia ou retoma uma campanha no motor desacoplado."""
+    success, message = start_campaign_engine(id)
+    return jsonify({'ok': success, 'message': message}), (200 if success else 400)
+
+
+@bp.route('/api/bulk/campaigns/<int:id>/pause', methods=['POST'])
+@login_required
+def api_bulk_campaign_pause(id):
+    """Pausa a execução de uma campanha em andamento."""
+    success, message = pause_campaign_engine(id, reason="Pausado pelo usuário na interface")
+    return jsonify({'ok': success, 'message': message})
+
+
+@bp.route('/api/bulk/campaigns/<int:id>/cancel', methods=['POST'])
+@login_required
+def api_bulk_campaign_cancel(id):
+    """Cancela a campanha e desativa os envios pendentes."""
+    success, message = cancel_campaign_engine(id)
+    return jsonify({'ok': success, 'message': message})
+
+
+@bp.route('/api/bulk/campaigns/<int:id>/status', methods=['GET'])
+@login_required
+def api_bulk_campaign_status(id):
+    """Retorna telemetria em tempo real, status da fila e métricas anti-ban."""
+    campaign = BulkCampaign.query.get_or_404(id)
+    telemetry = get_campaign_telemetry(id)
+    
+    inst = campaign.waha_instance
+    inst_stats = inst.get_anti_ban_stats() if inst else None
+
+    return jsonify({
+        'ok': True,
+        'campaign': campaign.to_dict(),
+        'speed_mpm': telemetry.get('speed_mpm', 0.0),
+        'eta_seconds': telemetry.get('eta_seconds', 0),
+        'logs': telemetry.get('logs', []),
+        'master_switch_enabled': is_master_switch_enabled(),
+        'instance_stats': inst_stats
+    })
+
+
+@bp.route('/api/bulk/master-switch', methods=['POST'])
+@login_required
+def api_bulk_toggle_master_switch():
+    """Liga ou desliga o Master Switch global do motor de disparo."""
+    data = request.get_json(force=True) or {}
+    enabled = bool(data.get('enabled', True))
+    set_master_switch(enabled)
+    return jsonify({'ok': True, 'master_switch_enabled': enabled})
+
+
+@bp.route('/api/bulk/spintax-preview', methods=['POST'])
+@login_required
+def api_bulk_spintax_preview():
+    """Gera 3 variações dinâmicas de exemplo usando Spintax e variáveis de teste."""
+    data = request.get_json(force=True) or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'ok': True, 'variations': []})
+
+    # Mock de contatos de teste
+    test_contacts = [
+        {'name': 'Lucas Andrade', 'client_name': 'Lucas Andrade', 'status': 'lead', 'segment': 'Tecnologia', 'address': 'São Paulo - SP'},
+        {'name': 'Fernanda Lima', 'client_name': 'Fernanda Lima', 'status': 'proposta', 'segment': 'Varejo', 'address': 'Rio de Janeiro - RJ'},
+        {'name': 'Carlos Eduardo', 'client_name': 'Carlos Eduardo', 'status': 'contato', 'segment': 'Alimentos', 'address': 'Curitiba - PR'}
+    ]
+
+    class MockRecipient:
+        def __init__(self, name):
+            self.name = name
+
+    class MockClient:
+        def __init__(self, name, status, segment, address):
+            self.name = name
+            self.status = status
+            self.segment = segment
+            self.display_segment = segment
+            self.address = address
+
+    variations = []
+    for c in test_contacts:
+        rec = MockRecipient(c['name'])
+        cli = MockClient(c['client_name'], c['status'], c['segment'], c['address'])
+        resolved = resolve_message_variables(text, rec, cli)
+        variations.append(resolved)
+
+    return jsonify({'ok': True, 'variations': variations})
+
 
 @bp.route('/api/external/send', methods=['POST'])
 @login_required

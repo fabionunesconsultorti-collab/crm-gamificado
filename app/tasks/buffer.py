@@ -27,7 +27,7 @@ REDIS_PREFIX_BUFFER = "crm:wa:buffer"
 REDIS_PREFIX_TIMER = "crm:wa:timer"
 REDIS_PREFIX_LOCK = "crm:wa:lock"
 
-DEFAULT_DEBOUNCE_DELAY = 12  # segundos de silêncio para fechar a janela
+DEFAULT_DEBOUNCE_DELAY = 4  # janela ideal de silêncio (3 a 5 segundos para agrupar mensagens picadas)
 BUFFER_TTL = 3600  # 1 hora de segurança para mensagens no buffer
 TIMER_KEY_TTL = 300  # 5 minutos para o token ativo
 

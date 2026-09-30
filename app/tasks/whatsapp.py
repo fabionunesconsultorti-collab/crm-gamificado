@@ -254,7 +254,12 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
         except Exception:
             pass
 
-        # 4. Verificação de Bot Ativo
+        # 4. Verificação de Bot Ativo e Fallback Humano Imediato
+        from app.utils.dialogue_collector import DialogueCollector
+        if DialogueCollector.is_human_takeover_active(chat_id):
+            logger.info(f"[Task WhatsApp Batch] Chat '{chat_id}' está em transbordo humano. Nenhuma resposta de IA será enviada.")
+            return {"status": "human_takeover_active", "chat_id": chat_id}
+
         bot_enabled = Setting.get('whatsapp_bot_enabled')
         if bot_enabled is not None and str(bot_enabled).lower() in ['false', '0', 'no']:
             logger.info(f"[Task WhatsApp Batch] Bot de respostas automáticas está pausado nas configurações para '{chat_id}'.")
@@ -412,11 +417,14 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
             db.session.rollback()
             logger.warning(f"[Task WhatsApp Batch] Erro ao registrar Inbound MessageLog: {e}")
 
-        # 7. Regra de Transbordo para Atendente Humano
+        # 7. Regra de Transbordo para Atendente Humano (Gatilhos Textuais + Rede Neural TensorFlow)
+        from app.utils.tf_engine import TensorFlowEngine
+        tf_analysis = TensorFlowEngine.classify_sentiment_and_intent(aggregated_text)
+
         triggers_raw = Setting.get('whatsapp_bot_handover_trigger') or 'humano, atendente, falar com pessoa, falar com alguem, suporte humano'
         triggers = [t.strip().lower() for t in triggers_raw.split(',') if t.strip()]
         lower_aggregated = aggregated_text.lower()
-        is_handover = any(t in lower_aggregated for t in triggers)
+        is_handover = any(t in lower_aggregated for t in triggers) or tf_analysis.get('requires_human', False)
 
         # 8. Regra de Horário Comercial
         is_out_of_hours = False
@@ -438,6 +446,7 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
         # 9. Definição da Resposta
         reply_text = None
         if is_handover:
+            DialogueCollector.activate_human_takeover(chat_id, reason="solicitacao_cliente_ou_neural")
             reply_text = Setting.get('whatsapp_bot_handover_msg') or (
                 "Com certeza! Estou direcionando seu atendimento para um de nossos consultores humanos. Em instantes alguém da equipe responderá aqui."
             )
@@ -448,7 +457,7 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
             )
             logger.info(f"[Task WhatsApp Batch] Resposta fora do expediente enviada para '{chat_id}'.")
         else:
-            # Carrega histórico do Redis e aciona o Ollama
+            # Carrega histórico do Redis e aciona o modelo de IA
             chat_history = ConversationMemory.get_context_messages(chat_id)
             logger.info(f"[Task WhatsApp Batch] Contexto multi-turno carregado: {len(chat_history)} mensagens anteriores.")
 
@@ -485,7 +494,16 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                 ai_duration = round((time.time() - ai_start) * 1000, 2)
                 if ai_error:
                     logger.warning(f"[Task WhatsApp Batch] Aviso da IA ({ai_duration}ms): {ai_error}")
+                    # Registra falha de interpretação para transbordo automático se persistir
+                    takeover_triggered = DialogueCollector.register_failure_and_check_takeover(chat_id, reason=ai_error)
+                    if takeover_triggered:
+                        reply_text = (
+                            "Compreendo que não consegui te ajudar com precisão. Estou pausando as respostas automáticas "
+                            "e notificando nossa equipe humana para assumir seu atendimento por aqui em instantes."
+                        )
                 else:
+                    # Resposta gerada com sucesso: zera o contador de falhas
+                    DialogueCollector.reset_failures(chat_id)
                     logger.info(f"[Task WhatsApp Batch] IA gerou resposta em {ai_duration}ms: '{reply_text[:60]}...'")
 
                 try:
@@ -502,7 +520,14 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
             except Exception as e:
                 ai_duration = round((time.time() - ai_start) * 1000, 2)
                 logger.error(f"[Task WhatsApp Batch] Exceção crítica na IA ({ai_duration}ms): {e}", exc_info=True)
-                reply_text = fallback_msg
+                takeover_triggered = DialogueCollector.register_failure_and_check_takeover(chat_id, reason=str(e))
+                if takeover_triggered:
+                    reply_text = (
+                        "Compreendo que não consegui te responder adequadamente. Estou pausando as respostas automáticas "
+                        "e nossa equipe humana assumirá seu atendimento em instantes."
+                    )
+                else:
+                    reply_text = fallback_msg
                 try:
                     LiveTracker.emit_step(
                         batch_id=batch_token,
@@ -517,6 +542,13 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
 
             if not reply_text or not reply_text.strip():
                 reply_text = fallback_msg
+
+            # Registra turno consolidado na memória conversacional
+            try:
+                ConversationMemory.record_turn(chat_id, user_content=aggregated_text, assistant_content=reply_text)
+            except Exception as e:
+                logger.warning(f"[Task WhatsApp Batch] Erro ao gravar turno na memória: {e}")
+
 
         # Desativa o 'digitando...' antes de enviar
         if should_type:

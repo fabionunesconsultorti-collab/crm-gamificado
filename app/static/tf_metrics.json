@@ -1,154 +1,154 @@
 {
-  "lead_score_acc": 94.11,
-  "lead_score_loss": 0.0734,
-  "churn_acc": 92.23,
-  "churn_loss": 0.0807,
-  "sentiment_acc": 90.35,
-  "sentiment_loss": 0.0844,
+  "lead_score_acc": 97.29,
+  "lead_score_loss": 0.0569,
+  "churn_acc": 95.34,
+  "churn_loss": 0.0626,
+  "sentiment_acc": 94.37,
+  "sentiment_loss": 0.0637,
   "epochs": 20,
-  "total_samples": 2980,
-  "last_trained_at": "28/09/2026 11:48:30",
-  "training_duration_ms": 0.09,
+  "total_samples": 3240,
+  "last_trained_at": "30/09/2026 13:17:19",
+  "training_duration_ms": 6.57,
   "history": [
     {
       "epoch": 1,
-      "loss": 0.401,
-      "accuracy": 75.45,
-      "val_loss": 0.4331,
-      "val_accuracy": 73.19
+      "loss": 0.3888,
+      "accuracy": 78.68,
+      "val_loss": 0.4082,
+      "val_accuracy": 77.11
     },
     {
       "epoch": 2,
-      "loss": 0.3579,
-      "accuracy": 78.38,
-      "val_loss": 0.3865,
-      "val_accuracy": 76.03
+      "loss": 0.3375,
+      "accuracy": 81.77,
+      "val_loss": 0.3544,
+      "val_accuracy": 80.13
     },
     {
       "epoch": 3,
-      "loss": 0.32,
-      "accuracy": 80.87,
-      "val_loss": 0.3456,
-      "val_accuracy": 78.44
+      "loss": 0.2943,
+      "accuracy": 84.37,
+      "val_loss": 0.309,
+      "val_accuracy": 82.68
     },
     {
       "epoch": 4,
-      "loss": 0.2866,
-      "accuracy": 82.99,
-      "val_loss": 0.3095,
-      "val_accuracy": 80.5
+      "loss": 0.2578,
+      "accuracy": 86.55,
+      "val_loss": 0.2707,
+      "val_accuracy": 84.82
     },
     {
       "epoch": 5,
-      "loss": 0.2572,
-      "accuracy": 84.79,
-      "val_loss": 0.2778,
-      "val_accuracy": 82.25
+      "loss": 0.2269,
+      "accuracy": 88.38,
+      "val_loss": 0.2382,
+      "val_accuracy": 86.61
     },
     {
       "epoch": 6,
-      "loss": 0.2313,
-      "accuracy": 86.32,
-      "val_loss": 0.2498,
-      "val_accuracy": 83.73
+      "loss": 0.2006,
+      "accuracy": 89.92,
+      "val_loss": 0.2106,
+      "val_accuracy": 88.12
     },
     {
       "epoch": 7,
-      "loss": 0.2085,
-      "accuracy": 87.62,
-      "val_loss": 0.2252,
-      "val_accuracy": 84.99
+      "loss": 0.1781,
+      "accuracy": 91.21,
+      "val_loss": 0.187,
+      "val_accuracy": 89.39
     },
     {
       "epoch": 8,
-      "loss": 0.1885,
-      "accuracy": 88.73,
-      "val_loss": 0.2036,
-      "val_accuracy": 86.07
+      "loss": 0.1589,
+      "accuracy": 92.3,
+      "val_loss": 0.1668,
+      "val_accuracy": 90.45
     },
     {
       "epoch": 9,
-      "loss": 0.1709,
-      "accuracy": 89.67,
-      "val_loss": 0.1846,
-      "val_accuracy": 86.98
+      "loss": 0.1424,
+      "accuracy": 93.21,
+      "val_loss": 0.1495,
+      "val_accuracy": 91.35
     },
     {
       "epoch": 10,
-      "loss": 0.1554,
-      "accuracy": 90.47,
-      "val_loss": 0.1678,
-      "val_accuracy": 87.76
+      "loss": 0.1282,
+      "accuracy": 93.98,
+      "val_loss": 0.1346,
+      "val_accuracy": 92.1
     },
     {
       "epoch": 11,
-      "loss": 0.1418,
-      "accuracy": 91.15,
-      "val_loss": 0.1531,
-      "val_accuracy": 88.42
+      "loss": 0.1159,
+      "accuracy": 94.62,
+      "val_loss": 0.1217,
+      "val_accuracy": 92.73
     },
     {
       "epoch": 12,
-      "loss": 0.1298,
-      "accuracy": 91.73,
-      "val_loss": 0.1402,
-      "val_accuracy": 88.98
+      "loss": 0.1052,
+      "accuracy": 95.16,
+      "val_loss": 0.1105,
+      "val_accuracy": 93.26
     },
     {
       "epoch": 13,
-      "loss": 0.1192,
-      "accuracy": 92.22,
-      "val_loss": 0.1287,
-      "val_accuracy": 89.45
+      "loss": 0.0959,
+      "accuracy": 95.61,
+      "val_loss": 0.1007,
+      "val_accuracy": 93.7
     },
     {
       "epoch": 14,
-      "loss": 0.1099,
-      "accuracy": 92.64,
-      "val_loss": 0.1187,
-      "val_accuracy": 89.86
+      "loss": 0.0878,
+      "accuracy": 95.99,
+      "val_loss": 0.0922,
+      "val_accuracy": 94.07
     },
     {
       "epoch": 15,
-      "loss": 0.1017,
-      "accuracy": 92.99,
-      "val_loss": 0.1098,
-      "val_accuracy": 90.2
+      "loss": 0.0808,
+      "accuracy": 96.31,
+      "val_loss": 0.0848,
+      "val_accuracy": 94.38
     },
     {
       "epoch": 16,
-      "loss": 0.0945,
-      "accuracy": 93.29,
-      "val_loss": 0.1021,
-      "val_accuracy": 90.49
+      "loss": 0.0747,
+      "accuracy": 96.58,
+      "val_loss": 0.0784,
+      "val_accuracy": 94.65
     },
     {
       "epoch": 17,
-      "loss": 0.0882,
-      "accuracy": 93.55,
-      "val_loss": 0.0953,
-      "val_accuracy": 90.74
+      "loss": 0.0693,
+      "accuracy": 96.81,
+      "val_loss": 0.0728,
+      "val_accuracy": 94.87
     },
     {
       "epoch": 18,
-      "loss": 0.0826,
-      "accuracy": 93.77,
-      "val_loss": 0.0892,
-      "val_accuracy": 90.96
+      "loss": 0.0646,
+      "accuracy": 97.0,
+      "val_loss": 0.0678,
+      "val_accuracy": 95.06
     },
     {
       "epoch": 19,
-      "loss": 0.0777,
-      "accuracy": 93.95,
-      "val_loss": 0.0839,
-      "val_accuracy": 91.13
+      "loss": 0.0605,
+      "accuracy": 97.16,
+      "val_loss": 0.0635,
+      "val_accuracy": 95.22
     },
     {
       "epoch": 20,
-      "loss": 0.0734,
-      "accuracy": 94.11,
-      "val_loss": 0.0793,
-      "val_accuracy": 91.29
+      "loss": 0.0569,
+      "accuracy": 97.29,
+      "val_loss": 0.0597,
+      "val_accuracy": 95.34
     }
   ]
 }

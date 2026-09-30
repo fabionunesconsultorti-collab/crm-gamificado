@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="d-flex align-center gap-2">
+    <a href="{{ url_for('integrations.admin_integrations') }}" class="btn-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left me-1"></i> Central de Integrações
+    </a>
+    <a href="{{ url_for('integrations.bling_dashboard') }}" class="btn-warning btn-sm">
+        <i class="fa-solid fa-boxes-packing me-1"></i> Bling Analytics
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-center justify-between mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="text-main font-bold m-0 d-flex align-center gap-2">
+            <i class="fa-solid fa-boxes-packing text-warning"></i> Ferramentas do Bling ERP
+        </h2>
+        <p class="text-muted text-sm m-0">Sincronização bidirecional, catálogo de produtos, pedidos de venda e estoque.</p>
+    </div>
+    <div class="d-flex align-center gap-2">
+        <button class="btn-secondary btn-sm" onclick="openConfigModal('bling', 'Bling ERP', '{{ config.client_id }}', '{{ config.auth_type }}')">
+            <i class="fa-solid fa-sliders me-1"></i> Credenciais API
+        </button>
+        <button class="btn-info btn-sm" onclick="testConnection('bling')">
+            <i class="fa-solid fa-network-wired me-1"></i> Testar Conexão
+        </button>
+    </div>
+</div>
+
+<!-- KPIs Rápidos da Base Bling -->
+<div class="grid grid-cols-auto-fit gap-3 mb-4">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-warning">{{ summary.products_count or 0 }}</span>
+            <span class="kpi-label">Produtos em Estoque</span>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-primary">{{ summary.clients_count or 0 }}</span>
+            <span class="kpi-label">Clientes Sincronizados</span>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+            <i class="fa-solid fa-receipt"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val text-success">{{ summary.sales_count or 0 }}</span>
+            <span class="kpi-label">Pedidos de Venda</span>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;">
+            <i class="fa-solid fa-tags"></i>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-val">{{ summary.brands_count or 0 }} marcas / {{ summary.categories_count or 0 }} cats</span>
+            <span class="kpi-label">Atributos Cadastrados</span>
+        </div>
+    </div>
+</div>
+
+<div class="d-grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+    <!-- Painel de Sincronização & Ações (7 colunas) -->
+    <div class="lg:col-span-7 d-flex flex-column gap-4">
+        
+        <!-- Card 1: Monitor de Progresso de Sincronização -->
+        <div class="card m-0">
+            <div class="card-header pb-2 mb-2 d-flex justify-between align-center">
+                <h4 class="font-bold text-main m-0 d-flex align-center gap-2">
+                    <i class="fa-solid fa-chart-line text-warning"></i> Status da Sincronização
+                </h4>
+                <span class="badge badge-warning" id="syncStatusText">{{ summary.progress_pct }}% Completo</span>
+            </div>
+
+            <div class="progress-wrapper w-100 mb-2" style="height: 12px;">
+                <div id="syncProgressBar" class="progress-bar" style="width: {{ summary.progress_pct }}%; background: linear-gradient(90deg, #f59e0b, #10b981);"></div>
+            </div>
+
+            <div class="d-flex justify-between text-muted text-xs mb-3" id="syncCountsText">
+                <span>Registros Locais: <strong>{{ summary.total_local }}</strong></span>
+                <span>Base Total ERP: <strong>{{ summary.total_remote }}</strong></span>
+                <span>Faltam: <strong>{{ summary.remaining }}</strong></span>
+            </div>
+
+            <div class="p-3 rounded mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+                <div class="font-semibold text-xs text-muted mb-2 uppercase">Ações de Sincronização em Massa:</div>
+                
+                <div class="d-grid grid-cols-2 gap-2 mb-2">
+                    <button class="btn-primary btn-sm py-2 text-xs" onclick="runClientSync('bling', 'inbound')">
+                        <i class="fa-solid fa-download me-1"></i> Puxar Clientes do Bling
+                    </button>
+                    <button class="btn-success btn-sm py-2 text-xs" onclick="runClientSync('bling', 'outbound')">
+                        <i class="fa-solid fa-upload me-1"></i> Subir Clientes para Bling
+                    </button>
+                </div>
+                <div class="d-grid grid-cols-2 gap-2 mb-2">
+                    <button class="btn-warning btn-sm py-2 text-xs" onclick="runSalesSync('bling')">
+                        <i class="fa-solid fa-cart-shopping me-1"></i> Sincronizar Pedidos de Venda
+                    </button>
+                    <button class="btn-info btn-sm py-2 text-xs" onclick="runProductsSync('bling')">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> Sincronizar Catálogo & Estoque
+                    </button>
+                </div>
+                <button class="btn-primary btn-sm w-100 py-2 font-bold text-xs" style="background: linear-gradient(90deg, #f59e0b, #10b981); border:none;" onclick="runSyncAll('bling')">
+                    <i class="fa-solid fa-bolt me-1"></i> Sincronização Geral Completa (Tudo)
+                </button>
+            </div>
+
+            <div class="d-flex justify-between align-center">
+                <a href="{{ url_for('integrations.bling_reports') }}" class="btn-secondary btn-sm text-xs">
+                    <i class="fa-solid fa-chart-pie me-1"></i> Relatórios de Decisão
+                </a>
+                <a href="{{ url_for('integrations.bling_dashboard') }}" class="btn-warning btn-sm text-xs">
+                    <i class="fa-solid fa-chart-line me-1"></i> Painel de Analytics Completo
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Painel de Atributos Identificados (5 colunas) -->
+    <div class="lg:col-span-5 d-flex flex-column gap-4">
+        <div class="card m-0">
+            <div class="card-header pb-2 mb-2">
+                <h4 class="font-bold text-main m-0 d-flex align-center gap-2">
+                    <i class="fa-solid fa-tags text-warning"></i> Atributos da Base Bling
+                </h4>
+            </div>
+
+            <div class="mb-3">
+                <span class="text-muted text-xs font-semibold">Marcas Identificadas ({{ summary.brands_count }}):</span>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for b in summary.brands_list[:12] %}
+                    <span class="badge badge-secondary" style="font-size:0.7rem;">{{ b }}</span>
+                    {% else %}
+                    <span class="text-muted text-xs">Nenhuma marca importada ainda</span>
+                    {% endfor %}
+                    {% if summary.brands_list|length > 12 %}
+                    <span class="badge badge-primary" style="font-size:0.7rem;">+{{ summary.brands_list|length - 12 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <span class="text-muted text-xs font-semibold">Categorias / Tipos ({{ summary.categories_count }}):</span>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for cat in summary.categories_list[:12] %}
+                    <span class="badge badge-secondary" style="font-size:0.7rem;">{{ cat }}</span>
+                    {% else %}
+                    <span class="text-muted text-xs">Nenhuma categoria importada</span>
+                    {% endfor %}
+                    {% if summary.categories_list|length > 12 %}
+                    <span class="badge badge-info" style="font-size:0.7rem;">+{{ summary.categories_list|length - 12 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <span class="text-muted text-xs font-semibold">Grades / Tamanhos ({{ summary.sizes_count }}):</span>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for sz in summary.sizes_list[:15] %}
+                    <span class="badge badge-primary font-bold" style="font-size:0.7rem;">{{ sz }}</span>
+                    {% else %}
+                    <span class="text-muted text-xs">Nenhum tamanho cadastrado</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Configuração de Credenciais Bling -->
+<div id="configModal" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px); z-index:9999; align-items:center; justify-content:center;">
+    <div class="card" style="max-width:500px; width:90%;">
+        <div class="card-header pb-2 mb-3 d-flex justify-between align-center">
+            <h4 class="font-bold text-main m-0"><i class="fa-solid fa-key text-warning me-2"></i>Credenciais Bling ERP</h4>
+            <button class="btn-secondary btn-sm" onclick="closeConfigModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="configForm" onsubmit="saveConfig(event)">
+            <input type="hidden" id="configProvider" value="bling">
+            <div class="form-group w-100 mb-3">
+                <label class="text-xs font-semibold">Client ID (Bling v3):</label>
+                <input type="text" id="configClientId" class="input-glass" value="{{ config.client_id or '' }}" placeholder="Ex: 8527a2...">
+            </div>
+            <div class="form-group w-100 mb-3">
+                <label class="text-xs font-semibold">Client Secret:</label>
+                <input type="password" id="configClientSecret" class="input-glass" placeholder="••••••••••••••••">
+            </div>
+            <div class="d-flex justify-end gap-2 mt-4">
+                <button type="button" class="btn-secondary btn-sm" onclick="closeConfigModal()">Cancelar</button>
+                <button type="submit" class="btn-primary btn-sm"><i class="fa-solid fa-check me-1"></i>Salvar Credenciais</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openConfigModal(provider, name, clientId, authType) {
+        document.getElementById('configModal').style.display = 'flex';
+    }
+    function closeConfigModal() {
+        document.getElementById('configModal').style.display = 'none';
+    }
+
+    async function saveConfig(e) {
+        e.preventDefault();
+        const clientId = document.getElementById('configClientId').value;
+        const clientSecret = document.getElementById('configClientSecret').value;
+
+        try {
+            const resp = await fetch("{{ url_for('integrations.save_integration_config') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: 'bling',
+                    client_id: clientId,
+                    client_secret: clientSecret
+                })
+            });
+            const data = await resp.json();
+            alert(data.message || 'Configurações salvas!');
+            if (data.success) location.reload();
+        } catch (err) {
+            alert('Erro ao salvar: ' + err);
+        }
+    }
+
+    async function testConnection(provider) {
+        try {
+            const resp = await fetch(`/integrations/test/${provider}`, { method: 'POST' });
+            const data = await resp.json();
+            alert(data.message || (data.success ? 'Conexão bem sucedida!' : 'Falha na conexão.'));
+        } catch (err) {
+            alert('Erro no teste: ' + err);
+        }
+    }
+
+    async function runClientSync(provider, direction) {
+        try {
+            const resp = await fetch(`/integrations/bling/sync/clients?direction=${direction}`, { method: 'POST' });
+            const data = await resp.json();
+            alert(data.message || 'Sincronização iniciada.');
+            location.reload();
+        } catch (err) {
+            alert('Erro na sincronização: ' + err);
+        }
+    }
+
+    async function runSalesSync(provider) {
+        try {
+            const resp = await fetch(`/integrations/bling/sync/sales`, { method: 'POST' });
+            const data = await resp.json();
+            alert(data.message || 'Sincronização de pedidos iniciada.');
+            location.reload();
+        } catch (err) {
+            alert('Erro na sincronização: ' + err);
+        }
+    }
+
+    async function runProductsSync(provider) {
+        try {
+            const resp = await fetch(`/integrations/bling/sync/products`, { method: 'POST' });
+            const data = await resp.json();
+            alert(data.message || 'Sincronização de produtos iniciada.');
+            location.reload();
+        } catch (err) {
+            alert('Erro na sincronização: ' + err);
+        }
+    }
+
+    async function runSyncAll(provider) {
+        if (!confirm('Deseja iniciar a sincronização completa (Produtos, Clientes e Pedidos)?')) return;
+        await runProductsSync(provider);
+        await runClientSync(provider, 'inbound');
+        await runSalesSync(provider);
+    }
+</script>
+{% endblock %}
