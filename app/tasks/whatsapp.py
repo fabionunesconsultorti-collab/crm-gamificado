@@ -106,6 +106,26 @@ def _do_process_whatsapp_message(payload, event=None, instance_id=None):
     client = LeadEnricher.find_client_by_phone(clean_digits or from_raw)
     if client:
         logger.info(f"[Task WhatsApp] Cliente identificado: ID={client.id}, Nome='{client.name}', Telefone='{client.phone}'")
+        if not client.bot_enabled:
+            logger.info(f"[Task WhatsApp] Lead ID={client.id} está configurado como 'Atendimento Humano'. Nenhuma resposta automática de bot será enviada.")
+            try:
+                log = MessageLog(
+                    client_id=client.id,
+                    user_id=None,
+                    content=body.strip(),
+                    channel='waha_api',
+                    status='received',
+                    direction='inbound',
+                    chat_id=from_raw,
+                    timestamp=datetime.now(timezone.utc),
+                    waha_instance_id=_resolve_waha_instance_pk(instance_id)
+                )
+                db.session.add(log)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            return {"status": "human_mode_active", "reason": "client_bot_disabled", "client_id": client.id, "message_id": msg_id}
+
         # Enriquecimento com dados da mensagem
         extracted = LeadEnricher.extract_entities_from_text(body.strip())
         if extracted:
@@ -116,11 +136,25 @@ def _do_process_whatsapp_message(payload, event=None, instance_id=None):
     # 3. Geração de resposta via Inteligência Artificial
     ai_start = time.time()
     try:
-        reply_text, ai_error = AIHandler.generate_reply(body.strip())
+        reply_text, ai_error = AIHandler.generate_reply(body.strip(), instance_id=instance_id)
         ai_duration = round((time.time() - ai_start) * 1000, 2)
-        if ai_error:
+        if AIHandler.is_context_pause(reply_text):
+            DialogueCollector.activate_human_takeover(from_raw, reason="falta_de_contexto_aguardando_humano")
+            if client:
+                client.bot_enabled = False
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+            clean_reply = AIHandler.clean_pause_tags(reply_text)
+            reply_text = clean_reply if (clean_reply and len(clean_reply.strip()) >= 10) else (
+                Setting.get('whatsapp_bot_context_pause_msg') or 
+                "Não consegui compreender o contexto da sua mensagem. Pausei o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes."
+            )
+        elif ai_error:
             logger.warning(f"[Task WhatsApp] Aviso/Erro na geração da IA ({ai_duration}ms): {ai_error}")
         else:
+            reply_text = AIHandler.clean_pause_tags(reply_text)
             logger.info(f"[Task WhatsApp] IA gerou resposta em {ai_duration}ms: '{reply_text[:60]}...'")
     except Exception as e:
         ai_duration = round((time.time() - ai_start) * 1000, 2)
@@ -254,11 +288,33 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
         except Exception:
             pass
 
-        # 4. Verificação de Bot Ativo e Fallback Humano Imediato
+        # 4. Verificação de Bot Ativo, Transbordo Humano e Chave Humano vs Robô do Lead
         from app.utils.dialogue_collector import DialogueCollector
         if DialogueCollector.is_human_takeover_active(chat_id):
             logger.info(f"[Task WhatsApp Batch] Chat '{chat_id}' está em transbordo humano. Nenhuma resposta de IA será enviada.")
             return {"status": "human_takeover_active", "chat_id": chat_id}
+
+        from app.utils.lead_enricher import LeadEnricher
+        pre_client = LeadEnricher.find_client_by_phone(clean_digits or chat_id)
+        if pre_client and not pre_client.bot_enabled:
+            logger.info(f"[Task WhatsApp Batch] Lead ID={pre_client.id} ('{pre_client.name}') está configurado como 'Atendimento Humano'. Nenhuma resposta automática do robô será gerada.")
+            try:
+                inbound_log = MessageLog(
+                    client_id=pre_client.id,
+                    user_id=None,
+                    content=aggregated_text,
+                    channel='waha_api',
+                    status='received',
+                    direction='inbound',
+                    chat_id=chat_id,
+                    timestamp=datetime.now(timezone.utc),
+                    waha_instance_id=_resolve_waha_instance_pk(instance_id)
+                )
+                db.session.add(inbound_log)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            return {"status": "human_mode_active", "chat_id": chat_id, "client_id": pre_client.id}
 
         bot_enabled = Setting.get('whatsapp_bot_enabled')
         if bot_enabled is not None and str(bot_enabled).lower() in ['false', '0', 'no']:
@@ -489,10 +545,38 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                 reply_text, ai_error = AIHandler.generate_chat_reply(
                     customer_message=aggregated_text,
                     chat_history=chat_history,
-                    client_info=client_info
+                    client_info=client_info,
+                    instance_id=instance_id
                 )
                 ai_duration = round((time.time() - ai_start) * 1000, 2)
-                if ai_error:
+                
+                # Detecta se a IA solicitou pausa por falta de contexto ou recusa
+                is_context_pause = AIHandler.is_context_pause(reply_text) or (ai_error == "context_pause_requested")
+
+                if is_context_pause:
+                    logger.info(f"[Task WhatsApp Batch] 🚨 Falta de contexto detectada na conversa com '{chat_id}'. Ativando pausa e intervenção humana.")
+                    DialogueCollector.activate_human_takeover(chat_id, reason="falta_de_contexto_aguardando_humano")
+                    if client:
+                        client.bot_enabled = False
+                        try:
+                            db.session.commit()
+                            logger.info(f"[Task WhatsApp Batch] Lead ID={client.id} alterado no CRM para 'Atendimento Humano' por falta de contexto.")
+                        except Exception as e:
+                            db.session.rollback()
+                            logger.warning(f"[Task WhatsApp Batch] Erro ao atualizar status bot_enabled do cliente: {e}")
+
+                    clean_reply = AIHandler.clean_pause_tags(reply_text)
+                    configured_pause_msg = Setting.get('whatsapp_bot_context_pause_msg')
+                    if not clean_reply or len(clean_reply.strip()) < 10 or AIHandler.is_refusal(clean_reply):
+                        reply_text = configured_pause_msg or (
+                            "Não consegui compreender o contexto da sua mensagem. "
+                            "Pausei o atendimento automático para que nossa equipe humana analise e dê continuidade por aqui em instantes."
+                        )
+                    else:
+                        reply_text = clean_reply
+
+                    DialogueCollector.reset_failures(chat_id)
+                elif ai_error:
                     logger.warning(f"[Task WhatsApp Batch] Aviso da IA ({ai_duration}ms): {ai_error}")
                     # Registra falha de interpretação para transbordo automático se persistir
                     takeover_triggered = DialogueCollector.register_failure_and_check_takeover(chat_id, reason=ai_error)
@@ -501,9 +585,16 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                             "Compreendo que não consegui te ajudar com precisão. Estou pausando as respostas automáticas "
                             "e notificando nossa equipe humana para assumir seu atendimento por aqui em instantes."
                         )
+                        if client:
+                            client.bot_enabled = False
+                            try:
+                                db.session.commit()
+                            except Exception:
+                                db.session.rollback()
                 else:
                     # Resposta gerada com sucesso: zera o contador de falhas
                     DialogueCollector.reset_failures(chat_id)
+                    reply_text = AIHandler.clean_pause_tags(reply_text)
                     logger.info(f"[Task WhatsApp Batch] IA gerou resposta em {ai_duration}ms: '{reply_text[:60]}...'")
 
                 try:
@@ -511,8 +602,8 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                         batch_id=batch_token,
                         chat_id=chat_id,
                         step=STEP_OLLAMA,
-                        status="completed" if not ai_error else "warning",
-                        details={"reply_preview": (reply_text or "")[:120], "duration_ms": ai_duration},
+                        status="completed" if not (ai_error or is_context_pause) else "warning",
+                        details={"reply_preview": (reply_text or "")[:120], "duration_ms": ai_duration, "context_pause": is_context_pause},
                         duration_ms=ai_duration
                     )
                 except Exception:
@@ -526,6 +617,12 @@ def _do_process_buffered_whatsapp_messages(chat_id: str, batch_token: str, insta
                         "Compreendo que não consegui te responder adequadamente. Estou pausando as respostas automáticas "
                         "e nossa equipe humana assumirá seu atendimento em instantes."
                     )
+                    if client:
+                        client.bot_enabled = False
+                        try:
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
                 else:
                     reply_text = fallback_msg
                 try:

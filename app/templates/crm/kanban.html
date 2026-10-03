@@ -224,6 +224,87 @@
     border: 1px solid rgba(99, 102, 241, 0.25);
 }
 
+.kbadge-humano {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.kbadge-robo {
+    background: rgba(16, 185, 129, 0.18);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+/* ── Chave de Atendimento no Card do Kanban (Humano vs Robô) ── */
+.kcard-bot-mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.kcard-bot-mode-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.02em;
+}
+.kcard-bot-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 2px 4px;
+    gap: 4px;
+}
+.kcard-bot-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    margin: 0;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.kcard-bot-opt input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+    width: 12px;
+    height: 12px;
+}
+.kcard-bot-opt:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+.kcard-bot-opt.active-humano {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.kcard-bot-opt.active-humano input[type="radio"] {
+    accent-color: #f59e0b;
+}
+.kcard-bot-opt.active-robo {
+    background: rgba(16, 185, 129, 0.2);
+    color: #4ade80;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.kcard-bot-opt.active-robo input[type="radio"] {
+    accent-color: #10b981;
+}
+
 /* Meta: Segmento e Avaliação */
 .kcard-meta-row {
     display: flex;
@@ -588,6 +669,13 @@
                 <option value="vip" {{ 'selected' if current_filters and current_filters.tier == 'vip' }}>💎 VIP</option>
             </select>
 
+            <!-- Filtro de Atendimento (Robô vs Humano) -->
+            <select name="bot_mode" id="kanbanBotFilter" class="kanban-filter-select" onchange="onKanbanFilterChange()">
+                <option value="">Todos os Atendimentos</option>
+                <option value="robo" {{ 'selected' if current_filters and current_filters.bot_mode == 'robo' }}>🤖 Robô Ativo</option>
+                <option value="humano" {{ 'selected' if current_filters and current_filters.bot_mode == 'humano' }}>👤 Atendimento Humano</option>
+            </select>
+
             <!-- Botão Limpar Filtros -->
             <button type="button" class="btn-secondary btn-sm" id="btnResetKanban" onclick="resetKanbanFilters()" style="display: {{ 'inline-flex' if has_active_filters else 'none' }}; color: #f87171;">
                 <i class="fa-solid fa-xmark"></i> Limpar
@@ -638,6 +726,7 @@
                  data-seller="{{ client.assigned_user.username | lower if client.assigned_user else (client.referred_by.username | lower if client.referred_by else '') }}"
                  data-seller-id="{{ client.assigned_to or client.referred_by_id or '' }}"
                  data-tier="{{ client.tier or '' }}"
+                 data-bot="{{ 'robo' if client.bot_enabled else 'humano' }}"
                  data-source="{{ 'gmaps' if (client.badges and 'outbound_gmaps' in client.badges) else (client.lead_source or '') }}"
                  data-notes="{{ client.notes or '' | lower }}">
                 
@@ -647,6 +736,16 @@
                         <span class="kcard-title" title="{{ client.name }}">{{ client.name }}</span>
                     </div>
                     <div class="kcard-badges">
+                        {% if not client.bot_enabled %}
+                        <span class="kbadge kbadge-humano" id="kbadge-bot-{{ client.id }}" title="Atendimento Humano (Robô Pausado)">
+                            <i class="fa-solid fa-user-tie"></i> Humano
+                        </span>
+                        {% else %}
+                        <span class="kbadge kbadge-robo" id="kbadge-bot-{{ client.id }}" title="Robô Ativo">
+                            <i class="fa-solid fa-robot"></i> Robô
+                        </span>
+                        {% endif %}
+
                         {% if client.tier == 'vip' %}
                         <span class="kbadge kbadge-vip" title="Cliente VIP">💎 VIP</span>
                         {% elif client.tier == 'ouro' %}
@@ -757,7 +856,27 @@
                 </div>
                 {% endif %}
 
-                <!-- 6. Barra de Ações Rápidas -->
+                <!-- 6. Chave de Atendimento: Humano () Robô () -->
+                <div class="kcard-bot-mode-bar" onclick="event.stopPropagation();" title="Definir modo de resposta automática no WhatsApp">
+                    <div class="kcard-bot-mode-label">
+                        <i class="fa-solid fa-headset text-primary"></i>
+                        <span>Atendimento:</span>
+                    </div>
+                    <div class="kcard-bot-toggle-group" id="bot-toggle-group-{{ client.id }}">
+                        <label class="kcard-bot-opt {{ 'active-humano' if not client.bot_enabled else '' }}" title="Desativar respostas automáticas do robô (Atendimento Humano)">
+                            <input type="radio" name="kanban_bot_{{ client.id }}" value="humano" {{ 'checked' if not client.bot_enabled else '' }}
+                                   onchange="setKanbanBotMode({{ client.id }}, false, this)">
+                            <i class="fa-solid fa-user-tie"></i> Humano
+                        </label>
+                        <label class="kcard-bot-opt {{ 'active-robo' if client.bot_enabled else '' }}" title="Ativar robô para responder automaticamente via IA">
+                            <input type="radio" name="kanban_bot_{{ client.id }}" value="robo" {{ 'checked' if client.bot_enabled else '' }}
+                                   onchange="setKanbanBotMode({{ client.id }}, true, this)">
+                            <i class="fa-solid fa-robot"></i> Robô
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 7. Barra de Ações Rápidas -->
                 <div class="kcard-actions">
                     <a href="{{ url_for('crm.message_client', id=client.id) }}" class="kact-btn kact-wa" title="Enviar Mensagem / WhatsApp">
                         <i class="fa-brands fa-whatsapp"></i>
@@ -835,6 +954,7 @@ const segmentSelect = document.getElementById('kanbanSegmentFilter');
 const sellerSelect  = document.getElementById('kanbanSellerFilter');
 const sourceSelect  = document.getElementById('kanbanSourceFilter');
 const tierSelect    = document.getElementById('kanbanTierFilter');
+const botSelect     = document.getElementById('kanbanBotFilter');
 const btnReset      = document.getElementById('btnResetKanban');
 const liveTag       = document.getElementById('kanbanLiveTag');
 const totalVisible  = document.getElementById('kanbanVisibleTotal');
@@ -858,8 +978,9 @@ function filterKanbanCards() {
     const seller  = sellerSelect ? sellerSelect.value.trim() : '';
     const source  = sourceSelect ? sourceSelect.value.toLowerCase().trim() : '';
     const tier    = tierSelect ? tierSelect.value.toLowerCase().trim() : '';
+    const bot     = botSelect ? botSelect.value.toLowerCase().trim() : '';
 
-    const hasFilters = Boolean(q || segment || seller || source || tier);
+    const hasFilters = Boolean(q || segment || seller || source || tier || bot);
     if (btnReset) btnReset.style.display = hasFilters ? 'inline-flex' : 'none';
     if (liveTag) liveTag.style.display = hasFilters ? 'inline' : 'none';
 
@@ -880,6 +1001,7 @@ function filterKanbanCards() {
             const cSegment = card.dataset.segment || '';
             const cSellerId= card.dataset.sellerId || '';
             const cTier    = card.dataset.tier || '';
+            const cBot     = card.dataset.bot || 'robo';
             const cSource  = card.dataset.source || '';
             const cNotes   = card.dataset.notes || '';
 
@@ -896,9 +1018,10 @@ function filterKanbanCards() {
             const matchesSegment = !segment || cSegment.includes(segment);
             const matchesSeller  = !seller || cSellerId === seller;
             const matchesTier    = !tier || cTier === tier;
+            const matchesBot     = !bot || cBot === bot;
             const matchesSource  = !source || (source === 'gmaps' ? cSource.includes('gmaps') : cSource === source);
 
-            if (matchesQ && matchesSegment && matchesSeller && matchesTier && matchesSource) {
+            if (matchesQ && matchesSegment && matchesSeller && matchesTier && matchesBot && matchesSource) {
                 card.style.display = '';
                 colVisibleCount++;
                 totalCardsVisible++;
@@ -927,7 +1050,83 @@ function resetKanbanFilters() {
     if (sellerSelect) sellerSelect.value = '';
     if (sourceSelect) sourceSelect.value = '';
     if (tierSelect) tierSelect.value = '';
+    if (botSelect) botSelect.value = '';
     filterKanbanCards();
+}
+
+// ── Chave de Atendimento: Humano vs Robô ─────────────────────
+async function setKanbanBotMode(clientId, enableBot, inputEl) {
+    const card = document.querySelector(`.kanban-card[data-id="${clientId}"]`);
+    const group = document.getElementById(`bot-toggle-group-${clientId}`);
+    const badge = document.getElementById(`kbadge-bot-${clientId}`);
+
+    // Atualização visual otimista
+    if (group) {
+        group.querySelectorAll('.kcard-bot-opt').forEach(opt => {
+            opt.classList.remove('active-humano', 'active-robo');
+        });
+        const activeLabel = inputEl ? inputEl.closest('.kcard-bot-opt') : null;
+        if (activeLabel) {
+            activeLabel.classList.add(enableBot ? 'active-robo' : 'active-humano');
+        }
+    }
+    if (card) {
+        card.dataset.bot = enableBot ? 'robo' : 'humano';
+    }
+    if (badge) {
+        if (enableBot) {
+            badge.className = 'kbadge kbadge-robo';
+            badge.innerHTML = '<i class="fa-solid fa-robot"></i> Robô';
+            badge.title = 'Robô Ativo';
+        } else {
+            badge.className = 'kbadge kbadge-humano';
+            badge.innerHTML = '<i class="fa-solid fa-user-tie"></i> Humano';
+            badge.title = 'Atendimento Humano (Robô Pausado)';
+        }
+    }
+
+    try {
+        const resp = await fetch(`/crm/client/${clientId}/toggle-bot`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({bot_enabled: enableBot})
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            throw new Error(data.message || 'Erro ao alterar modo do bot');
+        }
+        // Se houver filtro ativo de bot, reexecuta o filtro para atualizar contadores/visibilidade
+        if (botSelect && botSelect.value) {
+            filterKanbanCards();
+        }
+    } catch (err) {
+        console.error('Erro ao atualizar modo de atendimento:', err);
+        alert('Não foi possível alterar o modo de atendimento. Tente novamente.');
+        // Reverter visual
+        const revertBot = !enableBot;
+        if (card) card.dataset.bot = revertBot ? 'robo' : 'humano';
+        if (group) {
+            group.querySelectorAll('.kcard-bot-opt').forEach(opt => opt.classList.remove('active-humano', 'active-robo'));
+            const prevVal = revertBot ? 'robo' : 'humano';
+            const prevRadio = group.querySelector(`input[value="${prevVal}"]`);
+            if (prevRadio) {
+                prevRadio.checked = true;
+                const prevLabel = prevRadio.closest('.kcard-bot-opt');
+                if (prevLabel) prevLabel.classList.add(revertBot ? 'active-robo' : 'active-humano');
+            }
+        }
+        if (badge) {
+            if (revertBot) {
+                badge.className = 'kbadge kbadge-robo';
+                badge.innerHTML = '<i class="fa-solid fa-robot"></i> Robô';
+                badge.title = 'Robô Ativo';
+            } else {
+                badge.className = 'kbadge kbadge-humano';
+                badge.innerHTML = '<i class="fa-solid fa-user-tie"></i> Humano';
+                badge.title = 'Atendimento Humano (Robô Pausado)';
+            }
+        }
+    }
 }
 
 // Inicializa verificação de colunas vazias

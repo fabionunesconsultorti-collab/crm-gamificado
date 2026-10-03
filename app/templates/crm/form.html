@@ -78,6 +78,16 @@
         {% endif %}">
         Status: {{ client.status | upper }}
     </span>
+
+    {% if not client.bot_enabled %}
+    <span class="badge badge-warning" title="Respostas automáticas do bot desativadas">
+        <i class="fa-solid fa-user-tie"></i> Humano
+    </span>
+    {% else %}
+    <span class="badge badge-success" title="Bot automático ativo para este lead">
+        <i class="fa-solid fa-robot"></i> Robô
+    </span>
+    {% endif %}
     {% else %}
     <span class="badge badge-primary">NOVO REGISTRO</span>
     {% endif %}
@@ -377,6 +387,30 @@
                     <option value="indicacao" {{ 'selected' if client and client.lead_source == 'indicacao' }}>Indicação</option>
                 </select>
             </div>
+            <!-- Modo de Atendimento (Humano vs Robô) -->
+            <div class="form-group mb-0" style="grid-column: span 2;">
+                <label class="d-flex align-center gap-2 mb-2 font-bold text-sm">
+                    <i class="fa-solid fa-headset text-primary"></i> Modo de Atendimento (WhatsApp):
+                </label>
+                <div class="d-flex align-center gap-3 p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); flex-wrap: wrap;">
+                    <label class="d-flex align-center gap-2 cursor-pointer m-0 px-3 py-2 rounded" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); transition: all 0.2s;">
+                        <input type="radio" name="bot_enabled" id="bot_mode_humano" value="humano" {{ 'checked' if client and not client.bot_enabled else '' }} style="cursor: pointer; width: 17px; height: 17px; accent-color: #f59e0b;">
+                        <span class="d-flex align-center gap-2 font-bold" style="color: #fbbf24; font-size: 0.88rem;">
+                            <i class="fa-solid fa-user-tie"></i> Atendimento Humano
+                        </span>
+                    </label>
+                    <label class="d-flex align-center gap-2 cursor-pointer m-0 px-3 py-2 rounded" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                        <input type="radio" name="bot_enabled" id="bot_mode_robo" value="robo" {{ 'checked' if not client or client.bot_enabled else '' }} style="cursor: pointer; width: 17px; height: 17px; accent-color: #10b981;">
+                        <span class="d-flex align-center gap-2 font-bold" style="color: #4ade80; font-size: 0.88rem;">
+                            <i class="fa-solid fa-robot"></i> Robô
+                        </span>
+                    </label>
+                </div>
+                <span class="text-xs text-muted mt-1 d-block">
+                    <i class="fa-solid fa-circle-info text-info"></i> Selecione <strong>Atendimento Humano</strong> para pausar o robô de IA neste lead e responder manualmente pelo WhatsApp.
+                </span>
+            </div>
+
             <div class="form-group mb-0" style="grid-column: span 2;">
                 <label for="notes">Anotações &amp; Histórico de Atendimento</label>
                 <textarea name="notes" id="notes" class="input-glass" rows="4" 

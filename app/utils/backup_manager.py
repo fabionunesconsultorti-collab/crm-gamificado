@@ -11,24 +11,37 @@ from flask import current_app
 from sqlalchemy import text
 from app import db
 from app.models import (
-    User, Client, MessageLog, Setting, Store,
-    MessageTemplate, WahaInstance, ScrapingJob,
-    FileMappingTemplate, SystemLog, KnowledgeDoc
+    PermissionGroup, User, Store, WahaInstance, Setting,
+    MessageTemplate, FileMappingTemplate, IntegrationConfig,
+    BlingProductCache, Client, KnowledgeDoc, FineTuningPair,
+    ScrapingJob, BulkCampaign, BulkCampaignRecipient,
+    ExternalEntityMap, BlingSalesCache, IntegrationLog,
+    MessageLog, SystemLog, BehaviorGuide
 )
 
 logger = logging.getLogger(__name__)
 
-# Modelos em ordem de dependência para inserção / restauração segura
+# Modelos em ordem estrita de dependência (pais antes de filhos) para inserção e restauração segura
 ORDERED_MODELS = [
+    ('permission_groups', PermissionGroup),
     ('users', User),
+    ('behavior_guides', BehaviorGuide),
     ('stores', Store),
     ('waha_instances', WahaInstance),
     ('settings', Setting),
     ('message_templates', MessageTemplate),
     ('file_mapping_templates', FileMappingTemplate),
+    ('integration_configs', IntegrationConfig),
+    ('bling_product_cache', BlingProductCache),
     ('clients', Client),
     ('knowledge_docs', KnowledgeDoc),
+    ('fine_tuning_pairs', FineTuningPair),
     ('scraping_jobs', ScrapingJob),
+    ('bulk_campaigns', BulkCampaign),
+    ('bulk_campaign_recipients', BulkCampaignRecipient),
+    ('external_entity_maps', ExternalEntityMap),
+    ('bling_sales_cache', BlingSalesCache),
+    ('integration_logs', IntegrationLog),
     ('message_logs', MessageLog),
     ('system_logs', SystemLog),
 ]
@@ -161,17 +174,17 @@ class BackupManager:
             return {"success": False, "error": str(e)}
 
     @classmethod
-    def create_backup(cls, destination="local", upload_gdrive=False):
+    def create_backup(cls, destination="local", upload_gdrive=False, custom_filename=None):
         """
         Gera um backup completo e estruturado de todo o ecossistema CRM Pro:
-        1. 11 Tabelas do Banco de Dados (incluindo KnowledgeDoc da IA).
+        1. Todas as Tabelas do Banco de Dados em ordem estrita de integridade referencial.
         2. Base Vetorial Física do RAG (ChromaDB com todos os embeddings e índices).
         3. Arquivos de Mídia e Customização Visual (Logotipos e Uploads estáticos).
         4. Snapshot de Configurações de Ambiente (.env e variáveis operacionais).
         Salva em formato JSON compactado com gzip (.json.gz).
         """
         timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"backup_crm_{timestamp_str}.json.gz"
+        filename = custom_filename or f"backup_crm_{timestamp_str}.json.gz"
         backup_dir = cls.get_backup_dir()
         file_path = os.path.join(backup_dir, filename)
 
@@ -335,35 +348,55 @@ class BackupManager:
             data = payload["data"]
             stats = {}
 
-            # 2. Executa a restauração relacional dentro de transação segura
-            for key, model in ORDERED_MODELS:
-                rows = data.get(key, [])
-                restored_count = 0
-                for row_dict in rows:
-                    rec_id = row_dict.get('id')
-                    existing = model.query.get(rec_id) if rec_id else None
+            # 2. Snapshot de segurança pré-restauração para garantir que o estado atual nunca se perca
+            try:
+                safety_tag = f"pre_restore_safety_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+                cls.create_backup(custom_filename=f"{safety_tag}.json.gz")
+                logger.info(f"[Backup Restore] Snapshot de segurança pré-restauração salvo: {safety_tag}.json.gz")
+            except Exception as safety_err:
+                logger.warning(f"[Backup Restore] Aviso ao criar snapshot pré-restauração: {safety_err}")
 
-                    processed_dict = {}
-                    for k, v in row_dict.items():
-                        col = model.__table__.columns.get(k)
-                        if col is not None and str(col.type).lower().startswith(('date', 'timestamp')):
-                            processed_dict[k] = _parse_datetime(v)
-                        else:
-                            processed_dict[k] = v
+            # 3. Executa a restauração relacional com blindagem contra autoflush e integridade referencial
+            with db.session.no_autoflush:
+                is_postgres = db.engine.dialect.name == 'postgresql'
 
-                    if existing:
-                        for k, v in processed_dict.items():
-                            setattr(existing, k, v)
-                    else:
+                # 3.1 Limpa tabelas presentes no backup na ordem reversa de dependência (filhos antes de pais)
+                tables_to_truncate = []
+                for key, model in reversed(ORDERED_MODELS):
+                    if key in data and len(data[key]) > 0:
+                        tables_to_truncate.append(f'"{model.__table__.name}"')
+
+                if is_postgres and tables_to_truncate:
+                    sql = f'TRUNCATE TABLE {", ".join(tables_to_truncate)} RESTART IDENTITY CASCADE;'
+                    db.session.execute(text(sql))
+                else:
+                    for key, model in reversed(ORDERED_MODELS):
+                        if key in data and len(data[key]) > 0:
+                            db.session.query(model).delete(synchronize_session=False)
+
+                # 3.2 Inserção atômica dos registros do backup
+                for key, model in ORDERED_MODELS:
+                    rows = data.get(key, [])
+                    restored_count = 0
+                    for row_dict in rows:
+                        processed_dict = {}
+                        for k, v in row_dict.items():
+                            col = model.__table__.columns.get(k)
+                            if col is None:
+                                continue
+                            if str(col.type).lower().startswith(('date', 'timestamp')):
+                                processed_dict[k] = _parse_datetime(v)
+                            else:
+                                processed_dict[k] = v
+
                         new_inst = model(**processed_dict)
                         db.session.add(new_inst)
+                        restored_count += 1
+                    stats[key] = restored_count
 
-                    restored_count += 1
-                stats[key] = restored_count
+                db.session.commit()
 
-            db.session.commit()
-
-            # Ajusta sequences de auto-incremento do PostgreSQL
+            # Ajusta sequences de auto-incremento do PostgreSQL com base nos IDs restaurados
             if db.engine.dialect.name == 'postgresql':
                 for key, model in ORDERED_MODELS:
                     tbl_name = model.__table__.name
@@ -379,6 +412,19 @@ class BackupManager:
                     except Exception as seq_err:
                         db.session.rollback()
                         logger.debug(f"[Backup Restore] Sequence para {tbl_name} não requer ajuste: {seq_err}")
+
+            # Garante que novas configurações do sistema introduzidas após backups legados sejam mantidas
+            try:
+                from init_db import DEFAULT_SYSTEM_SETTINGS
+                added_defaults = 0
+                for def_k, def_v in DEFAULT_SYSTEM_SETTINGS.items():
+                    if not Setting.query.filter_by(key=def_k).first():
+                        db.session.add(Setting(key=def_k, value=def_v))
+                        added_defaults += 1
+                if added_defaults > 0:
+                    db.session.commit()
+            except Exception as merge_err:
+                logger.debug(f"[Backup Restore] Aviso na sincronização de configurações complementares: {merge_err}")
 
             # 3. Restauração da Base Vetorial RAG (ChromaDB)
             rag_restored = False
@@ -499,7 +545,7 @@ class BackupManager:
                 has_uploads = False
                 version = "Legado"
 
-                if (fn.endswith('.json.gz') or fn.endswith('.json')) and st.st_size < 10 * 1024 * 1024:
+                if (fn.endswith('.json.gz') or fn.endswith('.json')) and st.st_size < 100 * 1024 * 1024:
                     try:
                         if fn.endswith('.gz'):
                             with gzip.open(fp, 'rb') as f:

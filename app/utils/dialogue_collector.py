@@ -33,7 +33,8 @@ class DialogueCollector:
             return False
         try:
             conn = get_redis_connection()
-            return bool(conn.get(f"{REDIS_PREFIX_TAKEOVER}:{chat_id}"))
+            clean_digits = chat_id.split('@')[0]
+            return bool(conn.get(f"{REDIS_PREFIX_TAKEOVER}:{chat_id}") or conn.get(f"{REDIS_PREFIX_TAKEOVER}:{clean_digits}"))
         except Exception as e:
             logger.warning(f"[DialogueCollector] Erro ao checar takeover para {chat_id}: {e}")
             return False
@@ -45,8 +46,11 @@ class DialogueCollector:
             return False
         try:
             conn = get_redis_connection()
+            clean_digits = chat_id.split('@')[0]
             key = f"{REDIS_PREFIX_TAKEOVER}:{chat_id}"
             conn.set(key, reason, ex=TAKEOVER_DEFAULT_TTL)
+            if clean_digits != chat_id:
+                conn.set(f"{REDIS_PREFIX_TAKEOVER}:{clean_digits}", reason, ex=TAKEOVER_DEFAULT_TTL)
             logger.info(f"[DialogueCollector] 🚨 Transbordo Humano ATIVADO para '{chat_id}'. Motivo: {reason}")
 
             # Registra evento na telemetria LiveTracker
@@ -74,8 +78,12 @@ class DialogueCollector:
             return False
         try:
             conn = get_redis_connection()
+            clean_digits = chat_id.split('@')[0]
             conn.delete(f"{REDIS_PREFIX_TAKEOVER}:{chat_id}")
             conn.delete(f"{REDIS_PREFIX_FAILS}:{chat_id}")
+            if clean_digits != chat_id:
+                conn.delete(f"{REDIS_PREFIX_TAKEOVER}:{clean_digits}")
+                conn.delete(f"{REDIS_PREFIX_FAILS}:{clean_digits}")
             logger.info(f"[DialogueCollector] 🤖 Bot RETOMADO para '{chat_id}'. Atendimento automático reativado.")
             return True
         except Exception as e:
@@ -153,6 +161,16 @@ class DialogueCollector:
         except Exception as e:
             db.session.rollback()
             logger.error(f"[DialogueCollector] Erro ao salvar MessageLog humano: {e}")
+
+        # 2.1 Pausa automaticamente o bot para permitir que o atendente humano conduza o diálogo
+        try:
+            cls.activate_human_takeover(chat_id, reason="intervencao_humana_outbound")
+            if client and client.bot_enabled:
+                client.bot_enabled = False
+                db.session.commit()
+                logger.info(f"[DialogueCollector] Lead ID={client.id} alternado para modo 'Humano' após envio de mensagem pelo operador.")
+        except Exception as e:
+            logger.warning(f"[DialogueCollector] Erro ao pausar bot após envio humano: {e}")
 
         # 3. Atualiza memória conversacional multi-turno
         try:

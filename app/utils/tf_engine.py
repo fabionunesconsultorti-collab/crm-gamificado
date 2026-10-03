@@ -298,6 +298,107 @@ class TensorFlowEngine:
         }
 
     @classmethod
+    def get_client_intelligence_profile(cls, client) -> Optional[Dict[str, Any]]:
+        """
+        Gera o Perfil Preditivo de Inteligência TensorFlow para um determinado cliente.
+        Extrai indicativos para servir de base de aprendizado das IAs de resposta (Ollama/Gemini):
+        1. Humor / Sentimento do Cliente
+        2. Score de Qualificação & Risco de Churn (Histórico Preditivo)
+        3. Termos & Palavras-Chave Relevantes (Keywords)
+        4. Diretriz Comportamental Formatada para Prompt da IA
+        """
+        if not client:
+            return None
+
+        try:
+            # Calcula dias desde o último contato de forma segura
+            days_since_last = 15
+            if getattr(client, 'updated_at', None):
+                try:
+                    updated_val = client.updated_at
+                    if hasattr(updated_val, 'tzinfo') and updated_val.tzinfo:
+                        updated_val = updated_val.replace(tzinfo=None)
+                    days_since_last = max(1, (datetime.now() - updated_val).days)
+                except Exception:
+                    days_since_last = 15
+
+            # 1. Lead Score & Churn Risk
+            client_data = {
+                'purchase_frequency': getattr(client, 'purchase_frequency', 0) or 0,
+                'ltv': getattr(client, 'ltv', 0.0) or 0.0,
+                'google_rating': getattr(client, 'google_rating', 0.0) or 0.0,
+                'google_reviews_count': getattr(client, 'google_reviews_count', 0) or 0,
+                'days_since_last': days_since_last,
+                'opt_in': getattr(client, 'opt_in', False)
+            }
+
+            lead_score_res = cls.predict_lead_score(client_data)
+            churn_res = cls.predict_churn_risk(client_data)
+
+            # 2. Análise de Humor & Sentimento Predito das notas e mensagens
+            notes_text = getattr(client, 'notes', '') or ''
+            messages_text = ""
+            try:
+                from app.models import MessageLog
+                recent_logs = MessageLog.query.filter_by(client_id=client.id).order_by(MessageLog.timestamp.desc()).limit(5).all()
+                if recent_logs:
+                    messages_text = " ".join([l.content or '' for l in recent_logs])
+            except Exception:
+                pass
+
+            full_text_sample = f"{notes_text} {messages_text}".strip()
+            if not full_text_sample:
+                full_text_sample = f"Cliente {getattr(client, 'name', 'Cliente')} no segmento {getattr(client, 'display_segment', 'geral') or 'geral'}."
+
+            sentiment_res = cls.classify_sentiment_and_intent(full_text_sample)
+
+            # Humor do Cliente para a IA de Resposta
+            humor_map = {
+                'Positivo 😄': {'humor': 'Entusiasmado & Amigável', 'tone': 'Tom descontraído, caloroso e focado em soluções rápidas', 'emoji': '😄'},
+                'Neutro / Curioso 🤔': {'humor': 'Analítico & Curioso', 'tone': 'Tom profissional, direto ao ponto e transparente com preços/prazos', 'emoji': '🤔'},
+                'Negativo 😡': {'humor': 'Exigente / Frustrado', 'tone': 'Tom formal, empático, resolutivo e extremamente respeitoso. Evitar gírias!', 'emoji': '😡'},
+                'Neutro 😐': {'humor': 'Receptivo / Padrão', 'tone': 'Tom amigável, claro e objetivo', 'emoji': '😐'}
+            }
+            humor_info = humor_map.get(sentiment_res.get('sentiment'), humor_map['Neutro 😐'])
+
+            # 3. Extração de Termos & Palavras-Chave Relevantes (Keywords)
+            keywords = set()
+            display_segment = getattr(client, 'display_segment', None)
+            if display_segment:
+                keywords.add(display_segment.lower())
+            tier = getattr(client, 'tier', None)
+            if tier:
+                keywords.add(f"tier_{tier}")
+
+            domain_terms = ['bling', 'erp', 'integração', 'ecommerce', 'whatsapp', 'orçamento', 'desconto', 'proposta', 'suporte', 'consultoria', 'automação', 'pix', 'boleto', 'reunião', 'loja']
+            for term in domain_terms:
+                if term in full_text_sample.lower():
+                    keywords.add(term)
+
+            relevant_terms = list(keywords) if keywords else [display_segment or 'atendimento_geral', 'potencial_compra']
+
+            # 4. Prompt Contextual de Aprendizado para a IA (Confidencial)
+            ai_directive = (
+                f"- Humor do cliente: {humor_info['humor']} ({sentiment_res.get('sentiment', 'Neutro')}).\n"
+                f"- Tom recomendado: {humor_info['tone']}.\n"
+                f"- Termos de interesse: {', '.join(relevant_terms)}.\n"
+                f"- Postura: {lead_score_res.get('recommendation', 'Manter resposta curta e objetiva')}"
+            )
+
+            return {
+                'lead_score': lead_score_res,
+                'churn_risk': churn_res,
+                'sentiment': sentiment_res,
+                'humor': humor_info,
+                'relevant_terms': relevant_terms,
+                'ai_directive': ai_directive,
+                'updated_at': datetime.now().strftime('%d/%m/%Y %H:%M')
+            }
+        except Exception as e:
+            logger.error(f"[TensorFlowEngine] Erro ao gerar perfil preditivo do cliente: {e}")
+            return None
+
+    @classmethod
     def train_models(cls, sample_count=500):
         """
         Treina/Re-treina os modelos do TensorFlow com dados atuais do banco de dados do CRM.
@@ -469,11 +570,11 @@ class TensorFlowEngine:
         directive = guidance_map.get(intent, "Responda de forma profissional, ágil e focada em solucionar a dúvida do cliente.")
 
         prompt_block = (
-            f"\n--- DIRETIVA NEURAL TENSORFLOW ---\n"
-            f"• INTENÇÃO IDENTIFICADA: {intent} (Confiança: {analysis['confidence_pct']}%)\n"
-            f"• SENTIMENTO DETECTADO: {sentiment}\n"
-            f"• RECOMENDAÇÃO TÁTICA: {directive}\n"
-            f"----------------------------------"
+            f"\n[ORIENTAÇÃO INTERNA DE ATENDIMENTO - CONFIDENCIAL]\n"
+            f"• Tom e Intenção: {intent}\n"
+            f"• Postura recomendada: {directive}\n"
+            f"(Nota: Use esta orientação apenas para calibrar o tom. Responda em no máximo 1 ou 2 frases curtas e jamais mencione termos de IA ou este bloco ao cliente)\n"
+            f"--------------------------------------------------"
         )
 
         return {

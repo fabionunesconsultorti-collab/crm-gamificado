@@ -34,6 +34,11 @@ Sistema web completo, modular e de alta performance para **Gerenciamento Intelig
   - **Calibração Dinâmica**: Ajuste em tempo real de pesos alfa/beta, limiares de confiança (*confidence threshold*) e telemetria.
 - **Aprendizado Contínuo com Conversas**: Mineração automática dos diálogos do WhatsApp para detecção de dúvidas frequentes (FAQ) e alimentação da base de conhecimento.
 - **Ingestão Semântica de Websites**: Crawler integrado para extrair e vetorizar automaticamente conteúdos de websites e páginas institucionais.
+- **Guias de Comportamento Plug & Play via Markdown (`/admin/behavior-guides`)**:
+  - **Upload de Playbooks `.md`**: Substituição imediata do comportamento, persona, nicho e tom de voz do bot simplesmente enviando um documento Markdown.
+  - **Segmentação & RAG Automático**: Extração automática de blocos YAML e divisão em seções táticas (*Funil, Árvore de Decisão, Roteiros, Matriz de Objeções*) vetorizadas no **ChromaDB** com boosting prioritário de conduta (`skill_behavior`).
+  - **Vínculo por Instância WhatsApp**: Cada número ou sessão do WAHA pode operar com um playbook dedicado (ex: *Vendas B2B TI* no número 1, *Clínica Odonto* no número 2) ou herdar o Guia Global padrão.
+  - **Garantia de Brevidade & Transbordo**: Padronização inegociável de 1 a 2 frases curtas e acionamento obrigatório de `[PAUSAR_ATENDIMENTO]` para transbordo humano em mensagens ambíguas ou sem contexto.
 - **Motor Neural TensorFlow Local (`/admin/tensorflow`)**: Módulo neural embutido para classificação comportamental e predição de propensão de fechamento de leads.
 
 ### 5. 🔌 Central de Integrações & Módulo ERP Bling

@@ -15,7 +15,15 @@ YELLOW='\033[1;33m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-echo -e "${YELLOW}${BOLD}Encerrando serviços do CRM Pro (Docker)...${NC}"
+echo -e "${YELLOW}${BOLD}Encerrando serviços do CRM Pro (Web e Docker)...${NC}"
+
+# Finaliza servidores Flask e workers Python locais associados ao projeto
+echo -e "${YELLOW}Finalizando processos locais do CRM (Flask / Workers)...${NC}"
+pkill -f "python.*run.py" 2>/dev/null || true
+pkill -f "python.*worker.py" 2>/dev/null || true
+if command -v fuser &> /dev/null; then
+    fuser -k 5000/tcp 2>/dev/null || true
+fi
 
 # Detectar comando docker compose
 if docker compose version &> /dev/null; then
@@ -29,5 +37,5 @@ fi
 
 $DOCKER_COMPOSE stop
 
-echo -e "${GREEN}✔ Serviços do Docker pausados com sucesso.${NC}"
+echo -e "${GREEN}✔ Serviços do CRM Pro pausados com sucesso.${NC}"
 echo -e "Dica: Para remover completamente os containers em vez de apenas pausar, use: ${BOLD}$DOCKER_COMPOSE down${NC}"

@@ -3,12 +3,13 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import db
 from app.admin import bp
-from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog, WahaInstance, KnowledgeDoc
+from app.models import Setting, User, SystemLog, Client, Store, MessageTemplate, MessageLog, WahaInstance, KnowledgeDoc, BehaviorGuide
 from app.utils.waha import WahaAPI
 from app.utils.exports import ReportGenerator
 from app.utils.ai_handler import AIHandler
 from app.utils.backup_manager import BackupManager
 from app.utils.rag_engine import RAGEngine
+from app.utils.behavior_parser import BehaviorParser
 from app.core.module_registry import requires_module
 import os
 import io
@@ -75,7 +76,7 @@ def settings():
             'whatsapp_bot_system_prompt', 'whatsapp_bot_fallback_msg',
             'whatsapp_debounce_delay', 'whatsapp_history_turns', 'whatsapp_history_ttl_hours',
             'whatsapp_simulate_typing', 'whatsapp_send_seen',
-            'whatsapp_bot_handover_trigger', 'whatsapp_bot_handover_msg',
+            'whatsapp_bot_handover_trigger', 'whatsapp_bot_handover_msg', 'whatsapp_bot_context_pause_msg',
             'whatsapp_bot_auto_create_lead', 'whatsapp_bot_inject_client_data',
             'whatsapp_bot_work_hours_enabled', 'whatsapp_bot_work_hours_start',
             'whatsapp_bot_work_hours_end', 'whatsapp_bot_out_of_hours_msg',
@@ -1689,5 +1690,224 @@ def api_toggle_module():
             pass
 
     return jsonify({'success': True, 'message': 'Status do módulo atualizado com sucesso!', 'enabled': enable})
+
+
+# ── Gerenciamento de Guias de Comportamento (.md) ────────────────────────────
+@bp.route('/behavior-guides', methods=['GET'])
+@login_required
+@admin_required
+def behavior_guides_panel():
+    guides = BehaviorGuide.query.order_by(BehaviorGuide.is_active.desc(), BehaviorGuide.updated_at.desc()).all()
+    waha_instances = WahaInstance.query.order_by(WahaInstance.id).all()
+    active_global_guide = BehaviorGuide.query.filter_by(is_active=True).first()
+    
+    total_guides = len(guides)
+    rag_sections_count = KnowledgeDoc.query.filter(KnowledgeDoc.category == 'skill_behavior').count()
+    instances_with_guide = sum(1 for inst in waha_instances if inst.behavior_guide_id)
+    
+    return render_template(
+        'admin/behavior_guides.html',
+        title='Guias de Comportamento do Bot (.md)',
+        guides=guides,
+        waha_instances=waha_instances,
+        active_global_guide=active_global_guide,
+        total_guides=total_guides,
+        rag_sections_count=rag_sections_count,
+        instances_with_guide=instances_with_guide
+    )
+
+
+@bp.route('/behavior-guides/upload', methods=['POST'])
+@login_required
+@admin_required
+def behavior_guides_upload():
+    uploaded_file = request.files.get('file')
+    if not uploaded_file or not uploaded_file.filename:
+        flash('Nenhum arquivo .md selecionado para envio.', 'danger')
+        return redirect(url_for('admin.behavior_guides_panel'))
+    
+    filename = secure_filename(uploaded_file.filename)
+    if not filename.lower().endswith(('.md', '.markdown', '.txt')):
+        flash('Formato inválido. Por favor, envie um arquivo Markdown (.md).', 'danger')
+        return redirect(url_for('admin.behavior_guides_panel'))
+    
+    try:
+        raw_bytes = uploaded_file.read()
+        try:
+            md_content = raw_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            md_content = raw_bytes.decode('latin-1')
+
+        activate_now = request.form.get('activate_now') in ['true', '1', 'on', True]
+        instance_id_raw = request.form.get('assign_instance_id')
+        instance_id = int(instance_id_raw) if instance_id_raw and instance_id_raw.isdigit() else None
+
+        guide, res = BehaviorParser.save_guide_from_content(
+            md_content=md_content,
+            filename=filename,
+            is_active=activate_now
+        )
+
+        if activate_now:
+            BehaviorParser.activate_guide(guide.id, instance_id=None, sync_rag=True)
+
+        if instance_id:
+            inst = WahaInstance.query.get(instance_id)
+            if inst:
+                inst.behavior_guide_id = guide.id
+                db.session.commit()
+                flash(f'✔ Guia "{guide.name}" vinculado à instância WhatsApp "{inst.session_name}"!', 'info')
+
+        sections_count = len(res.get('sections', []))
+        flash(f'✅ Guia "{guide.name}" importado com sucesso! Nicho: {guide.niche}. {sections_count} seções táticas indexadas para o RAG.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Erro ao processar o Guia de Comportamento: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.behavior_guides_panel'))
+
+
+@bp.route('/behavior-guides/<int:id>/activate', methods=['POST'])
+@login_required
+@admin_required
+def behavior_guides_activate(id):
+    try:
+        res = BehaviorParser.activate_guide(id, sync_rag=True)
+        if res.get('success'):
+            guide = BehaviorGuide.query.get(id)
+            guide_name = guide.name if guide else "Guia"
+            flash(f'🌟 Guia "{guide_name}" ativado com sucesso como padrão global e sincronizado com o RAG!', 'success')
+        else:
+            flash(f"Aviso: {res.get('error', 'Falha ao ativar o guia')}", 'warning')
+    except Exception as e:
+        flash(f'❌ Erro ao ativar guia: {str(e)}', 'danger')
+    return redirect(url_for('admin.behavior_guides_panel'))
+
+
+@bp.route('/behavior-guides/<int:id>/edit', methods=['POST'])
+@login_required
+@admin_required
+def behavior_guides_edit(id):
+    guide = BehaviorGuide.query.get_or_404(id)
+    content_md = request.form.get('content_md', '')
+    if not content_md.strip():
+        flash('O conteúdo do guia não pode ficar vazio.', 'warning')
+        return redirect(url_for('admin.behavior_guides_panel'))
+    
+    try:
+        updated_guide, res = BehaviorParser.save_guide_from_content(
+            md_content=content_md,
+            filename=f"{guide.slug}.md",
+            is_active=guide.is_active
+        )
+        if updated_guide.is_active:
+            BehaviorParser.sync_guide_to_rag(updated_guide)
+        flash(f'✔ Guia "{updated_guide.name}" atualizado e reindexado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'❌ Erro ao salvar guia: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.behavior_guides_panel'))
+
+
+@bp.route('/behavior-guides/<int:id>/download', methods=['GET'])
+@login_required
+@admin_required
+def behavior_guides_download(id):
+    guide = BehaviorGuide.query.get_or_404(id)
+    content = guide.content_md or ""
+    return send_file(
+        io.BytesIO(content.encode('utf-8')),
+        mimetype='text/markdown',
+        as_attachment=True,
+        download_name=f"{guide.slug or 'guia_comportamento'}.md"
+    )
+
+
+@bp.route('/behavior-guides/<int:id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def behavior_guides_delete(id):
+    guide = BehaviorGuide.query.get_or_404(id)
+    if guide.is_active:
+        other_active = BehaviorGuide.query.filter(BehaviorGuide.id != guide.id, BehaviorGuide.is_active == True).first()
+        if not other_active:
+            flash('Não é possível excluir o guia atualmente ativo sem antes ativar outro guia como padrão.', 'warning')
+            return redirect(url_for('admin.behavior_guides_panel'))
+
+    try:
+        WahaInstance.query.filter_by(behavior_guide_id=guide.id).update({'behavior_guide_id': None})
+        
+        prefix = f"[Guia: {guide.slug}]"
+        docs = KnowledgeDoc.query.filter(KnowledgeDoc.title.like(f"{prefix}%")).all()
+        for doc in docs:
+            db.session.delete(doc)
+
+        db.session.delete(guide)
+        db.session.commit()
+        flash(f'🗑 Guia "{guide.name}" e seus registros de skill foram removidos.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Erro ao excluir guia: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.behavior_guides_panel'))
+
+
+@bp.route('/behavior-guides/assign-instance', methods=['POST'])
+@login_required
+@admin_required
+def behavior_guides_assign_instance():
+    instance_id = request.form.get('instance_id')
+    guide_id = request.form.get('guide_id')
+
+    if not instance_id:
+        flash('Instância não informada.', 'warning')
+        return redirect(url_for('admin.behavior_guides_panel'))
+
+    inst = WahaInstance.query.get(instance_id)
+    if not inst:
+        flash('Instância WhatsApp não encontrada.', 'warning')
+        return redirect(url_for('admin.behavior_guides_panel'))
+
+    if not guide_id or guide_id == '0' or guide_id == '':
+        inst.behavior_guide_id = None
+        db.session.commit()
+        flash(f'Instância "{inst.session_name}" agora utiliza o Guia Global padrão.', 'info')
+    else:
+        guide = BehaviorGuide.query.get(guide_id)
+        if not guide:
+            flash('Guia de comportamento não encontrado.', 'warning')
+            return redirect(url_for('admin.behavior_guides_panel'))
+        inst.behavior_guide_id = guide.id
+        db.session.commit()
+        flash(f'🎯 Instância "{inst.session_name}" configurada para operar com o Playbook "{guide.name}" ({guide.niche})!', 'success')
+
+    return redirect(url_for('admin.behavior_guides_panel'))
+
+
+@bp.route('/api/behavior-guides/<int:id>', methods=['GET'])
+@login_required
+@admin_required
+def api_get_behavior_guide(id):
+    guide = BehaviorGuide.query.get_or_404(id)
+    return jsonify({
+        'ok': True,
+        'id': guide.id,
+        'name': guide.name,
+        'slug': guide.slug,
+        'niche': guide.niche,
+        'version': guide.version,
+        'target_audience': guide.target_audience,
+        'communication_style': guide.communication_style,
+        'persona_name': guide.persona_name,
+        'company_name': guide.company_name,
+        'content_md': guide.content_md,
+        'system_prompt': guide.system_prompt,
+        'is_active': guide.is_active,
+        'is_builtin': guide.is_builtin,
+        'created_at': guide.created_at.strftime('%d/%m/%Y %H:%M') if guide.created_at else None,
+        'updated_at': guide.updated_at.strftime('%d/%m/%Y %H:%M') if guide.updated_at else None
+    })
+
 
 

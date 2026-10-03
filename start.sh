@@ -139,4 +139,13 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+# Garante que a porta 5000 não está presa por processo anterior
+if command -v fuser &> /dev/null; then
+    if fuser 5000/tcp &> /dev/null; then
+        echo -e "${YELLOW}Porta 5000 em uso. Liberando processo anterior...${NC}"
+        fuser -k 5000/tcp 2>/dev/null || true
+        sleep 1
+    fi
+fi
+
 python run.py

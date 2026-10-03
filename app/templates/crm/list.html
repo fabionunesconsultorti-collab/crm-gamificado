@@ -374,6 +374,11 @@
                                         <i class="fa-solid fa-map-pin"></i> Maps
                                     </span>
                                     {% endif %}
+                                    {% if not client.bot_enabled %}
+                                    <span class="tag-badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35);" title="Atendimento Humano (Robô de IA Pausado)">
+                                        <i class="fa-solid fa-user-tie"></i> Humano
+                                    </span>
+                                    {% endif %}
                                     {% if client.tier == 'vip' %}
                                     <span class="tag-badge tag-tier" title="Cliente VIP">💎 VIP</span>
                                     {% elif client.tier == 'ouro' %}

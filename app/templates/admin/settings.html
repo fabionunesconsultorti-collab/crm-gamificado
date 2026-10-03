@@ -2094,7 +2094,7 @@
                         <div class="form-group mb-3">
                             <textarea name="whatsapp_bot_system_prompt" id="whatsapp_bot_system_prompt" class="input-glass w-100" rows="8"
                                       style="font-family: inherit; font-size: 0.84rem; line-height: 1.5; resize: vertical;"
-                                      placeholder="Instruções completas para a conduta do assistente...">{{ settings.get('whatsapp_bot_system_prompt', 'Você é um assistente comercial educado, atencioso e prestativo. Responda de forma clara, natural, profissional e amigável em português do Brasil. Mantenha respostas curtas e fáceis de ler no celular (1 a 3 parágrafos curtos). Seu objetivo é tirar dúvidas sobre nossos serviços, qualificar o interesse do lead e propor que um consultor da equipe entre em contato para prosseguir com a proposta.') }}</textarea>
+                                      placeholder="Instruções completas para a conduta do assistente...">{{ settings.get('whatsapp_bot_system_prompt', 'Você é atendente oficial de WhatsApp da empresa [EMPRESA]. Forneça respostas padronizadas, curtas e estritamente objetivas (máximo de 1 a 2 frases diretas no estilo WhatsApp comercial). Responda dúvidas com base exclusivamente nas informações oficiais da empresa. NUNCA aja como IA genérica, robô ou ChatGPT. NUNCA mencione termos técnicos internos como TensorFlow, Diretiva ou RAG. Se você não entender com precisão o contexto da mensagem, se for ambígua ou sem sentido: pause o atendimento emitindo [PAUSAR_ATENDIMENTO] Não consegui compreender o contexto da sua mensagem. Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes.') }}</textarea>
                         </div>
 
                         <div class="form-group mb-0">
@@ -2217,12 +2217,23 @@
                                    placeholder="humano, atendente, suporte">
                         </div>
 
-                        <div class="form-group mb-0">
+                        <div class="form-group mb-3">
                             <label for="whatsapp_bot_handover_msg" class="text-xs font-semibold mb-1 d-block text-gray-300">
-                                Mensagem de Notificação de Transferência
+                                Mensagem de Notificação de Transferência (Solicitação do Cliente)
                             </label>
                             <textarea name="whatsapp_bot_handover_msg" id="whatsapp_bot_handover_msg" class="input-glass w-100" rows="2"
                                       placeholder="Mensagem ao transferir...">{{ settings.get('whatsapp_bot_handover_msg', 'Com certeza! Estou direcionando seu atendimento para um de nossos consultores humanos. Em instantes alguém da equipe responderá aqui.') }}</textarea>
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label for="whatsapp_bot_context_pause_msg" class="text-xs font-semibold mb-1 d-block text-gray-300">
+                                <i class="fa-solid fa-pause text-warning me-1"></i> Mensagem ao Pausar por Falta de Contexto (Automático)
+                            </label>
+                            <textarea name="whatsapp_bot_context_pause_msg" id="whatsapp_bot_context_pause_msg" class="input-glass w-100" rows="2"
+                                      placeholder="Mensagem ao pausar por falta de contexto...">{{ settings.get('whatsapp_bot_context_pause_msg', 'Não consegui compreender o contexto da sua mensagem. Pausei o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes.') }}</textarea>
+                            <small class="text-xs text-muted mt-1 d-block">
+                                Disparada quando o bot não compreende a mensagem ou faltam dados oficiais, suspendendo o robô e aguardando contexto humano.
+                            </small>
                         </div>
                     </div>
 

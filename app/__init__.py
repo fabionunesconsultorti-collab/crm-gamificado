@@ -14,6 +14,25 @@ naming_convention = {
     "pk": "pk_%(table_name)s"
 }
 db = SQLAlchemy(metadata=MetaData(naming_convention=naming_convention))
+
+# Blindagem estrita contra perda acidental de dados:
+# Impede terminantemente a execução de db.drop_all() em bancos de dados persistentes (PostgreSQL ou arquivo SQLite).
+_orig_drop_all = db.drop_all
+def _safe_drop_all(*args, **kwargs):
+    try:
+        uri = str(db.engine.url)
+        if 'sqlite' not in uri or ':memory:' not in uri:
+            raise RuntimeError(
+                f"🚨 OPERAÇÃO BLOQUEADA POR SEGURANÇA: db.drop_all() foi chamado no banco de dados '{uri}'. "
+                "Esta operação foi terminantemente abortada para proteger os dados de produção/desenvolvimento. "
+                "drop_all só é permitido em SQLite em memória ('sqlite:///:memory:') em suítes de teste."
+            )
+    except Exception as e:
+        if "OPERAÇÃO BLOQUEADA POR SEGURANÇA" in str(e):
+            raise
+    return _orig_drop_all(*args, **kwargs)
+db.drop_all = _safe_drop_all
+
 migrate = Migrate()
 login = LoginManager()
 login.login_view = 'auth.login'

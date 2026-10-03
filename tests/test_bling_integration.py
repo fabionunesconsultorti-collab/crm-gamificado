@@ -189,6 +189,54 @@ class BlingIntegrationTestCase(unittest.TestCase):
         self.assertEqual(BlingProductCache.query.count(), 0)
         self.assertEqual(BlingSalesCache.query.count(), 0)
 
+    def test_bling_tools_page_renders_successfully(self):
+        """Verifica se a tela /integrations/bling/tools renderiza sem BuildError de url_for."""
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(self.admin.id)
+            sess['_fresh'] = True
+
+        response = client.get('/integrations/bling/tools')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Ferramentas do Bling ERP', response.data)
+
+    def test_save_integration_config_endpoint(self):
+        """Verifica se tanto save_integration_config quanto update_config funcionam corretamente."""
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(self.admin.id)
+            sess['_fresh'] = True
+
+        # Teste via rota save-config
+        res = client.post('/integrations/save-config', json={
+            'provider': 'bling',
+            'client_id': 'test_client_id_endpoint',
+            'client_secret': 'test_secret_endpoint'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data['success'])
+
+        cfg = IntegrationConfig.query.filter_by(provider='bling').first()
+        self.assertEqual(cfg.client_id, 'test_client_id_endpoint')
+
+    def test_bling_oauth_authorize_redirect(self):
+        """Verifica se /integrations/bling/authorize redireciona corretamente para a URL do Bling."""
+        # Salva client_id para permitir autorização
+        IntegrationManager.update_config('bling', {
+            'client_id': 'app_bling_client_xyz'
+        })
+
+        client = self.app.test_client()
+        with client.session_transaction() as sess:
+            sess['_user_id'] = str(self.admin.id)
+            sess['_fresh'] = True
+
+        res = client.get('/integrations/bling/authorize')
+        self.assertEqual(res.status_code, 302)
+        self.assertIn('https://www.bling.com.br/Api/v3/oauth/authorize', res.location)
+        self.assertIn('client_id=app_bling_client_xyz', res.location)
+
 if __name__ == '__main__':
     unittest.main()
 

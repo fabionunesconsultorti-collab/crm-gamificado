@@ -166,6 +166,7 @@ def kanban():
     tier = request.args.get('tier', '').strip()
     source = request.args.get('source', '').strip()
     badge = request.args.get('badge', '').strip()
+    bot_mode = request.args.get('bot_mode', '').strip()
 
     query = Client.query
 
@@ -211,6 +212,11 @@ def kanban():
     if badge:
         query = query.filter(Client.badges.contains(badge))
 
+    if bot_mode == 'robo':
+        query = query.filter(Client.bot_enabled.is_(True))
+    elif bot_mode == 'humano':
+        query = query.filter(Client.bot_enabled.is_(False))
+
     all_clients = query.order_by(Client.updated_at.desc()).all()
     clients_by_status = defaultdict(list)
     for c in all_clients:
@@ -231,9 +237,10 @@ def kanban():
         'store_id': store_id,
         'tier': tier,
         'source': source,
-        'badge': badge
+        'badge': badge,
+        'bot_mode': bot_mode
     }
-    has_active_filters = bool(q or segment or seller_id or store_id or tier or source or badge)
+    has_active_filters = bool(q or segment or seller_id or store_id or tier or source or badge or bot_mode)
 
     settings = {s.key: s.value for s in Setting.query.all()}
     total_db_clients = Client.query.count()
@@ -331,6 +338,9 @@ def new_client():
             preferred_channel=request.form.get('preferred_channel'),
             lead_source=request.form.get('lead_source'),
             
+            # Modo de Atendimento (Robô vs Humano)
+            bot_enabled=str(request.form.get('bot_enabled', 'true')).lower() in ['true', '1', 'yes', 'bot', 'robo'],
+
             # LGPD
             opt_in=True if request.form.get('opt_in') else False,
             opt_in_date=datetime.utcnow() if request.form.get('opt_in') else None,
@@ -401,6 +411,22 @@ def edit_client(id):
         client.referred_by_id = request.form.get('referred_by_id') or None
         client.preferred_channel = request.form.get('preferred_channel')
         client.lead_source = request.form.get('lead_source')
+
+        # Modo de Atendimento (Robô vs Humano)
+        if 'bot_enabled' in request.form:
+            bot_enabled_raw = request.form.get('bot_enabled')
+            client.bot_enabled = str(bot_enabled_raw).lower() in ['true', '1', 'yes', 'bot', 'robo']
+            if client.phone:
+                try:
+                    from app.utils.lead_enricher import LeadEnricher
+                    clean_phone = LeadEnricher.clean_digits(client.phone)
+                    from app.utils.dialogue_collector import DialogueCollector
+                    if not client.bot_enabled:
+                        DialogueCollector.activate_human_takeover(clean_phone or client.phone, reason="chave_humano_crm")
+                    else:
+                        DialogueCollector.deactivate_human_takeover(clean_phone or client.phone)
+                except Exception:
+                    pass
         
         client.opt_in = True if request.form.get('opt_in') else False
         client.consent_channel = request.form.get('consent_channel')
@@ -425,9 +451,61 @@ def edit_client(id):
 
     users = User.query.all()
     stores = Store.query.all()
-    from app.utils.tf_engine import TensorFlowEngine
-    tf_profile = TensorFlowEngine.get_client_intelligence_profile(client) if client else None
+    tf_profile = None
+    try:
+        from app.utils.tf_engine import TensorFlowEngine
+        tf_profile = TensorFlowEngine.get_client_intelligence_profile(client) if client else None
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[edit_client] Aviso ao carregar perfil preditivo TensorFlow: {e}")
+        tf_profile = None
+
     return render_template('crm/form.html', title='Editar Cliente', client=client, users=users, stores=stores, tf_profile=tf_profile)
+
+
+# ── Toggle Bot Mode (Robô vs Humano) ──────────────────────────────────────────
+@bp.route('/client/<int:id>/toggle-bot', methods=['POST'])
+@login_required
+def toggle_client_bot(id):
+    """Alterna ou define o modo de atendimento do lead (Robô vs Humano)."""
+    client = Client.query.get_or_404(id)
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    
+    if 'bot_enabled' in data:
+        new_val = str(data['bot_enabled']).lower() in ['true', '1', 'yes', 'bot', 'robo']
+    else:
+        new_val = not client.bot_enabled
+
+    client.bot_enabled = new_val
+    db.session.commit()
+
+    if client.phone:
+        try:
+            from app.utils.lead_enricher import LeadEnricher
+            clean_phone = LeadEnricher.clean_digits(client.phone)
+            from app.utils.dialogue_collector import DialogueCollector
+            if not client.bot_enabled:
+                DialogueCollector.activate_human_takeover(clean_phone or client.phone, reason="chave_humano_crm")
+            else:
+                DialogueCollector.deactivate_human_takeover(clean_phone or client.phone)
+        except Exception:
+            pass
+
+    mode = "robo" if client.bot_enabled else "humano"
+    msg = f"Modo alterado para {'Robô (Respostas automáticas de IA ativas)' if client.bot_enabled else 'Atendimento Humano (Respostas automáticas do bot desativadas)'}."
+    
+    log = SystemLog(user_id=current_user.id, action=f"Alterou modo de atendimento de '{client.name}' para {mode.upper()}")
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'client_id': client.id,
+        'bot_enabled': client.bot_enabled,
+        'mode': mode,
+        'label': 'Robô' if client.bot_enabled else 'Humano',
+        'message': msg
+    })
 
 # ── Message Client (Manual WA / API preview) ──────────────────────────────────
 @bp.route('/client/<int:id>/message', methods=['GET', 'POST'])

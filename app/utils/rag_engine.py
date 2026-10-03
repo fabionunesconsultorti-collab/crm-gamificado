@@ -26,7 +26,7 @@ class RAGEngine:
         'rag_min_similarity': '0.45',      # Limiar de corte
         'rag_reranker_enabled': 'true',
         'rag_top_n': '3',                  # Chunks finais enviados ao LLM
-        'rag_rerank_min_score': '0.55',
+        'rag_rerank_min_score': '0.45',
         'whatsapp_bot_temperature': '0.25',
         'whatsapp_bot_max_tokens': '200'
     }
@@ -58,7 +58,7 @@ class RAGEngine:
             'rag_min_similarity': float(cls.get_setting('rag_min_similarity', 0.45)),
             'rag_reranker_enabled': str(cls.get_setting('rag_reranker_enabled', 'true')).lower() in ['true', '1', 'yes'],
             'rag_top_n': int(cls.get_setting('rag_top_n', 3)),
-            'rag_rerank_min_score': float(cls.get_setting('rag_rerank_min_score', 0.55)),
+            'rag_rerank_min_score': float(cls.get_setting('rag_rerank_min_score', 0.45)),
             'whatsapp_bot_temperature': float(cls.get_setting('whatsapp_bot_temperature', 0.25)),
             'whatsapp_bot_max_tokens': int(cls.get_setting('whatsapp_bot_max_tokens', 200))
         }

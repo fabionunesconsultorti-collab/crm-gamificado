@@ -1,0 +1,581 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .behavior-hero {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 50%, rgba(16, 185, 129, 0.1) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(16px);
+        border-radius: 16px;
+        padding: 1.75rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    .b-stat-card {
+        background: rgba(15, 23, 42, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .b-stat-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    .b-stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+    }
+
+    .card-glass {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 1.5rem;
+        backdrop-filter: blur(12px);
+    }
+
+    .upload-dropzone {
+        border: 2px dashed rgba(99, 102, 241, 0.4);
+        border-radius: 14px;
+        background: rgba(99, 102, 241, 0.03);
+        padding: 2.2rem 1.5rem;
+        text-align: center;
+        transition: all 0.25s ease;
+        cursor: pointer;
+    }
+    .upload-dropzone:hover, .upload-dropzone.dragover {
+        border-color: #6366f1;
+        background: rgba(99, 102, 241, 0.08);
+        transform: scale(1.005);
+    }
+
+    .guide-card {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.25s ease;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .guide-card:hover {
+        border-color: rgba(99, 102, 241, 0.4);
+        transform: translateY(-3px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+    .guide-card.is-active {
+        border: 2px solid #10b981;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+    }
+
+    .input-glass {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+        border-radius: 8px;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+    }
+    .input-glass:focus {
+        border-color: #6366f1;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .tag-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .code-preview-box {
+        background: #090d16;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        font-family: 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 0.82rem;
+        color: #94a3b8;
+        padding: 0.85rem;
+        max-height: 180px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+    }
+</style>
+
+<div class="container-fluid py-3">
+
+    <!-- Hero Header -->
+    <div class="behavior-hero d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-2 py-1">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Playbooks Plug & Play (.md)
+                </span>
+                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-2 py-1">
+                    <i class="fa-solid fa-shield-check me-1"></i> Pausa [PAUSAR_ATENDIMENTO] Ativa
+                </span>
+            </div>
+            <h1 class="h3 font-bold text-white mb-1">
+                <i class="fa-solid fa-book-bookmark text-primary me-2"></i>Guias de Comportamento do Bot
+            </h1>
+            <p class="text-muted text-sm mb-0" style="max-width: 780px;">
+                Personalize o comportamento, funil de vendas, árvore de decisão, objeções e tom de voz do bot simplesmente enviando um documento <code>.md</code>. Alterne guias por nicho ou atribua playbooks específicos a cada número do WhatsApp.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="#upload-section" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Subir Playbook (.md)</span>
+            </a>
+            <a href="{{ url_for('admin.bot_live') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                <i class="fa-solid fa-network-wired"></i>
+                <span>Monitorar Fluxo IA</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Estatísticas e Métricas -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="b-stat-card">
+                <div class="b-stat-icon bg-success bg-opacity-20 text-success">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <div class="text-xs text-muted text-uppercase fw-semibold">Playbook Global Ativo</div>
+                    <div class="fw-bold text-white text-truncate fs-6" title="{{ active_global_guide.name if active_global_guide else 'Nenhum' }}">
+                        {{ active_global_guide.name if active_global_guide else 'Padrão do Sistema' }}
+                    </div>
+                    <div class="text-xs text-success text-truncate">
+                        Nicho: {{ active_global_guide.niche if active_global_guide else 'Geral' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="b-stat-card">
+                <div class="b-stat-icon bg-primary bg-opacity-20 text-primary">
+                    <i class="fa-solid fa-books"></i>
+                </div>
+                <div>
+                    <div class="text-xs text-muted text-uppercase fw-semibold">Playbooks no Acervo</div>
+                    <div class="fw-bold text-white fs-4">{{ total_guides }}</div>
+                    <div class="text-xs text-muted">Prontos para ativação</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="b-stat-card">
+                <div class="b-stat-icon bg-info bg-opacity-20 text-info">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div>
+                    <div class="text-xs text-muted text-uppercase fw-semibold">Seções Táticas no RAG</div>
+                    <div class="fw-bold text-white fs-4">{{ rag_sections_count }}</div>
+                    <div class="text-xs text-info">Indexadas no ChromaDB</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="b-stat-card">
+                <div class="b-stat-icon bg-warning bg-opacity-20 text-warning">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                </div>
+                <div>
+                    <div class="text-xs text-muted text-uppercase fw-semibold">Instâncias WhatsApp</div>
+                    <div class="fw-bold text-white fs-4">{{ waha_instances|length }}</div>
+                    <div class="text-xs text-warning">{{ instances_with_guide }} com playbook dedicado</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção de Vínculo por Instância WhatsApp (Multi-Tenant / Multi-Número) -->
+    {% if waha_instances %}
+    <div class="card-glass mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="fw-bold text-white mb-1">
+                    <i class="fa-solid fa-arrows-split-up-and-left text-info me-2"></i>Playbook por Instância do WhatsApp
+                </h5>
+                <p class="text-muted text-xs mb-0">
+                    Defina qual comportamento cada número/instância do WhatsApp deve assumir. Se uma instância não tiver playbook dedicado, usará o Guia Global padrão.
+                </p>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                <thead>
+                    <tr class="text-muted text-xs text-uppercase border-secondary">
+                        <th>Instância</th>
+                        <th>Sessão WAHA</th>
+                        <th>Playbook Atribuído</th>
+                        <th>Status Efetivo</th>
+                        <th class="text-end">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inst in waha_instances %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge {{ 'bg-success' if inst.is_active else 'bg-secondary' }} rounded-circle p-1"></span>
+                                <strong class="text-white">{{ inst.session_name }}</strong>
+                                {% if inst.is_default %}
+                                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 text-xs">Padrão</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <code class="text-info text-xs">{{ inst.api_url or 'Localhost:3000' }}</code>
+                        </td>
+                        <td>
+                            <form action="{{ url_for('admin.behavior_guides_assign_instance') }}" method="POST" class="d-inline-flex align-items-center gap-2">
+                                <input type="hidden" name="instance_id" value="{{ inst.id }}">
+                                <select name="guide_id" class="input-glass form-select form-select-sm text-xs py-1" style="min-width: 220px;" onchange="this.form.submit()">
+                                    <option value="0" {% if not inst.behavior_guide_id %}selected{% endif %}>
+                                        🌐 Usar Guia Global Padrão ({{ active_global_guide.name if active_global_guide else 'Sistema' }})
+                                    </option>
+                                    {% for g in guides %}
+                                    <option value="{{ g.id }}" {% if inst.behavior_guide_id == g.id %}selected{% endif %}>
+                                        🎯 {{ g.name }} ({{ g.niche }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                        </td>
+                        <td>
+                            {% if inst.behavior_guide %}
+                                <span class="tag-badge bg-info bg-opacity-20 text-info border border-info border-opacity-25">
+                                    <i class="fa-solid fa-bullseye"></i> {{ inst.behavior_guide.niche }}
+                                </span>
+                            {% else %}
+                                <span class="tag-badge bg-secondary bg-opacity-20 text-muted border border-secondary border-opacity-25">
+                                    <i class="fa-solid fa-globe"></i> Herda Global
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if inst.behavior_guide %}
+                                <a href="javascript:void(0)" onclick="openPreviewModal({{ inst.behavior_guide.id }})" class="btn btn-sm btn-outline-info text-xs py-1">
+                                    <i class="fa-solid fa-eye me-1"></i> Ver Guia
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Upload de Novo Guia Markdown -->
+    <div id="upload-section" class="card-glass mb-4">
+        <h5 class="fw-bold text-white mb-2">
+            <i class="fa-solid fa-file-arrow-up text-primary me-2"></i>Importar Novo Guia de Comportamento (.md)
+        </h5>
+        <p class="text-muted text-xs mb-3">
+            Arraste ou selecione o arquivo <code>.md</code> contendo as diretrizes, persona, funil de atendimento e respostas. O sistema fará a extração automática das seções para o ChromaDB (RAG) e a injeção do Prompt de Sistema.
+        </p>
+
+        <form action="{{ url_for('admin.behavior_guides_upload') }}" method="POST" enctype="multipart/form-data" id="guide-upload-form">
+            <div class="upload-dropzone mb-3" id="dropzone" onclick="document.getElementById('file-input').click()">
+                <i class="fa-solid fa-cloud-arrow-up fa-2x text-primary mb-2 opacity-75"></i>
+                <h6 class="fw-bold text-white mb-1" id="file-label">Clique para selecionar ou arraste o arquivo .md aqui</h6>
+                <p class="text-muted text-xs mb-0">Formatos aceitos: <code>.md</code>, <code>.markdown</code> (UTF-8 com ou sem YAML frontmatter)</p>
+                <input type="file" id="file-input" name="file" accept=".md,.markdown,.txt" style="display: none;" onchange="handleFileSelected(this)">
+            </div>
+
+            <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-5">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="activate_now" name="activate_now" value="1" checked>
+                        <label class="form-check-label text-sm text-white" for="activate_now">
+                            Ativar imediatamente como <strong>Padrão Global</strong>
+                        </label>
+                    </div>
+                </div>
+                {% if waha_instances %}
+                <div class="col-12 col-md-4">
+                    <select name="assign_instance_id" class="input-glass form-select form-select-sm text-xs py-1">
+                        <option value="">(Opcional) Vincular a uma Instância WhatsApp</option>
+                        {% for inst in waha_instances %}
+                        <option value="{{ inst.id }}">Vincular à instância: {{ inst.session_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-12 col-md-3 text-md-end">
+                    <button type="submit" class="btn btn-success d-inline-flex align-items-center gap-2" id="submit-upload-btn" disabled>
+                        <i class="fa-solid fa-check"></i>
+                        <span>Processar e Importar</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Acervo de Guias (Grid de Cards) -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h5 class="fw-bold text-white mb-0">
+                <i class="fa-solid fa-layer-group text-primary me-2"></i>Acervo de Playbooks Disponíveis
+            </h5>
+            <p class="text-muted text-xs mb-0">Selecione, edite ou alterne o guia ativo a qualquer momento sem reiniciar o sistema.</p>
+        </div>
+        <span class="badge bg-secondary bg-opacity-25 text-muted px-2 py-1 text-xs">
+            {{ guides|length }} Playbook(s)
+        </span>
+    </div>
+
+    <div class="row g-4 mb-4">
+        {% for guide in guides %}
+        <div class="col-12 col-lg-6 col-xl-4">
+            <div class="guide-card h-100 p-4 {{ 'is-active' if guide.is_active else '' }}">
+                
+                <!-- Header do Card -->
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            {% if guide.is_active %}
+                                <span class="tag-badge bg-success bg-opacity-20 text-success border border-success border-opacity-30">
+                                    <i class="fa-solid fa-circle-check"></i> ATIVO GLOBAL
+                                </span>
+                            {% else %}
+                                <span class="tag-badge bg-secondary bg-opacity-20 text-muted border border-secondary border-opacity-30">
+                                    <i class="fa-solid fa-circle-pause"></i> Standby
+                                </span>
+                            {% endif %}
+
+                            {% if guide.is_builtin %}
+                                <span class="tag-badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30">
+                                    <i class="fa-solid fa-box-archive"></i> Nativo
+                                </span>
+                            {% endif %}
+                            <span class="tag-badge bg-dark text-muted border border-secondary border-opacity-20">v{{ guide.version }}</span>
+                        </div>
+                        <h5 class="fw-bold text-white mb-0 text-truncate" title="{{ guide.name }}" style="font-size: 1.05rem;">
+                            {{ guide.name }}
+                        </h5>
+                    </div>
+                </div>
+
+                <!-- Detalhes do Nicho e Persona -->
+                <div class="mb-3">
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        <span class="tag-badge bg-info bg-opacity-15 text-info border border-info border-opacity-20">
+                            <i class="fa-solid fa-briefcase"></i> Nicho: {{ guide.niche }}
+                        </span>
+                        {% if guide.persona_name %}
+                        <span class="tag-badge bg-purple bg-opacity-15 text-purple border border-purple border-opacity-20" style="color: #c084fc;">
+                            <i class="fa-solid fa-user-tie"></i> Persona: {{ guide.persona_name }}
+                        </span>
+                        {% endif %}
+                        {% if guide.company_name %}
+                        <span class="tag-badge bg-light bg-opacity-10 text-light border border-light border-opacity-15">
+                            <i class="fa-solid fa-building"></i> {{ guide.company_name }}
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {% if guide.target_audience %}
+                    <p class="text-muted text-xs mb-1">
+                        <strong class="text-white-50">Público-Alvo:</strong> {{ guide.target_audience }}
+                    </p>
+                    {% endif %}
+
+                    {% if guide.communication_style %}
+                    <p class="text-muted text-xs mb-0">
+                        <strong class="text-white-50">Estilo:</strong> {{ guide.communication_style }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Preview do Prompt de Sistema -->
+                <div class="mb-3 flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-xs text-muted text-uppercase fw-semibold">Diretiva de Sistema:</span>
+                        <span class="text-xs text-muted">{{ (guide.system_prompt or '')|length }} caracteres</span>
+                    </div>
+                    <div class="code-preview-box">
+                        {{ (guide.system_prompt or guide.content_md or 'Sem diretiva definida.')[:240] }}...
+                    </div>
+                </div>
+
+                <!-- Rodapé de Ações -->
+                <div class="border-top border-secondary border-opacity-25 pt-3 mt-auto d-flex justify-content-between align-items-center gap-2">
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-info d-inline-flex align-items-center gap-1 text-xs" onclick="openPreviewModal({{ guide.id }})" title="Visualizar e Editar Markdown">
+                            <i class="fa-solid fa-pen-to-square"></i> Editar .md
+                        </button>
+                        <a href="{{ url_for('admin.behavior_guides_download', id=guide.id) }}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 text-xs" title="Baixar arquivo .md original">
+                            <i class="fa-solid fa-download"></i>
+                        </a>
+                    </div>
+
+                    <div class="d-flex gap-1">
+                        {% if not guide.is_active %}
+                        <form action="{{ url_for('admin.behavior_guides_activate', id=guide.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 text-xs">
+                                <i class="fa-solid fa-play"></i> Ativar Global
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        {% if not guide.is_active or (guides|length > 1) %}
+                        <form action="{{ url_for('admin.behavior_guides_delete', id=guide.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir o guia \'{{ guide.name }}\'? As seções do RAG correspondentes serão removidas.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center text-xs" title="Excluir Guia">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center py-5">
+            <i class="fa-solid fa-book-open fa-3x text-muted mb-3 opacity-50"></i>
+            <h5 class="text-muted fw-bold">Nenhum Guia de Comportamento Encontrado</h5>
+            <p class="text-muted text-sm">Faça o upload do seu primeiro arquivo <code>.md</code> acima para começar.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<!-- Modal de Visualização e Edição de Markdown -->
+<div class="modal fade" id="guideEditModal" tabindex="-1" aria-labelledby="guideEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc;">
+            <div class="modal-header border-secondary border-opacity-30">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-file-code text-primary fs-5"></i>
+                    <div>
+                        <h5 class="modal-title fw-bold text-white mb-0" id="modalGuideTitle">Editar Playbook</h5>
+                        <span class="text-xs text-muted" id="modalGuideMeta">Nicho • Versão</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            
+            <form id="guideEditForm" method="POST" action="">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 text-info text-xs mb-3 d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-circle-info fs-6"></i>
+                        <span>
+                            Ao salvar alterações, o sistema irá reanalisar as seções do documento e sincronizar automaticamente as árvores de decisão e objeções com a base vetorial ChromaDB (RAG).
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label text-xs text-uppercase fw-semibold text-muted mb-0">Conteúdo do Documento Markdown (.md):</label>
+                            <span class="text-xs text-muted" id="charCount">0 caracteres</span>
+                        </div>
+                        <textarea name="content_md" id="modalContentMd" class="form-control font-monospace text-xs input-glass" rows="22" style="font-family: 'Fira Code', 'Cascadia Code', monospace; line-height: 1.5; resize: vertical;" oninput="updateCharCount()"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-30 d-flex justify-content-between">
+                    <span class="text-xs text-muted">A regra <code>[PAUSAR_ATENDIMENTO]</code> é preservada automaticamente.</span>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary text-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success d-inline-flex align-items-center gap-2 text-sm">
+                            <i class="fa-solid fa-floppy-disk"></i> Salvar e Reindexar RAG
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function handleFileSelected(input) {
+    const file = input.files[0];
+    const submitBtn = document.getElementById('submit-upload-btn');
+    const label = document.getElementById('file-label');
+    
+    if (file) {
+        label.innerHTML = `<strong>Arquivo selecionado:</strong> <span class="text-info">${file.name}</span> (${(file.size / 1024).toFixed(1)} KB)`;
+        submitBtn.removeAttribute('disabled');
+    } else {
+        label.innerText = 'Clique para selecionar ou arraste o arquivo .md aqui';
+        submitBtn.setAttribute('disabled', 'disabled');
+    }
+}
+
+// Drag & drop handlers
+const dropzone = document.getElementById('dropzone');
+['dragenter', 'dragover'].forEach(eventName => {
+    dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+    }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+    }, false);
+});
+
+dropzone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files.length) {
+        const fileInput = document.getElementById('file-input');
+        fileInput.files = files;
+        handleFileSelected(fileInput);
+    }
+});
+
+function updateCharCount() {
+    const val = document.getElementById('modalContentMd').value || '';
+    document.getElementById('charCount').innerText = `${val.length.toLocaleString()} caracteres`;
+}
+
+function openPreviewModal(guideId) {
+    fetch(`/admin/api/behavior-guides/${guideId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                document.getElementById('modalGuideTitle').innerText = data.name;
+                document.getElementById('modalGuideMeta').innerText = `Nicho: ${data.niche} • Versão: ${data.version} • Persona: ${data.persona_name || 'Sofia'}`;
+                document.getElementById('modalContentMd').value = data.content_md || '';
+                document.getElementById('guideEditForm').action = `/admin/behavior-guides/${data.id}/edit`;
+                updateCharCount();
+
+                const modal = new bootstrap.Modal(document.getElementById('guideEditModal'));
+                modal.show();
+            } else {
+                alert('Erro ao carregar dados do guia.');
+            }
+        })
+        .catch(err => {
+            alert('Falha ao comunicar com o servidor.');
+        });
+}
+</script>
+{% endblock %}

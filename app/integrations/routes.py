@@ -1,6 +1,6 @@
 import csv
 import io
-from flask import render_template, request, jsonify, flash, redirect, url_for, Response
+from flask import render_template, request, jsonify, flash, redirect, url_for, Response, session
 from flask_login import login_required, current_user
 from app import db
 from app.models import Client, ExternalEntityMap, IntegrationLog, BlingProductCache, BlingSalesCache
@@ -311,17 +311,21 @@ def toggle_integration(provider):
     return jsonify(res)
 
 @bp.route('/<provider>/config', methods=['POST'])
+@bp.route('/save-config', methods=['POST'], endpoint='save_integration_config')
 @login_required
-def update_config(provider):
+def update_config(provider=None):
     """Atualiza as credenciais de um integrador."""
     if current_user.role not in ['admin', 'gerente']:
         return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
 
-    data = request.get_json() or request.form.to_dict()
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    if not provider:
+        provider = data.get('provider', 'bling')
     res = IntegrationManager.update_config(provider, data)
     return jsonify(res)
 
 @bp.route('/<provider>/test', methods=['POST'])
+@bp.route('/test/<provider>', methods=['POST'])
 @login_required
 def test_connection(provider):
     """Testa a conexão com o servidor externo do integrador."""
@@ -330,21 +334,23 @@ def test_connection(provider):
 
     adapter = IntegrationManager.get_adapter(provider)
     if not adapter:
-        return jsonify({'success': False, 'message': f'Provedor {provider} não encontrado.'}), 4404
+        return jsonify({'success': False, 'message': f'Provedor {provider} não encontrado.'}), 404
 
     res = adapter.test_connection()
     return jsonify(res)
 
 @bp.route('/<provider>/sync-clients', methods=['POST'])
+@bp.route('/<provider>/sync/clients', methods=['POST'])
+@bp.route('/bling/sync/clients', methods=['POST'])
 @login_required
-def sync_clients(provider):
+def sync_clients(provider='bling'):
     """Executa a sincronização de clientes (inbound ou outbound)."""
     if current_user.role not in ['admin', 'gerente']:
         return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
 
-    data = request.get_json() or {}
-    direction = data.get('direction', 'inbound')
-    limit = data.get('limit', None)
+    data = request.get_json(silent=True) or {}
+    direction = (data.get('direction') if isinstance(data, dict) else None) or request.args.get('direction', 'inbound')
+    limit = (data.get('limit') if isinstance(data, dict) else None) or request.args.get('limit', None)
 
     adapter = IntegrationManager.get_adapter(provider)
     if not adapter:
@@ -361,8 +367,10 @@ def sync_clients(provider):
     return jsonify(res)
 
 @bp.route('/<provider>/sync-sales', methods=['POST'])
+@bp.route('/<provider>/sync/sales', methods=['POST'])
+@bp.route('/bling/sync/sales', methods=['POST'])
 @login_required
-def sync_sales(provider):
+def sync_sales(provider='bling'):
     """Busca vendas do ERP e atualiza o cache local."""
     if current_user.role not in ['admin', 'gerente']:
         return jsonify({'success': False, 'message': 'Acesso negado.'}), 403
@@ -447,6 +455,32 @@ def sync_single_client(client_id):
     res = adapter.sync_clients_outbound(client_id=client.id)
     return jsonify(res)
 
+@bp.route('/bling/authorize', methods=['GET'])
+@login_required
+def bling_oauth_authorize():
+    """Inicia o fluxo de autorização OAuth 2.0 redirecionando o usuário para o Bling ERP."""
+    if current_user.role not in ['admin', 'gerente']:
+        flash('Acesso negado.')
+        return redirect(url_for('integrations.bling_tools'))
+
+    adapter = IntegrationManager.get_adapter('bling')
+    if not adapter:
+        flash('Adaptador do Bling não encontrado.')
+        return redirect(url_for('integrations.bling_tools'))
+
+    config = adapter.get_config()
+    if not config or not config.client_id:
+        flash('Por favor, cadastre e salve o Client ID do aplicativo Bling antes de autorizar.')
+        return redirect(url_for('integrations.bling_tools'))
+
+    import secrets
+    state = secrets.token_hex(16)
+    session['bling_oauth_state'] = state
+
+    # URL oficial de autorização OAuth 2.0 da API v3 do Bling
+    auth_url = f"https://www.bling.com.br/Api/v3/oauth/authorize?response_type=code&client_id={config.client_id}&state={state}"
+    return redirect(auth_url)
+
 @bp.route('/bling/callback', methods=['GET'])
 @login_required
 def bling_oauth_callback():
@@ -456,7 +490,7 @@ def bling_oauth_callback():
 
     if error:
         flash(f'Erro na autorização do Bling ERP: {error}')
-        return redirect(url_for('integrations.admin_integrations'))
+        return redirect(url_for('integrations.bling_tools'))
 
     if code:
         adapter = IntegrationManager.get_adapter('bling')
@@ -491,7 +525,7 @@ def bling_oauth_callback():
                 db.session.commit()
                 flash('Código OAuth2 recebido com sucesso!')
 
-    return redirect(url_for('integrations.admin_integrations'))
+    return redirect(url_for('integrations.bling_tools'))
 
 @bp.route('/bling/webhook', methods=['POST'])
 def bling_webhook_receiver():
@@ -545,6 +579,7 @@ def bling_reports():
     )
 
 @bp.route('/bling/sync-products', methods=['POST'])
+@bp.route('/bling/sync/products', methods=['POST'])
 @login_required
 def sync_products():
     """Busca a lista de produtos e estoque do Bling ERP e atualiza o cache local."""

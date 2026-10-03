@@ -8,14 +8,13 @@ from app.tasks.bulk_engine import (
     is_master_switch_enabled, set_master_switch,
     start_campaign_engine, pause_campaign_engine, cancel_campaign_engine
 )
+from config import TestConfig
 from app.crm.routes import build_client_filter_query
 
 
 class TestBulkEngine(unittest.TestCase):
     def setUp(self):
-        self.app = create_app()
-        self.app.config['TESTING'] = True
-        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        self.app = create_app(TestConfig)
         self.client = self.app.test_client()
 
         self.app_context = self.app.app_context()

@@ -4,6 +4,21 @@ import requests
 from google import genai
 from app.models import Setting
 
+DEFAULT_BOT_SYSTEM_PROMPT = (
+    "Você é atendente oficial de WhatsApp da empresa {company_name}.\n"
+    "Sua função é fornecer respostas padronizadas, curtas e estritamente objetivas (máximo de 1 a 2 frases diretas no estilo WhatsApp comercial).\n"
+    "Responda dúvidas comerciais e operacionais com base exclusivamente nas informações oficiais da empresa.\n\n"
+    "DIRETRIZES DE RESPOSTA OBRIGATÓRIAS:\n"
+    "1. RESPOSTAS CURTAS E OBJETIVAS: Seja conciso (máximo 1 a 2 frases). Vá direto ao ponto sem enrolação, sem introduções vazias ('Olá! Como posso ajudar?', 'Com certeza!') e sem despedidas prolixas.\n"
+    "2. POSTURA PROFISSIONAL: NUNCA aja como assistente genérico de IA, robô ou ChatGPT. NUNCA cite termos técnicos internos como 'TensorFlow', 'Diretiva', 'Neural', 'RAG', 'Score' ou 'Prompt'.\n"
+    "3. BASE DA VERDADE: Se a resposta estiver nas informações oficiais, responda com precisão cirúrgica. É proibido inventar regras, planos ou preços.\n\n"
+    "REGRA CRÍTICA DE FALTA DE CONTEXTO E PAUSA:\n"
+    "Se você NÃO entender com precisão o contexto da mensagem, se a mensagem for ambígua, sem sentido, confusa ou fora das informações oficiais da empresa:\n"
+    "É ESTRITAMENTE PROIBIDO inventar ou responder genericamente como IA.\n"
+    "Você DEVE OBRIGATORIAMENTE pausar o atendimento iniciando sua resposta com [PAUSAR_ATENDIMENTO] seguido exatamente de:\n"
+    "'[PAUSAR_ATENDIMENTO] Não consegui compreender o contexto da sua mensagem. Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes.'"
+)
+
 class AIHandler:
     @staticmethod
     def clean_text(text):
@@ -15,6 +30,47 @@ class AIHandler:
         if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
             text = text[1:-1].strip()
         return text
+
+    @staticmethod
+    def clean_pause_tags(text):
+        """Remove tags de controle como [PAUSAR_ATENDIMENTO] do texto final exibido ao cliente."""
+        if not text:
+            return ""
+        cleaned = re.sub(r'\[(PAUSAR_ATENDIMENTO|PAUSA_HUMANA|TRANSBORDO_HUMANO|SEM_CONTEXTO)\]', '', text, flags=re.IGNORECASE).strip()
+        return cleaned
+
+    @staticmethod
+    def is_context_pause(text):
+        """Detecta se a IA solicitou pausa de atendimento por falta de contexto ou necessidade de intervenção humana."""
+        if not text:
+            return False
+        lower = text.lower().strip()
+        pause_patterns = [
+            r"\[pausar_atendimento\]",
+            r"\[pausa_humana\]",
+            r"\[transbordo_humano\]",
+            r"\[sem_contexto\]",
+            r"n[aã]o consegui compreender o contexto",
+            r"n[aã]o compreendi o contexto",
+            r"n[aã]o entendi o contexto",
+            r"falta de contexto",
+            r"aguardando interven[çc][aã]o humana",
+            r"pausando as respostas autom[aá]ticas",
+            r"pausando o atendimento",
+            r"pausar o atendimento",
+            r"vou pausar o atendimento",
+            r"transferindo para um especialista humano",
+            r"passando para atendimento humano",
+            r"direcionando para nossa equipe humana",
+            r"parece que houve um mal-entendido",
+            r"n[aã]o t[eê]m nenhuma rela[çc][aã]o",
+            r"n[aã]o tenho informa[çc][oõ]es sobre",
+            r"n[aã]o posso ajudar com isso"
+        ]
+        for pat in pause_patterns:
+            if re.search(pat, lower):
+                return True
+        return False
 
     @staticmethod
     def is_refusal(text):
@@ -95,6 +151,9 @@ class AIHandler:
             'bot_persona_name': config.get('whatsapp_bot_persona_name', 'Sofia'),
             'bot_company_name': config.get('whatsapp_bot_company_name', 'CRM Pro'),
             'bot_system_prompt': config.get('whatsapp_bot_system_prompt', ''),
+            'bot_context_pause_msg': config.get('whatsapp_bot_context_pause_msg', 
+                'Não consegui compreender o contexto da sua mensagem. Pausei o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes.'
+            ),
             'bot_temperature': temp_val,
             'bot_max_tokens': tokens_val,
             'rag_enabled': rag_on,
@@ -231,10 +290,10 @@ class AIHandler:
             return text, f"Erro na IA ({cfg['provider']}): {error_msg[:100]}"
 
     @staticmethod
-    def generate_chat_reply(customer_message, chat_history=None, client_info=None, include_rag=True):
+    def generate_chat_reply(customer_message, chat_history=None, client_info=None, include_rag=True, instance_id=None):
         """
         Gera respostas inteligentes e contextualizadas para o WhatsApp utilizando:
-        1. Diretrizes comportamentais e persona configuradas no sistema;
+        1. Diretrizes comportamentais e persona configuradas no sistema (BehaviorGuide);
         2. Base de Conhecimento RAG (busca semântica de regras, preços, catálogos e FAQs);
         3. Histórico conversacional multi-turno;
         4. Dados cadastrais do cliente no CRM.
@@ -246,18 +305,50 @@ class AIHandler:
         persona_name = cfg['bot_persona_name'] or "Sofia"
         company_name = cfg['bot_company_name'] or "nossa empresa"
 
-        # Prompt base ou personalizado pelo usuário
-        if cfg['bot_system_prompt'] and cfg['bot_system_prompt'].strip():
-            base_prompt = cfg['bot_system_prompt'].strip()
+        # Resolução do Guia de Comportamento ativo (hierarquia: Instância WAHA -> Padrão Global -> Configurações)
+        active_guide = None
+        try:
+            from app.utils.behavior_parser import BehaviorParser
+            active_guide = BehaviorParser.get_guide_for_context(instance_id=instance_id)
+        except Exception as e:
+            print(f"[AIHandler] Erro ao recuperar guia de comportamento: {e}")
+
+        # Prompt base ou personalizado pelo usuário com atualização de padrões legados
+        old_defaults = [
+            "Você é um assistente comercial educado, atencioso e prestativo",
+            "1 a 3 parágrafos curtos",
+            "assistente virtual de atendimento da empresa"
+        ]
+        
+        if active_guide and active_guide.system_prompt:
+            base_prompt = active_guide.system_prompt
+            if active_guide.persona_name:
+                persona_name = active_guide.persona_name
+            if active_guide.company_name:
+                company_name = active_guide.company_name
         else:
-            base_prompt = (
-                f"Você é a {persona_name}, assistente virtual de atendimento da empresa {company_name} no WhatsApp. "
-                "Responda de forma clara, natural, profissional e amigável em português do Brasil. "
-                "Mantenha respostas concisas e legíveis em tela de celular (1 a 3 parágrafos curtos). "
-                "Seu objetivo é sanar dúvidas sobre nossos serviços e qualificar o contato para um consultor especialista."
-            )
+            user_prompt = (cfg['bot_system_prompt'] or "").strip()
+            if user_prompt and not any(old in user_prompt for old in old_defaults):
+                base_prompt = user_prompt
+            else:
+                base_prompt = DEFAULT_BOT_SYSTEM_PROMPT.format(company_name=company_name)
+
+        # Diretrizes inegociáveis de padronização, concisão e controle de contexto para WhatsApp
+        mandatory_rules = (
+            "\n[DIRETRIZES FUNDAMENTAIS DE ATENDIMENTO WHATSAPP]:\n"
+            "1. RESPOSTAS CURTAS E DIRETAS: Máximo de 1 a 2 frases diretas, padronizadas e profissionais. "
+            "Nunca faça introduções vazias ('Olá! Como posso te ajudar?', 'Com certeza!') ou respostas longas com vários parágrafos.\n"
+            "2. POSTURA PROFISSIONAL: NUNCA aja como IA, robô ou ChatGPT. NUNCA cite termos técnicos internos como 'TensorFlow', 'Diretiva', 'RAG' ou 'Inteligência Artificial'.\n"
+            "3. REGRA CRÍTICA DE FALTA DE CONTEXTO E PAUSA:\n"
+            "Se você NÃO entender com precisão o que o cliente quis dizer, se a mensagem for ambígua, sem sentido, vaga, fora de contexto ou não respondida nas informações oficiais:\n"
+            "NUNCA tente adivinhar, inventar ou responder genericamente.\n"
+            "Você DEVE obrigatoriamente pausar o atendimento iniciando sua resposta com a tag [PAUSAR_ATENDIMENTO] seguida de:\n"
+            "'[PAUSAR_ATENDIMENTO] Não consegui compreender o contexto da sua mensagem. Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes.'"
+        )
 
         prompt_sections = [base_prompt]
+        if "[PAUSAR_ATENDIMENTO]" not in base_prompt:
+            prompt_sections.append(mandatory_rules)
 
         # 1. Recuperação Semântica via RAG com Expansão de Consulta do Lead (Query Augmentation)
         rag_context = ""
@@ -293,22 +384,21 @@ class AIHandler:
                             "================================================================================\n"
                             f"{skills_text}\n"
                             "================================================================================\n"
-                            "DIRETIVA DE POSTURA: Você DEVE aplicar rigorosamente a postura, tom de voz, escuta ativa e "
-                            "técnicas de contorno de objeções/fechamento especificadas nos SKILLS prioritários acima."
+                            "DIRETIVA DE POSTURA: Aplique a postura e técnicas acima mantendo sempre respostas curtas e objetivas."
                         )
 
                     # Block 2: Informações Oficiais e FAQs do Negócio
                     if official_text:
                         prompt_sections.append(
                             "\n================================================================================\n"
-                            "📚 INFORMAÇÕES OFICIAIS DO NEGÓCIO & FAQS ACUMULADOS (FONTE DA VERDADE)\n"
+                            "📚 INFORMAÇÕES OFICIAIS DO NEGÓCIO & REGRAS (FONTE DA VERDADE)\n"
                             "================================================================================\n"
                             f"{official_text}\n"
                             "================================================================================\n"
-                            "REGRAS DE OURO OBRIGATÓRIAS (FORÇAMENTO COGNITIVO DO RAG):\n"
-                            "1. As informações acima são a FONTE DA VERDADE ABSOLUTA sobre os serviços, planos e preços.\n"
-                            "2. É ESTRITAMENTE PROIBIDO inventar, deduzir ou especular qualquer regra ou preço inexistente.\n"
-                            "3. Se a dúvida do lead estiver respondida nos documentos, responda com precisão cirúrgica e concisão para WhatsApp."
+                            "REGRAS DE RESPOSTA OBRIGATÓRIAS:\n"
+                            "1. As informações acima são a ÚNICA fonte de fatos sobre planos, preços e regras da empresa.\n"
+                            "2. Se a dúvida estiver respondida acima: responda diretamente com 1 ou 2 frases curtas e objetivas.\n"
+                            "3. Se a informação NÃO constar acima ou a dúvida for alheia: emita [PAUSAR_ATENDIMENTO] para transbordo humano."
                         )
             except Exception as e:
                 print(f"[AIHandler] Aviso ao recuperar contexto RAG: {e}")
@@ -333,14 +423,14 @@ class AIHandler:
             prompt_sections.append(
                 "\n--- CONTEXTO DO CLIENTE NO CRM ---\n"
                 + "\n".join(f"- {line}" for line in context_lines)
-                + "\nUse essas informações para personalizar o atendimento com empatia e naturalidade."
+                + "\nUse essas informações para personalizar o atendimento de forma direta e natural."
             )
 
         # 3. Qualificação Cadastral Ativa (Preenchimento progressivo de dados faltantes)
         if client_info and isinstance(client_info, dict) and client_info.get('qualification_prompt'):
             prompt_sections.append(str(client_info['qualification_prompt']).strip())
 
-        # 4. Injeção de Inteligência Preditiva TensorFlow (Humor, Score, Termos Relevantes)
+        # 4. Injeção de Perfil Preditivo de Atendimento (Humor, Score, Termos Relevantes)
         if client_info and isinstance(client_info, dict) and client_info.get('client_obj'):
             try:
                 from app.utils.tf_engine import TensorFlowEngine
@@ -349,19 +439,14 @@ class AIHandler:
                     tf_profile = TensorFlowEngine.get_client_intelligence_profile(client_info['client_obj'])
                     if tf_profile and tf_profile.get('ai_directive'):
                         prompt_sections.append(
-                            "\n================================================================================\n"
-                            "🧠 INTELIGÊNCIA PREDITIVA TENSORFLOW (HUMOR, PERFIL NEURAL & TERMOS DO CLIENTE)\n"
-                            "================================================================================\n"
+                            "\n[ORIENTAÇÃO INTERNA DE ATENDIMENTO - CONFIDENCIAL]\n"
                             f"{tf_profile['ai_directive']}\n"
-                            "================================================================================\n"
-                            "DIRETIVA: Adapte rigorosamente o TOM e a POSTURA da resposta conforme o humor e "
-                            "a qualificação neural do cliente acima. Use os termos relevantes para contextualizar "
-                            "a conversa sem parecer artificial."
+                            "(Nota: calibre o tom conforme o perfil acima sem citar termos técnicos ao cliente)"
                         )
             except Exception as e:
                 print(f"[AIHandler] Aviso TensorFlow inject: {e}")
 
-        # 5. Injeção de Orientação Neural TensorFlow sobre a Mensagem Atual (Intenção & Tática)
+        # 5. Injeção de Orientação Tática sobre a Mensagem Atual (Intenção & Postura)
         try:
             from app.utils.tf_engine import TensorFlowEngine
             query_guidance = TensorFlowEngine.get_rag_guidance_for_query(customer_message)
@@ -403,9 +488,15 @@ class AIHandler:
                 if resp.status_code == 200:
                     content = resp.json().get("message", {}).get("content", "")
                     cleaned = AIHandler.clean_text(content)
-                    if cleaned and not AIHandler.is_refusal(cleaned):
+                    if cleaned:
+                        if AIHandler.is_refusal(cleaned):
+                            pause_msg = cfg.get('bot_context_pause_msg') or (
+                                "Não consegui compreender o contexto da sua mensagem. "
+                                "Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes."
+                            )
+                            return f"[PAUSAR_ATENDIMENTO] {pause_msg}", None
                         return cleaned, None
-                return "Olá! Recebemos sua mensagem e já vamos te responder.", f"Ollama retorno vazio ou recusa ({resp.status_code})"
+                return "Olá! Recebemos sua mensagem e já vamos te responder.", f"Ollama retorno vazio ou erro ({resp.status_code})"
 
             # Provedor 2: DEEPSEEK (Cloud API)
             elif cfg['provider'] == 'deepseek':
@@ -420,7 +511,13 @@ class AIHandler:
                     choices = resp.json().get("choices", [])
                     if choices and choices[0].get("message"):
                         cleaned = AIHandler.clean_text(choices[0]["message"]["content"])
-                        if cleaned and not AIHandler.is_refusal(cleaned):
+                        if cleaned:
+                            if AIHandler.is_refusal(cleaned):
+                                pause_msg = cfg.get('bot_context_pause_msg') or (
+                                    "Não consegui compreender o contexto da sua mensagem. "
+                                    "Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes."
+                                )
+                                return f"[PAUSAR_ATENDIMENTO] {pause_msg}", None
                             return cleaned, None
                 return "Olá! Recebemos sua mensagem.", f"DeepSeek Status: {resp.status_code}"
 
@@ -442,7 +539,13 @@ class AIHandler:
                 )
                 if response and response.text:
                     cleaned = AIHandler.clean_text(response.text)
-                    if cleaned and not AIHandler.is_refusal(cleaned):
+                    if cleaned:
+                        if AIHandler.is_refusal(cleaned):
+                            pause_msg = cfg.get('bot_context_pause_msg') or (
+                                "Não consegui compreender o contexto da sua mensagem. "
+                                "Vou pausar o atendimento automático para que nossa equipe humana dê continuidade por aqui em instantes."
+                            )
+                            return f"[PAUSAR_ATENDIMENTO] {pause_msg}", None
                         return cleaned, None
                 return "Olá! Recebemos sua mensagem.", "Resposta vazia ou recusada pelo Gemini"
 
@@ -451,9 +554,9 @@ class AIHandler:
             return "Olá! Recebemos sua mensagem e um de nossos atendentes entrará em contato em instantes.", str(e)
 
     @staticmethod
-    def generate_reply(customer_message):
+    def generate_reply(customer_message, instance_id=None):
         """Wrapper de compatibilidade para chamadas legadas de resposta simples."""
-        return AIHandler.generate_chat_reply(customer_message)
+        return AIHandler.generate_chat_reply(customer_message, instance_id=instance_id)
 
 
     @staticmethod

@@ -140,6 +140,12 @@
                         <span class="nav-text">Fluxo IA do Bot</span>
                     </a>
                 </li>
+                <li>
+                    <a href="{{ url_for('admin.behavior_guides_panel') }}" class="nav-link {{ 'active' if 'behavior_guides' in request.endpoint }}" data-tooltip="Guias .md">
+                        <i class="fa-solid fa-book-bookmark nav-icon text-primary"></i>
+                        <span class="nav-text">Guias de Comportamento (.md)</span>
+                    </a>
+                </li>
                 {% endif %}
                 {% if is_module_enabled('tf_engine') %}
                 <li>

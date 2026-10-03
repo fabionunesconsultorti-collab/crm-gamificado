@@ -148,8 +148,20 @@ class Client(db.Model):
     google_rating = db.Column(db.Float, default=0.0)
     google_reviews_count = db.Column(db.Integer, default=0)
 
+    # 6. Modo de Atendimento (Robô IA vs Atendimento Humano)
+    bot_enabled = db.Column(db.Boolean, default=True, index=True)
+
     assigned_user = db.relationship('User', foreign_keys=[assigned_to], backref='assigned_clients')
     referred_by = db.relationship('User', foreign_keys=[referred_by_id], backref='referrals')
+
+    @property
+    def is_human_service(self):
+        """Retorna True se o lead estiver marcado para atendimento humano exclusivo."""
+        return not bool(self.bot_enabled)
+
+    @property
+    def service_mode_label(self):
+        return "Robô" if self.bot_enabled else "Humano"
 
     @property
     def display_segment(self):
@@ -278,6 +290,62 @@ class MessageTemplate(db.Model):
     def __repr__(self):
         return f'<MessageTemplate {self.name}>'
 
+
+class BehaviorGuide(db.Model):
+    """
+    Guia de Comportamento e Playbook de Atendimento (.md).
+    Permite configurar, trocar e instanciar personas, diretrizes e regras por nicho/instância.
+    """
+    __tablename__ = 'behavior_guide'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    slug = db.Column(db.String(128), unique=True, index=True, nullable=False)
+    niche = db.Column(db.String(128))
+    version = db.Column(db.String(32), default='1.0.0')
+    target_audience = db.Column(db.String(256))
+    communication_style = db.Column(db.String(256))
+    persona_name = db.Column(db.String(64), nullable=True)
+    company_name = db.Column(db.String(128), nullable=True)
+    system_prompt = db.Column(db.Text, nullable=False)
+    content_md = db.Column(db.Text, nullable=False)
+    metadata_json = db.Column(db.Text, default='{}')
+    is_active = db.Column(db.Boolean, default=False, index=True)
+    is_builtin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_metadata(self):
+        try:
+            import json
+            return json.loads(self.metadata_json or '{}')
+        except Exception:
+            return {}
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'niche': self.niche,
+            'version': self.version,
+            'target_audience': self.target_audience,
+            'communication_style': self.communication_style,
+            'persona_name': self.persona_name,
+            'company_name': self.company_name,
+            'system_prompt': self.system_prompt,
+            'content_md': self.content_md,
+            'metadata': self.get_metadata(),
+            'is_active': self.is_active,
+            'is_builtin': self.is_builtin,
+            'created_at': self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else '',
+            'updated_at': self.updated_at.strftime('%d/%m/%Y %H:%M') if self.updated_at else ''
+        }
+
+    def __repr__(self):
+        return f'<BehaviorGuide {self.id}: {self.name} [{self.slug}]>'
+
+
 class WahaInstance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128)) # Friendly name e.g. "Server 1" or "Atendimento"
@@ -286,6 +354,10 @@ class WahaInstance(db.Model):
     session_name = db.Column(db.String(128), default='default')
     is_default = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(64), default='disconnected')
+
+    # Vínculo com Guia de Comportamento dedicado (opcional; se nulo, usa o guia ativo global)
+    behavior_guide_id = db.Column(db.Integer, db.ForeignKey('behavior_guide.id'), nullable=True)
+    behavior_guide = db.relationship('BehaviorGuide', backref=db.backref('waha_instances', lazy='dynamic'))
 
     # Anti-ban e Rate Limiting
     enable_anti_ban = db.Column(db.Boolean, default=True)

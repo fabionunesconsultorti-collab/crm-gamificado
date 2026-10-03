@@ -55,6 +55,12 @@ def check_and_run_scheduled_backup(app):
                 logger.debug(f"[Backup Scheduler] Tabelas ainda não inicializadas no banco: {e}")
             else:
                 logger.error(f"[Backup Scheduler] Erro durante verificação de backup: {e}", exc_info=True)
+        finally:
+            try:
+                from app import db
+                db.session.remove()
+            except Exception:
+                pass
 
 
 def _scheduler_loop(app):
